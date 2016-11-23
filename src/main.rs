@@ -1,11 +1,11 @@
-struct sixteen_bit_reg {
+struct Reg16 {
     high: u8,
     low: u8
 }
 
-impl sixteen_bit_reg {
-    fn new() -> sixteen_bit_reg {
-        sixteen_bit_reg {
+impl Reg16 {
+    fn new() -> Reg16 {
+        Reg16 {
             high: 0,
             low: 0
         }
@@ -51,32 +51,32 @@ impl sixteen_bit_reg {
 
 }
 
-struct CPU {
-    reg_af: sixteen_bit_reg,
-    reg_bc: sixteen_bit_reg,
-    reg_de: sixteen_bit_reg,
-    reg_hl: sixteen_bit_reg,
-    reg_sp: sixteen_bit_reg,
-    reg_pc: sixteen_bit_reg
+struct Cpu {
+    reg_af: Reg16,
+    reg_bc: Reg16,
+    reg_de: Reg16,
+    reg_hl: Reg16,
+    reg_sp: Reg16,
+    reg_pc: Reg16
 }
 
-impl CPU {
-    fn new() -> CPU {
-        CPU {
-            reg_af: sixteen_bit_reg::new(),
-            reg_bc: sixteen_bit_reg::new(),
-            reg_de: sixteen_bit_reg::new(),
-            reg_hl: sixteen_bit_reg::new(),
-            reg_sp: sixteen_bit_reg::new(),
-            reg_pc: sixteen_bit_reg::new()
+impl Cpu {
+    fn new() -> Cpu {
+        Cpu {
+            reg_af: Reg16::new(),
+            reg_bc: Reg16::new(),
+            reg_de: Reg16::new(),
+            reg_hl: Reg16::new(),
+            reg_sp: Reg16::new(),
+            reg_pc: Reg16::new()
         }
     }
 }
 
 fn main() {
-    let mut cpu = CPU::new();
+    let mut cpu = Cpu::new();
 
-    let mut test_reg = sixteen_bit_reg::new();
+    let mut test_reg = Reg16::new();
     test_reg.set(60000);
     println!("Value in test reg: {}", test_reg.get());
     test_reg.inc();
