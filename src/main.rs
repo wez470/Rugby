@@ -1,55 +1,5 @@
-struct Reg16 {
-    high: u8,
-    low: u8
-}
-
-impl Reg16 {
-    fn new() -> Reg16 {
-        Reg16 {
-            high: 0,
-            low: 0
-        }
-    }
-
-    fn set_low(&mut self, val: u8) {
-        self.low = val;
-    }
-
-    fn get_low(&self) -> u8 {
-        self.low
-    }
-
-    fn inc_low(&mut self) {
-        self.low += 1;
-    }
-
-    fn set_high(&mut self, val: u8) {
-        self.high = val;
-    }
-
-    fn get_high(&self) -> u8 {
-        self.high
-    }
-
-    fn inc_high(&mut self) {
-        self.high += 1;
-    }
-
-    fn set(&mut self, val: u16) {
-        self.low = (val & 0xFF) as u8;
-        self.high = ((val >> 8) & 0xFF) as u8;
-    }
-
-    fn get(&self) -> u16 {
-        ((self.high as u16) << 8) | (self.low as u16)
-    }
-
-    fn inc(&mut self) {
-        let val: u16 = self.get();
-        self.set(val + 1);
-    }
-
-}
+mod reg_16;
+use reg_16::Reg16;
 
 struct Cpu {
     reg_af: Reg16,
