@@ -1,19 +1,19 @@
 use reg_16::Reg16;
 use memory::Memory;
 
-pub struct Cpu<'a> {
+pub struct Cpu {
     reg_af: Reg16,
     reg_bc: Reg16,
     reg_de: Reg16,
     reg_hl: Reg16,
     reg_sp: Reg16,
     reg_pc: Reg16,
-    memory: &'a mut Memory,
+    memory: Memory,
     rom: Box<[u8]>,
 }
 
-impl<'a> Cpu<'a> {
-    pub fn new(rom: Box<[u8]>, mem: &mut Memory) -> Cpu {
+impl Cpu {
+    pub fn new(rom: Box<[u8]>, mem: Memory) -> Cpu {
         let mut cpu = Cpu {
             reg_af: Reg16::new(),
             reg_bc: Reg16::new(),
