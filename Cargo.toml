@@ -1,6 +1,7 @@
 [package]
-name = "GameboyEmulator"
-version = "0.1.0"
 authors = ["Weston Carlson <wez470@gmail.com>"]
+name = "rustboy"
+version = "0.1.0"
 
 [dependencies]
+clap = "2.19.0"
