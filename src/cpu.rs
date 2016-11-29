@@ -254,7 +254,14 @@ impl Cpu {
             0xC0 => { println!("TODO: {:02X}", opcode); 0 }
             0xC1 => { println!("TODO: {:02X}", opcode); 0 }
             0xC2 => { println!("TODO: {:02X}", opcode); 0 }
-            0xC3 => { println!("TODO: {:02X}", opcode); 0 }
+            0xC3 => {
+                //jp
+                let low = self.rom[(self.reg_pc.get() + 1) as usize];
+                let high = self.rom[(self.reg_pc.get() + 2) as usize];
+                self.reg_pc.low = low;
+                self.reg_pc.high = high;
+                16
+            }
             0xC4 => { println!("TODO: {:02X}", opcode); 0 }
             0xC5 => { println!("TODO: {:02X}", opcode); 0 }
             0xC6 => { println!("TODO: {:02X}", opcode); 0 }
