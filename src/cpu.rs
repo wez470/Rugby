@@ -43,11 +43,7 @@ impl Cpu {
         println!("{:02X}", opcode);
 
         let cycles = match opcode {
-            0x00 => {
-                //nop
-                self.reg_pc.inc();
-                0
-            },
+            0x00 => self.nop(),
             0x01 => { println!("TODO: {:02X}", opcode); 0 }
             0x02 => { println!("TODO: {:02X}", opcode); 0 }
             0x03 => { println!("TODO: {:02X}", opcode); 0 }
@@ -254,14 +250,7 @@ impl Cpu {
             0xC0 => { println!("TODO: {:02X}", opcode); 0 }
             0xC1 => { println!("TODO: {:02X}", opcode); 0 }
             0xC2 => { println!("TODO: {:02X}", opcode); 0 }
-            0xC3 => {
-                //jp
-                let low = self.rom[(self.reg_pc.get() + 1) as usize];
-                let high = self.rom[(self.reg_pc.get() + 2) as usize];
-                self.reg_pc.low = low;
-                self.reg_pc.high = high;
-                16
-            }
+            0xC3 => self.jp(),
             0xC4 => { println!("TODO: {:02X}", opcode); 0 }
             0xC5 => { println!("TODO: {:02X}", opcode); 0 }
             0xC6 => { println!("TODO: {:02X}", opcode); 0 }
@@ -331,5 +320,50 @@ impl Cpu {
                 0
             }
         };
+    }
+
+    fn nop(&mut self) -> i32 {
+        self.reg_pc.inc();
+        4
+    }
+
+    fn jp(&mut self) -> i32 {
+        let low = self.rom[(self.reg_pc.get() + 1) as usize];
+        let high = self.rom[(self.reg_pc.get() + 2) as usize];
+        self.reg_pc.low = low;
+        self.reg_pc.high = high;
+        16
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use memory::Memory;
+
+    fn test_setup() -> Cpu {
+        let test_rom = Box::new([0x00, 0x01, 0xFF, 0xC3, 0x33, 0x6A]);
+        let test_mem = Memory::new();
+        let mut test_cpu = Cpu::new(test_rom, test_mem);
+        test_cpu.reg_pc.set(0);
+        test_cpu
+    }
+
+    #[test]
+    fn test_nop() {
+        let mut test_cpu = test_setup();
+        let pc_before = test_cpu.reg_pc.get();
+        let cycles = test_cpu.nop();
+        let pc_after = test_cpu.reg_pc.get();
+        assert!(cycles == 4);
+        assert!(pc_before + 1 == pc_after);
+    }
+
+    #[test]
+    fn test_jp() {
+        let mut test_cpu = test_setup();
+        let cycles = test_cpu.jp();
+        assert!(cycles == 16);
+        assert!(test_cpu.reg_pc.get() == 0xFF01);
     }
 }
