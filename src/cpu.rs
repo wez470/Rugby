@@ -312,7 +312,7 @@ impl Cpu {
             0xFB => { println!("TODO: {:02X}", opcode); 0 }
             0xFC => { println!("TODO: {:02X}", opcode); 0 }
             0xFD => { println!("TODO: {:02X}", opcode); 0 }
-            0xFE => cp(),
+            0xFE => self.cp(),
             0xFF => { println!("TODO: {:02X}", opcode); 0 }
 
             _ => {
@@ -336,51 +336,38 @@ impl Cpu {
     }
 
     fn cp(&mut self) -> i32 {
-        // Z 1 H C
-        // 2 8
-        // cp d8
         let a = self.reg_af.high;
-        let result = a - self.rom[(self.reg_pc.get() + 1) as usize];
-        // set zero if result == 0
-        // set subtract
-        //
+        let n = self.rom[(self.reg_pc.get() + 1) as usize];
+        self.set_zero_flag(a == n);
+        self.set_sub_flag(true);
+        self.set_carry_flag(a < n);
+        self.set_half_carry_flag(Cpu::get_sub_half_carry(a, n));
+        self.reg_pc.inc();
         8
     }
 
-    fn set_zero_flag(&mut self, bool: set) {
-        if set {
-            self.reg_af.low |= 128;
-        }
-        else {
-            self.reg_af.low &= 127;
-        }
+    fn get_add_half_carry(first: u8, second: u8) -> bool {
+       return ((first & 0xf) + (second & 0xf)) & 0x10 == 0x10;
     }
 
-    fn set_subtraction_flag(&mut self, bool: set) {
-        if set {
-            self.reg_af.low |= 64;
-        }
-        else {
-            self.reg_af.low &= 191;
-        }
+    fn get_sub_half_carry(first: u8, second: u8) -> bool {
+       return (first & 0xf) < (second & 0xf);
     }
 
-    fn set_half_carry_flag(&mut self, bool: set) {
-        if set {
-            self.reg_af.low |= 32;
-        }
-        else {
-            self.reg_af.low &= 223;
-        }
+   fn set_zero_flag(&mut self, set: bool) {
+        self.reg_af.set_bit_8(set);
     }
 
-    fn set_carry_flag(&must self, bool: set) {
-        if set {
-            self.reg_af.low |= 16;
-        }
-        else {
-            self.reg_af.low &= 239;
-        }
+    fn set_sub_flag(&mut self, set: bool) {
+        self.reg_af.set_bit_7(set);
+    }
+
+    fn set_half_carry_flag(&mut self, set: bool) {
+        self.reg_af.set_bit_6(set);
+    }
+
+    fn set_carry_flag(&mut self, set: bool) {
+        self.reg_af.set_bit_5(set);
     }
 }
 

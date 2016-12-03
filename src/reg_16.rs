@@ -24,6 +24,42 @@ impl Reg16 {
         let val: u16 = self.get();
         self.set(val + 1);
     }
+
+    pub fn set_bit_8(&mut self, set: bool) {
+        if set {
+            self.low |= 128;
+        }
+        else {
+            self.low &= 127;
+        }
+    }
+
+    pub fn set_bit_7(&mut self, set: bool) {
+        if set {
+            self.low |= 64;
+        }
+        else {
+            self.low &= 191;
+        }
+    }
+
+    pub fn set_bit_6(&mut self, set: bool) {
+        if set {
+            self.low |= 32;
+        }
+        else {
+            self.low &= 223;
+        }
+    }
+
+    pub fn set_bit_5(&mut self, set: bool) {
+        if set {
+            self.low |= 16;
+        }
+        else {
+            self.low &= 239;
+        }
+    }
 }
 
 #[test]
