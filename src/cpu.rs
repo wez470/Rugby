@@ -312,7 +312,7 @@ impl Cpu {
             0xFB => { println!("TODO: {:02X}", opcode); 0 }
             0xFC => { println!("TODO: {:02X}", opcode); 0 }
             0xFD => { println!("TODO: {:02X}", opcode); 0 }
-            0xFE => { println!("TODO: {:02X}", opcode); 0 }
+            0xFE => cp(),
             0xFF => { println!("TODO: {:02X}", opcode); 0 }
 
             _ => {
@@ -333,6 +333,54 @@ impl Cpu {
         self.reg_pc.low = low;
         self.reg_pc.high = high;
         16
+    }
+
+    fn cp(&mut self) -> i32 {
+        // Z 1 H C
+        // 2 8
+        // cp d8
+        let a = self.reg_af.high;
+        let result = a - self.rom[(self.reg_pc.get() + 1) as usize];
+        // set zero if result == 0
+        // set subtract
+        //
+        8
+    }
+
+    fn set_zero_flag(&mut self, bool: set) {
+        if set {
+            self.reg_af.low |= 128;
+        }
+        else {
+            self.reg_af.low &= 127;
+        }
+    }
+
+    fn set_subtraction_flag(&mut self, bool: set) {
+        if set {
+            self.reg_af.low |= 64;
+        }
+        else {
+            self.reg_af.low &= 191;
+        }
+    }
+
+    fn set_half_carry_flag(&mut self, bool: set) {
+        if set {
+            self.reg_af.low |= 32;
+        }
+        else {
+            self.reg_af.low &= 223;
+        }
+    }
+
+    fn set_carry_flag(&must self, bool: set) {
+        if set {
+            self.reg_af.low |= 16;
+        }
+        else {
+            self.reg_af.low &= 239;
+        }
     }
 }
 
