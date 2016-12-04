@@ -61,7 +61,7 @@ impl Cpu {
             0x0F => { println!("TODO: {:02X}", opcode); 0 }
 
             0x10 => { println!("TODO: {:02X}", opcode); 0 }
-            0x11 => { println!("TODO: {:02X}", opcode); 0 }
+            0x11 => self.ld_de(),
             0x12 => { println!("TODO: {:02X}", opcode); 0 }
             0x13 => { println!("TODO: {:02X}", opcode); 0 }
             0x14 => { println!("TODO: {:02X}", opcode); 0 }
@@ -325,6 +325,14 @@ impl Cpu {
     fn nop(&mut self) -> i32 {
         self.reg_pc.inc();
         4
+    }
+
+    fn ld_de(&mut self) -> i32 {
+        let low = self.rom[(self.reg_pc.get() + 1) as usize];
+        let high = self.rom[(self.reg_pc.get() + 2) as usize];
+        self.reg_de.low = low;
+        self.reg_de.high = high;
+        12
     }
 
     fn jp(&mut self) -> i32 {
