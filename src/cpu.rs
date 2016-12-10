@@ -1,6 +1,27 @@
 use reg_16::Reg16;
 use memory::Memory;
 
+const BASE_CYCLES: [i32; 0xFF] = [
+//    00, 01, 02, 03, 04, 05, 06, 07, 08, 09,  A,  B,  C,  D,  E,  F
+       4, 12,  8,  8,  4,  4,  8,  4, 20,  8,  8,  8,  4,  4,  8,  4                 // 00
+       4, 12,  8,  8,  4,  4,  8,  4, 12,  8,  8,  8,  4,  4,  8,  4                 // 01
+       8, 12,  8,  8,  4,  4,  8,  4,  8,  8,  8,  8,  4,  4,  8,  4                 // 02
+                      // 02
+                      // 03
+                      // 04
+                      // 05
+                      // 06
+                      // 07
+                      // 08
+                      // 09
+                      //  A
+                      //  B
+                      //  C
+                      //  D
+                      //  E
+                      //  F
+]
+
 pub struct Cpu {
     reg_af: Reg16,
     reg_bc: Reg16,
@@ -61,7 +82,7 @@ impl Cpu {
             0x0F => { println!("TODO: {:02X}", opcode); 0 }
 
             0x10 => { println!("TODO: {:02X}", opcode); 0 }
-            0x11 => self.ld_de(),
+            0x11 => unimplemented!(), // TODO: self.ld_16(&mut self.reg_de),
             0x12 => { println!("TODO: {:02X}", opcode); 0 }
             0x13 => { println!("TODO: {:02X}", opcode); 0 }
             0x14 => { println!("TODO: {:02X}", opcode); 0 }
@@ -326,12 +347,13 @@ impl Cpu {
         self.reg_pc.inc();
         4
     }
-
-    fn ld_de(&mut self) -> i32 {
+//let (low, high) = { let rom = &self.rom; (rom[lowidx], rom[highidx]) };
+//(&mut self, reg: RegEnum) -> &mut Reg16
+    fn ld_16(self, reg: &mut Reg16) -> i32 {
         let low = self.rom[(self.reg_pc.get() + 1) as usize];
         let high = self.rom[(self.reg_pc.get() + 2) as usize];
-        self.reg_de.low = low;
-        self.reg_de.high = high;
+        reg.low = low;
+        reg.high = high;
         12
     }
 
