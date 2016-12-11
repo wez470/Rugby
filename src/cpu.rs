@@ -348,9 +348,10 @@ impl Cpu {
         self.reg_pc.inc();
     }
 
-    fn ld_16(&self) -> Reg16 {
+    fn ld_16(&mut self) -> Reg16 {
         let low = self.rom[(self.reg_pc.get() + 1) as usize];
         let high = self.rom[(self.reg_pc.get() + 2) as usize];
+        self.reg_pc.inc();
         Reg16 { high: high, low: low }
     }
 
