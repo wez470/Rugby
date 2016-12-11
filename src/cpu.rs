@@ -1,7 +1,7 @@
 use reg_16::Reg16;
 use memory::Memory;
 
-const BASE_CYCLES: [i32; 0x100] = [
+pub const BASE_CYCLES: [i32; 0x100] = [
 //     0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
        4, 12,  8,  8,  4,  4,  8,  4, 20,  8,  8,  8,  4,  4,  8,  4, // 0
        4, 12,  8,  8,  4,  4,  8,  4, 12,  8,  8,  8,  4,  4,  8,  4, // 1
@@ -35,12 +35,12 @@ pub struct Cpu {
 impl Cpu {
     pub fn new(rom: Box<[u8]>, mem: Memory) -> Cpu {
         let mut cpu = Cpu {
-            reg_af: Default::default(),
-            reg_bc: Default::default(),
-            reg_de: Default::default(),
-            reg_hl: Default::default(),
-            reg_sp: Default::default(),
-            reg_pc: Default::default(),
+            reg_af: Reg16::default(),
+            reg_bc: Reg16::default(),
+            reg_de: Reg16::default(),
+            reg_hl: Reg16::default(),
+            reg_sp: Reg16::default(),
+            reg_pc: Reg16::default(),
             memory: mem,
             rom: rom,
         };
@@ -84,7 +84,7 @@ impl Cpu {
             0x0F => { println!("TODO: {:02X}", opcode) }
 
             0x10 => { println!("TODO: {:02X}", opcode) }
-            0x11 => unimplemented!(), // TODO: self.ld_16(&mut self.reg_de),
+            0x11 => self.reg_de = self.ld_16(),
             0x12 => { println!("TODO: {:02X}", opcode) }
             0x13 => { println!("TODO: {:02X}", opcode) }
             0x14 => { println!("TODO: {:02X}", opcode) }
@@ -273,7 +273,7 @@ impl Cpu {
             0xC0 => { println!("TODO: {:02X}", opcode) }
             0xC1 => { println!("TODO: {:02X}", opcode) }
             0xC2 => { println!("TODO: {:02X}", opcode) }
-            0xC3 => self.jp(),
+            0xC3 => self.reg_pc = self.ld_16(),
             0xC4 => { println!("TODO: {:02X}", opcode) }
             0xC5 => { println!("TODO: {:02X}", opcode) }
             0xC6 => { println!("TODO: {:02X}", opcode) }
@@ -348,20 +348,10 @@ impl Cpu {
         self.reg_pc.inc();
     }
 
-//let (low, high) = { let rom = &self.rom; (rom[lowidx], rom[highidx]) };
-//(&mut self, reg: RegEnum) -> &mut Reg16
-
-    fn ld_16(self) -> Reg16 {
+    fn ld_16(&self) -> Reg16 {
         let low = self.rom[(self.reg_pc.get() + 1) as usize];
         let high = self.rom[(self.reg_pc.get() + 2) as usize];
         Reg16 { high: high, low: low }
-    }
-
-    fn jp(&mut self) {
-        let low = self.rom[(self.reg_pc.get() + 1) as usize];
-        let high = self.rom[(self.reg_pc.get() + 2) as usize];
-        self.reg_pc.low = low;
-        self.reg_pc.high = high;
     }
 
     fn cp(&mut self) {
@@ -416,7 +406,8 @@ mod tests {
     fn test_nop() {
         let mut test_cpu = test_setup();
         let pc_before = test_cpu.reg_pc.get();
-        let cycles = test_cpu.nop();
+        let cycles = BASE_CYCLES[0x00 as usize];
+        test_cpu.nop();
         let pc_after = test_cpu.reg_pc.get();
         assert!(cycles == 4);
         assert!(pc_before + 1 == pc_after);
@@ -425,7 +416,8 @@ mod tests {
     #[test]
     fn test_jp() {
         let mut test_cpu = test_setup();
-        let cycles = test_cpu.jp();
+        let cycles = BASE_CYCLES[0xC3 as usize];
+        test_cpu.reg_pc = test_cpu.ld_16();
         assert!(cycles == 16);
         assert!(test_cpu.reg_pc.get() == 0xFF01);
     }
