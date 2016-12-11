@@ -63,7 +63,7 @@ impl Cpu {
         println!("{:02X}", opcode);
 
         let mut cycles = 0;
-        //cycles += BASE_CYCLES[opcode];
+        cycles += BASE_CYCLES[opcode as usize];
 
         match opcode {
             0x00 => self.nop(),
