@@ -28,6 +28,10 @@ impl Reg16 {
         }
     }
 
+    pub fn is_bit_8_set(&self) -> bool {
+        self.low & 128 == 128
+    }
+
     pub fn set_bit_7(&mut self, set: bool) {
         if set {
             self.low |= 64;

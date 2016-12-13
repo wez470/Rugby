@@ -108,7 +108,7 @@ impl Cpu {
             0x25 => { println!("TODO: {:02X}", opcode) }
             0x26 => { println!("TODO: {:02X}", opcode) }
             0x27 => { println!("TODO: {:02X}", opcode) }
-            0x28 => { println!("TODO: {:02X}", opcode) }
+            0x28 => self.jr_z_signed_8(&mut cycles),
             0x29 => { println!("TODO: {:02X}", opcode) }
             0x2A => { println!("TODO: {:02X}", opcode) }
             0x2B => { println!("TODO: {:02X}", opcode) }
@@ -351,8 +351,22 @@ impl Cpu {
     fn ld_16(&mut self) -> Reg16 {
         let low = self.rom[(self.reg_pc.get() + 1) as usize];
         let high = self.rom[(self.reg_pc.get() + 2) as usize];
-        self.reg_pc.inc();
+        let new_pc = self.reg_pc.get() + 3;
+        self.reg_pc.set(new_pc);
         Reg16 { high: high, low: low }
+    }
+
+    fn jr_z_signed_8(&mut self, cycles: &mut i32) {
+        if self.get_zero_flag() {
+            *cycles += 4;
+            let val = self.rom[(self.reg_pc.get() + 1) as usize] as i8;
+            let new_pc = (self.reg_pc.get() as i32 + val as i32) as u16;
+            self.reg_pc.set(new_pc);
+        }
+        else {
+            let new_pc = self.reg_pc.get() + 2;
+            self.reg_pc.set(new_pc);
+        }
     }
 
     fn cp(&mut self) {
@@ -387,6 +401,10 @@ impl Cpu {
 
     fn set_carry_flag(&mut self, set: bool) {
         self.reg_af.set_bit_5(set);
+    }
+
+    fn get_zero_flag(&self) -> bool {
+        self.reg_af.is_bit_8_set()
     }
 }
 
