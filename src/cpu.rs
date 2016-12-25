@@ -21,6 +21,19 @@ pub const BASE_CYCLES: [i32; 0x100] = [
       12, 12,  8,  4,  0, 16,  8, 16, 12,  8, 16,  4,  0,  0,  8, 16, // F
 ];
 
+pub enum Regs {
+    A,
+    F,
+    B,
+    C,
+    D,
+    E,
+    H,
+    L,
+    SP,
+    PC,
+}
+
 pub struct Cpu {
     reg_af: Reg16,
     reg_bc: Reg16,
@@ -251,7 +264,7 @@ impl Cpu {
             0xAC => { println!("TODO: {:02X}", opcode) }
             0xAD => { println!("TODO: {:02X}", opcode) }
             0xAE => { println!("TODO: {:02X}", opcode) }
-            0xAF => { println!("TODO: {:02X}", opcode) }
+            0xAF => self.xor(Regs::A),
 
             0xB0 => { println!("TODO: {:02X}", opcode) }
             0xB1 => { println!("TODO: {:02X}", opcode) }
@@ -366,6 +379,21 @@ impl Cpu {
         else {
             let new_pc = self.reg_pc.get() + 2;
             self.reg_pc.set(new_pc);
+        }
+    }
+
+    fn xor(&mut self, reg: Regs) {
+        match reg {
+            Regs::A => { println!("Got here") }
+            Regs::F => { println!("placeholder") }
+            Regs::B => { println!("placeholder") }
+            Regs::C => { println!("placeholder") }
+            Regs::D => { println!("placeholder") }
+            Regs::E => { println!("placeholder") }
+            Regs::H => { println!("placeholder") }
+            Regs::L => { println!("placeholder") }
+            Regs::SP => { println!("placeholder") }
+            Regs::PC => { println!("placeholder") }
         }
     }
 
