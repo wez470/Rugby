@@ -404,7 +404,8 @@ impl Cpu {
         self.set_sub_flag(true);
         self.set_carry_flag(a < n);
         self.set_half_carry_flag(Cpu::get_sub_half_carry(a, n));
-        self.reg_pc.inc();
+        let new_pc = self.reg_pc.get() + 2;
+        self.reg_pc.set(new_pc);
     }
 
     fn get_add_half_carry(first: u8, second: u8) -> bool {
