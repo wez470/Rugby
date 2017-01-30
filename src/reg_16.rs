@@ -63,11 +63,9 @@ impl Reg16 {
 #[test]
 fn test_set_16_bit_reg() {
     let mut reg = Reg16::default();
-    let expected_low = 96;
-    let expected_high = 234;
     reg.set(60000);
-    assert!(reg.low == expected_low);
-    assert!(reg.high == expected_high);
+    assert_eq!(reg.low, 96);
+    assert_eq!(reg.high, 234);
 }
 
 #[test]
@@ -75,25 +73,21 @@ fn test_get_16_bit_reg() {
     let mut reg = Reg16::default();
     reg.low = 96;
     reg.high = 234;
-    let expected = 60000;
-    assert!(reg.get() == expected);
+    assert_eq!(reg.get(), 60000);
 }
 
 #[test]
 fn test_inc() {
     let mut reg = Reg16::default();
-    let val = 0;
-    let expected = val + 1;
-    reg.set(val);
+    reg.set(0);
     reg.inc();
-    assert!(reg.get() == expected);
+    assert_eq!(reg.get(), 1);
 }
 
 #[test]
 #[should_panic]
 fn test_inc_overflow() {
     let mut reg = Reg16::default();
-    let val = 65535;
-    reg.set(val);
+    reg.set(65535);
     reg.inc();
 }
