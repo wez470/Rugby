@@ -1,13 +1,13 @@
-const MEM_SIZE: usize = 0x10000;
+const MEM_SIZE: usize = 0x10000; // 64 KiB
 
 pub struct Memory {
-    pub mem: Box<[u8; MEM_SIZE]>
+    pub mem: Box<[u8; MEM_SIZE]>,
 }
 
 impl Memory {
     pub fn new() -> Memory {
         let mut mem = Memory {
-            mem: Box::new([0; MEM_SIZE])
+            mem: Box::new([0; MEM_SIZE]),
         };
         mem.reset();
         mem
@@ -48,5 +48,5 @@ impl Memory {
         self.mem[0xFF4A] = 0x00;
         self.mem[0xFF4B] = 0x00;
         self.mem[0xFFFF] = 0x00;
-    } 
+    }
 }

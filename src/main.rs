@@ -2,7 +2,6 @@ extern crate clap;
 
 use memory::Memory;
 use cpu::Cpu;
-use std::env;
 use std::fs::File;
 use std::io::Read;
 use clap::{Arg, App, AppSettings};
@@ -27,7 +26,7 @@ fn main() {
     check_error(file.read_to_end(&mut file_buf), "Couldn't read rom");
     let rom = file_buf.into_boxed_slice();
 
-    let mut mem = Memory::new();
+    let mem = Memory::new();
     let mut cpu = Cpu::new(rom, mem);
     cpu.reset();
     for _ in 0..10 {
