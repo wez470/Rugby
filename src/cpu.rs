@@ -214,6 +214,19 @@ impl Cpu {
             Regs_8::L => self.reg_hl.low = val,
         }
     }
+
+    fn get_reg_8(&self, reg: Regs_8) -> u8 {
+         match reg {
+            Regs_8::A => self.reg_af.high,
+            Regs_8::F => self.reg_af.low,
+            Regs_8::B => self.reg_bc.high,
+            Regs_8::C => self.reg_bc.low,
+            Regs_8::D => self.reg_de.high,
+            Regs_8::E => self.reg_de.low,
+            Regs_8::H => self.reg_hl.high,
+            Regs_8::L => self.reg_hl.low,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -247,5 +260,21 @@ mod tests {
         test_cpu.reg_pc = test_cpu.ld_16();
         assert!(cycles == 16);
         assert!(test_cpu.reg_pc.get() == 0xFF01);
+    }
+
+    #[test]
+    fn test_set_reg_8() {
+        let mut test_cpu = test_setup();
+        let expected = 4;
+        test_cpu.set_reg_8(Regs_8::B, expected);
+        assert_eq!(expected, test_cpu.reg_bc.high);
+    }
+
+    #[test]
+    fn test_get_reg_8() {
+        let mut test_cpu = test_setup();
+        let expected = 3;
+        test_cpu.reg_hl.low = expected;
+        assert_eq!(expected, test_cpu.get_reg_8(Regs_8::L));
     }
 }
