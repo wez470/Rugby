@@ -249,7 +249,6 @@ impl Cpu {
             Regs_16::PC => self.reg_pc.get(),
         }
     }
-
 }
 
 #[cfg(test)]
