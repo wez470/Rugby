@@ -152,7 +152,7 @@ impl Cpu {
 
     fn xor(&mut self, reg: Regs_8) {
         let n = self.get_reg_8(reg);
-        let result = Cpu::xor_helper(self.reg_af.high, n);
+        let result = self.reg_af.high ^ n;
 
         self.set_zero_flag(result == 0);
         self.set_sub_flag(false);
@@ -161,12 +161,6 @@ impl Cpu {
 
         let new_pc = self.reg_pc.get() + 1;
         self.reg_pc.set(new_pc);
-    }
-
-    fn xor_helper(first: u8, second: u8) -> u8 {
-        let a = first & second;
-        let b = !first & !second;
-        !a & !b
     }
 
     fn cp(&mut self) {
