@@ -151,16 +151,22 @@ impl Cpu {
     }
 
     fn xor(&mut self, reg: Regs_8) {
-        match reg {
-            Regs_8::A => { println!("Got here") }
-            Regs_8::F => { println!("placeholder") }
-            Regs_8::B => { println!("placeholder") }
-            Regs_8::C => { println!("placeholder") }
-            Regs_8::D => { println!("placeholder") }
-            Regs_8::E => { println!("placeholder") }
-            Regs_8::H => { println!("placeholder") }
-            Regs_8::L => { println!("placeholder") }
-        }
+        let n = self.get_reg_8(reg);
+        let result = Cpu::xor_helper(self.reg_af.high, n);
+
+        self.set_zero_flag(result == 0);
+        self.set_sub_flag(false);
+        self.set_half_carry_flag(false);
+        self.set_carry_flag(false);
+
+        let new_pc = self.reg_pc.get() + 1;
+        self.reg_pc.set(new_pc);
+    }
+
+    fn xor_helper(first: u8, second: u8) -> u8 {
+        let a = first & second;
+        let b = !first & !second;
+        !a & !b
     }
 
     fn cp(&mut self) {
