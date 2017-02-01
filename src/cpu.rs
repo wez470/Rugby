@@ -152,14 +152,14 @@ impl Cpu {
 
     fn xor(&mut self, reg: Regs_8) {
         match reg {
-            Regs::A => { println!("Got here") }
-            Regs::F => { println!("placeholder") }
-            Regs::B => { println!("placeholder") }
-            Regs::C => { println!("placeholder") }
-            Regs::D => { println!("placeholder") }
-            Regs::E => { println!("placeholder") }
-            Regs::H => { println!("placeholder") }
-            Regs::L => { println!("placeholder") }
+            Regs_8::A => { println!("Got here") }
+            Regs_8::F => { println!("placeholder") }
+            Regs_8::B => { println!("placeholder") }
+            Regs_8::C => { println!("placeholder") }
+            Regs_8::D => { println!("placeholder") }
+            Regs_8::E => { println!("placeholder") }
+            Regs_8::H => { println!("placeholder") }
+            Regs_8::L => { println!("placeholder") }
         }
     }
 
@@ -206,12 +206,12 @@ impl Cpu {
         match reg {
             Regs_8::A => self.reg_af.high = val,
             Regs_8::F => self.reg_af.low = val,
-            Regs_8::B => self.reg_af.high = val,
-            Regs_8::C => self.reg_af.high = val,
-            Regs_8::D => self.reg_af.high = val,
-            Regs_8::E => self.reg_af.high = val,
-            Regs_8::H => self.reg_af.high = val,
-            Regs_8::L => self.reg_af.high = val,
+            Regs_8::B => self.reg_bc.high = val,
+            Regs_8::C => self.reg_bc.low = val,
+            Regs_8::D => self.reg_de.high = val,
+            Regs_8::E => self.reg_de.low = val,
+            Regs_8::H => self.reg_hl.high = val,
+            Regs_8::L => self.reg_hl.low = val,
         }
     }
 }
