@@ -272,8 +272,8 @@ mod tests {
         let cycles = BASE_CYCLES[0x00 as usize];
         test_cpu.nop();
         let pc_after = test_cpu.reg_pc.get();
-        assert!(cycles == 4);
-        assert!(pc_before + 1 == pc_after);
+        assert_eq!(4, cycles);
+        assert_eq!(pc_before + 1, pc_after);
     }
 
     #[test]
@@ -281,8 +281,8 @@ mod tests {
         let mut test_cpu = test_setup();
         let cycles = BASE_CYCLES[0xC3 as usize];
         test_cpu.reg_pc = test_cpu.ld_16();
-        assert!(cycles == 16);
-        assert!(test_cpu.reg_pc.get() == 0xFF01);
+        assert_eq!(16, cycles);
+        assert_eq!(0xFF01, test_cpu.reg_pc.get());
     }
 
     #[test]
