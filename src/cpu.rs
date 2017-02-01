@@ -227,6 +227,29 @@ impl Cpu {
             Regs_8::L => self.reg_hl.low,
         }
     }
+
+    fn set_reg_16(&mut self, reg: Regs_16, val: u16) {
+        match reg {
+            Regs_16::AF => self.reg_af.set(val),
+            Regs_16::BC => self.reg_bc.set(val),
+            Regs_16::DE => self.reg_de.set(val),
+            Regs_16::HL => self.reg_hl.set(val),
+            Regs_16::SP => self.reg_sp.set(val),
+            Regs_16::PC => self.reg_pc.set(val),
+        }
+    }
+
+    fn get_reg_16(&self, reg: Regs_16) -> u16 {
+         match reg {
+            Regs_16::AF => self.reg_af.get(val),
+            Regs_16::BC => self.reg_bc.get(val),
+            Regs_16::DE => self.reg_de.get(val),
+            Regs_16::HL => self.reg_hl.get(val),
+            Regs_16::SP => self.reg_sp.get(val),
+            Regs_16::PC => self.reg_pc.get(val),
+        }
+    }
+
 }
 
 #[cfg(test)]
