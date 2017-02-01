@@ -41,7 +41,7 @@ pub const INSTRUCTION_LENGTH: [usize; 0x100] = [
        2,  1,  2,  1,  0,  1,  2,  1,  2,  1,  3,  1,  0,  0,  2,  1, // F
 ];
 
-pub enum Regs {
+pub enum Regs_8 {
     A,
     F,
     B,
@@ -50,6 +50,13 @@ pub enum Regs {
     E,
     H,
     L,
+}
+
+pub enum Regs_16 {
+    AF,
+    BC,
+    DE,
+    HL,
     SP,
     PC,
 }
@@ -108,7 +115,7 @@ impl Cpu {
             0x00 => self.nop(),
             0x11 => self.reg_de = self.ld_16(),
             0x28 => self.jr_z_signed_8(&mut cycles),
-            0xAF => self.xor(Regs::A),
+            0xAF => self.xor(Regs_8::A),
             0xC3 => self.reg_pc = self.ld_16(),
             0xFE => self.cp(),
 
@@ -143,7 +150,7 @@ impl Cpu {
         }
     }
 
-    fn xor(&mut self, reg: Regs) {
+    fn xor(&mut self, reg: Regs_8) {
         match reg {
             Regs::A => { println!("Got here") }
             Regs::F => { println!("placeholder") }
@@ -153,8 +160,6 @@ impl Cpu {
             Regs::E => { println!("placeholder") }
             Regs::H => { println!("placeholder") }
             Regs::L => { println!("placeholder") }
-            Regs::SP => { println!("placeholder") }
-            Regs::PC => { println!("placeholder") }
         }
     }
 
@@ -195,6 +200,19 @@ impl Cpu {
 
     fn get_zero_flag(&self) -> bool {
         self.reg_af.is_bit_8_set()
+    }
+
+    fn set_reg_8(&mut self, reg: Regs_8, val: u8) {
+        match reg {
+            Regs_8::A => self.reg_af.high = val,
+            Regs_8::F => self.reg_af.low = val,
+            Regs_8::B => self.reg_af.high = val,
+            Regs_8::C => self.reg_af.high = val,
+            Regs_8::D => self.reg_af.high = val,
+            Regs_8::E => self.reg_af.high = val,
+            Regs_8::H => self.reg_af.high = val,
+            Regs_8::L => self.reg_af.high = val,
+        }
     }
 }
 
