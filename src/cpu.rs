@@ -241,12 +241,12 @@ impl Cpu {
 
     fn get_reg_16(&self, reg: Regs_16) -> u16 {
          match reg {
-            Regs_16::AF => self.reg_af.get(val),
-            Regs_16::BC => self.reg_bc.get(val),
-            Regs_16::DE => self.reg_de.get(val),
-            Regs_16::HL => self.reg_hl.get(val),
-            Regs_16::SP => self.reg_sp.get(val),
-            Regs_16::PC => self.reg_pc.get(val),
+            Regs_16::AF => self.reg_af.get(),
+            Regs_16::BC => self.reg_bc.get(),
+            Regs_16::DE => self.reg_de.get(),
+            Regs_16::HL => self.reg_hl.get(),
+            Regs_16::SP => self.reg_sp.get(),
+            Regs_16::PC => self.reg_pc.get(),
         }
     }
 
@@ -299,5 +299,21 @@ mod tests {
         let expected = 3;
         test_cpu.reg_hl.low = expected;
         assert_eq!(expected, test_cpu.get_reg_8(Regs_8::L));
+    }
+
+    #[test]
+    fn test_set_reg_16() {
+        let mut test_cpu = test_setup();
+        let expected = 1000;
+        test_cpu.set_reg_16(Regs_16::AF, expected);
+        assert_eq!(expected, test_cpu.reg_af.get());
+    }
+
+    #[test]
+    fn test_get_reg_16() {
+        let mut test_cpu = test_setup();
+        let expected = 300;
+        test_cpu.reg_hl.set(expected);
+        assert_eq!(expected, test_cpu.get_reg_16(Regs_16::HL));
     }
 }
