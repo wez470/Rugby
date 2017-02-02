@@ -62,14 +62,23 @@ pub enum Regs_16 {
 }
 
 pub struct Cpu {
+    // Registers
     reg_af: Reg16,
     reg_bc: Reg16,
     reg_de: Reg16,
     reg_hl: Reg16,
     reg_sp: Reg16,
     reg_pc: Reg16,
+
+    // RAM and ROM
     memory: Memory,
     rom: Box<[u8]>,
+
+    /// The location of the start of the currently-executing instruction.
+    base_pc: usize,
+
+    /// A running total of the number of cycles taken in execution so far.
+    cycles: usize,
 }
 
 impl Cpu {
@@ -83,6 +92,8 @@ impl Cpu {
             reg_pc: Reg16::default(),
             memory: mem,
             rom: rom,
+            base_pc: 0,
+            cycles: 0,
         };
         cpu.reset();
         cpu
@@ -99,23 +110,24 @@ impl Cpu {
     }
 
     pub fn run(&mut self) {
-        let pc = self.reg_pc.get() as usize;
-        let opcode = self.rom[pc];
+        self.base_pc = self.reg_pc.get() as usize;
+        let opcode = self.rom[self.base_pc];
         let instruction_len = INSTRUCTION_LENGTH[opcode as usize];
+        self.cycles += BASE_CYCLES[opcode as usize] as usize;
 
-        print!("{:04X}:", pc);
-        for &byte in &self.rom[pc .. (pc + instruction_len)] {
+        print!("{:04X}:", self.base_pc);
+        for &byte in &self.rom[self.base_pc .. (self.base_pc + instruction_len)] {
             print!(" {:02X}", byte);
         }
         println!();
 
-        let mut cycles = BASE_CYCLES[opcode as usize];
+        self.reg_pc.inc(instruction_len as i8);
 
         match opcode {
-            0x00 => self.nop(),
+            0x00 => {}, // No-op
             0x11 => self.reg_de = self.ld_16(),
             0x18 => self.jr_r8(),
-            0x28 => self.jr_z_signed_8(&mut cycles),
+            0x28 => self.jr_z_signed_8(),
             0x3E => self.ld_a(),
             0xA8 => self.xor(Regs_8::B),
             0xA9 => self.xor(Regs_8::C),
@@ -133,63 +145,45 @@ impl Cpu {
         };
     }
 
-    fn nop(&mut self) {
-        self.reg_pc.inc(1);
-    }
-
     fn jr_r8(&mut self) {
-        let n = self.rom[(self.reg_pc.get() + 1) as usize] as i8;
+        let n = self.rom[self.base_pc + 1] as i8;
         self.reg_pc.inc(n);
     }
 
-    fn jr_z_signed_8(&mut self, cycles: &mut i32) {
+    fn jr_z_signed_8(&mut self) {
         if self.get_zero_flag() {
-            *cycles += 4;
-            let val = self.rom[(self.reg_pc.get() + 1) as usize] as i8;
-            let new_pc = (self.reg_pc.get() as i32 + val as i32) as u16;
-            self.reg_pc.set(new_pc);
-        }
-        else {
-            let new_pc = self.reg_pc.get() + 2;
-            self.reg_pc.set(new_pc);
+            self.cycles += 4;
+            let val = self.rom[self.base_pc + 1] as i8;
+            self.reg_pc.inc(val);
         }
     }
 
     fn ld_a(&mut self) {
-        self.reg_af.high = self.rom[(self.reg_pc.get() + 1) as usize()];
-        self.reg_pc.inc(2);
+        self.reg_af.high = self.rom[self.base_pc + 1];
     }
 
     fn xor(&mut self, reg: Regs_8) {
         let n = self.get_reg_8(reg);
         let result = self.reg_af.high ^ n;
-
         self.set_zero_flag(result == 0);
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
         self.set_carry_flag(false);
-
-        let new_pc = self.reg_pc.get() + 1;
-        self.reg_pc.set(new_pc);
     }
 
     fn ld_16(&mut self) -> Reg16 {
-        let low = self.rom[(self.reg_pc.get() + 1) as usize];
-        let high = self.rom[(self.reg_pc.get() + 2) as usize];
-        let new_pc = self.reg_pc.get() + 3;
-        self.reg_pc.set(new_pc);
+        let low = self.rom[self.base_pc + 1];
+        let high = self.rom[self.base_pc + 2];
         Reg16 { high: high, low: low }
     }
 
     fn cp(&mut self) {
         let a = self.reg_af.high;
-        let n = self.rom[(self.reg_pc.get() + 1) as usize];
+        let n = self.rom[self.base_pc + 1];
         self.set_zero_flag(a == n);
         self.set_sub_flag(true);
         self.set_carry_flag(a < n);
         self.set_half_carry_flag(Cpu::get_sub_half_carry(a, n));
-        let new_pc = self.reg_pc.get() + 2;
-        self.reg_pc.set(new_pc);
     }
 
     fn get_add_half_carry(first: u8, second: u8) -> bool {
@@ -285,12 +279,10 @@ mod tests {
     #[test]
     fn test_nop() {
         let mut test_cpu = test_setup();
-        let pc_before = test_cpu.reg_pc.get();
-        let cycles = BASE_CYCLES[0x00 as usize];
-        test_cpu.nop();
-        let pc_after = test_cpu.reg_pc.get();
-        assert_eq!(4, cycles);
-        assert_eq!(pc_before + 1, pc_after);
+        test_cpu.rom = Box::new([0x00]);
+        test_cpu.run();
+        assert_eq!(test_cpu.cycles, 4);
+        assert_eq!(test_cpu.reg_pc.get(), 1);
     }
 
     #[test]
