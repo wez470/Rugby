@@ -114,6 +114,7 @@ impl Cpu {
         match opcode {
             0x00 => self.nop(),
             0x11 => self.reg_de = self.ld_16(),
+            0x18 => self.jr_r8(),
             0x28 => self.jr_z_signed_8(&mut cycles),
             0xAF => self.xor(Regs_8::A),
             0xC3 => self.reg_pc = self.ld_16(),
@@ -126,7 +127,12 @@ impl Cpu {
     }
 
     fn nop(&mut self) {
-        self.reg_pc.inc();
+        self.reg_pc.inc(1);
+    }
+
+    fn jr_r8(&mut self) {
+        let n = self.rom[(self.reg_pc.get() + 1) as usize] as i8;
+        self.reg_pc.inc(n);
     }
 
     fn ld_16(&mut self) -> Reg16 {

@@ -14,9 +14,9 @@ impl Reg16 {
         ((self.high as u16) << 8) | (self.low as u16)
     }
 
-    pub fn inc(&mut self) {
-        let val: u16 = self.get();
-        self.set(val + 1);
+    pub fn inc(&mut self, val: i8) {
+        let new_val = (self.get() as i32 + val as i32) as u16;
+        self.set(new_val);
     }
 
     pub fn set_bit_8(&mut self, set: bool) {
@@ -80,14 +80,6 @@ fn test_get_16_bit_reg() {
 fn test_inc() {
     let mut reg = Reg16::default();
     reg.set(0);
-    reg.inc();
+    reg.inc(1);
     assert_eq!(reg.get(), 1);
-}
-
-#[test]
-#[should_panic]
-fn test_inc_overflow() {
-    let mut reg = Reg16::default();
-    reg.set(65535);
-    reg.inc();
 }
