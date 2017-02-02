@@ -109,7 +109,7 @@ impl Cpu {
         self.reg_sp.set(0xFFFE);
     }
 
-    pub fn run(&mut self) {
+    pub fn step(&mut self) {
         self.base_pc = self.reg_pc.get() as usize;
         let opcode = self.rom[self.base_pc];
         let instruction_len = INSTRUCTION_LENGTH[opcode as usize];
@@ -125,10 +125,11 @@ impl Cpu {
 
         match opcode {
             0x00 => {}, // No-op
-            0x11 => self.reg_de = self.ld_16(),
+            0x06 => self.ld_8(Regs_8::B),
+            0x11 => self.ld_16(Regs_16::DE),
             0x18 => self.jr_r8(),
             0x28 => self.jr_z_signed_8(),
-            0x3E => self.ld_a(),
+            0x3E => self.ld_8(Regs_8::A),
             0xA8 => self.xor(Regs_8::B),
             0xA9 => self.xor(Regs_8::C),
             0xAA => self.xor(Regs_8::D),
@@ -136,13 +137,30 @@ impl Cpu {
             0xAC => self.xor(Regs_8::H),
             0xAD => self.xor(Regs_8::L),
             0xAF => self.xor(Regs_8::A),
-            0xC3 => self.reg_pc = self.ld_16(),
+            0xC3 => self.ld_16(Regs_16::PC), // Note: this is a jump.
             0xFE => self.cp(),
 
             _ => {
                 println!("{:02X} Unimplemented", opcode);
             }
         };
+    }
+
+    pub fn step_n(&mut self, steps: usize) {
+        for _ in 0..steps {
+            self.step();
+        }
+    }
+
+    fn ld_8(&mut self, reg: Regs_8) {
+        let n = self.rom[self.base_pc + 1];
+        self.set_reg_8(reg, n);
+    }
+
+    fn ld_16(&mut self, reg: Regs_16) {
+        let low = self.rom[self.base_pc + 1] as u16;
+        let high = self.rom[self.base_pc + 2] as u16;
+        self.set_reg_16(reg, (high << 8) | low);
     }
 
     fn jr_r8(&mut self) {
@@ -158,10 +176,6 @@ impl Cpu {
         }
     }
 
-    fn ld_a(&mut self) {
-        self.reg_af.high = self.rom[self.base_pc + 1];
-    }
-
     fn xor(&mut self, reg: Regs_8) {
         let n = self.get_reg_8(reg);
         let result = self.reg_af.high ^ n;
@@ -169,12 +183,6 @@ impl Cpu {
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
         self.set_carry_flag(false);
-    }
-
-    fn ld_16(&mut self) -> Reg16 {
-        let low = self.rom[self.base_pc + 1];
-        let high = self.rom[self.base_pc + 2];
-        Reg16 { high: high, low: low }
     }
 
     fn cp(&mut self) {
@@ -268,61 +276,46 @@ mod tests {
     use super::*;
     use memory::Memory;
 
-    fn test_setup() -> Cpu {
-        let test_rom = Box::new([0x00, 0x01, 0xFF, 0xC3, 0x33, 0x6A]);
-        let test_mem = Memory::new();
-        let mut test_cpu = Cpu::new(test_rom, test_mem);
-        test_cpu.reg_pc.set(0);
-        test_cpu
+    fn setup(rom: Vec<u8>) -> Cpu {
+        let mut cpu = Cpu::new(rom.into_boxed_slice(), Memory::new());
+        cpu.reg_pc.set(0);
+        cpu
     }
 
     #[test]
     fn test_nop() {
-        let mut test_cpu = test_setup();
-        test_cpu.rom = Box::new([0x00]);
-        test_cpu.run();
-        assert_eq!(test_cpu.cycles, 4);
-        assert_eq!(test_cpu.reg_pc.get(), 1);
+        let mut cpu = setup(vec![0x00]); // nop
+        cpu.step();
+        assert_eq!(cpu.reg_pc.get(), 1);
+        assert_eq!(cpu.cycles, 4);
+    }
+
+    #[test]
+    fn test_reg_8() {
+        let mut cpu = setup(vec![
+            0x3E, 0x13, // ld a, 0x13
+            0x06, 0x42, // ld b, 0x42
+        ]);
+        cpu.set_reg_8(Regs_8::A, 0);
+        cpu.set_reg_8(Regs_8::B, 0);
+        cpu.step_n(2);
+        assert_eq!(cpu.get_reg_8(Regs_8::A), 0x13);
+        assert_eq!(cpu.get_reg_8(Regs_8::B), 0x42);
+    }
+
+    #[test]
+    fn test_reg_16() {
+        let mut cpu = setup(vec![0x11, 0x34, 0x12]); // ld de, 0x1234
+        cpu.set_reg_16(Regs_16::DE, 0);
+        cpu.step();
+        assert_eq!(cpu.get_reg_16(Regs_16::DE), 0x1234);
     }
 
     #[test]
     fn test_jp() {
-        let mut test_cpu = test_setup();
-        let cycles = BASE_CYCLES[0xC3 as usize];
-        test_cpu.reg_pc = test_cpu.ld_16();
-        assert_eq!(16, cycles);
-        assert_eq!(0xFF01, test_cpu.reg_pc.get());
-    }
-
-    #[test]
-    fn test_set_reg_8() {
-        let mut test_cpu = test_setup();
-        let expected = 4;
-        test_cpu.set_reg_8(Regs_8::B, expected);
-        assert_eq!(expected, test_cpu.reg_bc.high);
-    }
-
-    #[test]
-    fn test_get_reg_8() {
-        let mut test_cpu = test_setup();
-        let expected = 3;
-        test_cpu.reg_hl.low = expected;
-        assert_eq!(expected, test_cpu.get_reg_8(Regs_8::L));
-    }
-
-    #[test]
-    fn test_set_reg_16() {
-        let mut test_cpu = test_setup();
-        let expected = 1000;
-        test_cpu.set_reg_16(Regs_16::AF, expected);
-        assert_eq!(expected, test_cpu.reg_af.get());
-    }
-
-    #[test]
-    fn test_get_reg_16() {
-        let mut test_cpu = test_setup();
-        let expected = 300;
-        test_cpu.reg_hl.set(expected);
-        assert_eq!(expected, test_cpu.get_reg_16(Regs_16::HL));
+        let mut cpu = setup(vec![0xC3, 0x34, 0x12]); // jp 0x1234
+        cpu.step();
+        assert_eq!(cpu.cycles, 16);
+        assert_eq!(cpu.reg_pc.get(), 0x1234);
     }
 }

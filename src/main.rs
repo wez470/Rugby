@@ -26,12 +26,8 @@ fn main() {
     check_error(file.read_to_end(&mut file_buf), "Couldn't read rom");
     let rom = file_buf.into_boxed_slice();
 
-    let mem = Memory::new();
-    let mut cpu = Cpu::new(rom, mem);
-    cpu.reset();
-    for _ in 0..10 {
-        cpu.run();
-    }
+    let mut cpu = Cpu::new(rom, Memory::new());
+    cpu.step_n(10);
 }
 
 fn check_error<T, E: Display>(res: Result<T, E>, message: &'static str) -> T {
