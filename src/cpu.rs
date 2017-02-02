@@ -116,6 +116,7 @@ impl Cpu {
             0x11 => self.reg_de = self.ld_16(),
             0x18 => self.jr_r8(),
             0x28 => self.jr_z_signed_8(&mut cycles),
+            0x3E => self.ld_a(),
             0xA8 => self.xor(Regs_8::B),
             0xA9 => self.xor(Regs_8::C),
             0xAA => self.xor(Regs_8::D),
@@ -160,6 +161,11 @@ impl Cpu {
             let new_pc = self.reg_pc.get() + 2;
             self.reg_pc.set(new_pc);
         }
+    }
+
+    fn ld_a(&mut self) {
+        self.reg_af.high = self.rom[(self.reg_pc.get() + 1) as usize()];
+        self.reg_pc.inc(2);
     }
 
     fn xor(&mut self, reg: Regs_8) {
