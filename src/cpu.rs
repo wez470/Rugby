@@ -142,14 +142,6 @@ impl Cpu {
         self.reg_pc.inc(n);
     }
 
-    fn ld_16(&mut self) -> Reg16 {
-        let low = self.rom[(self.reg_pc.get() + 1) as usize];
-        let high = self.rom[(self.reg_pc.get() + 2) as usize];
-        let new_pc = self.reg_pc.get() + 3;
-        self.reg_pc.set(new_pc);
-        Reg16 { high: high, low: low }
-    }
-
     fn jr_z_signed_8(&mut self, cycles: &mut i32) {
         if self.get_zero_flag() {
             *cycles += 4;
@@ -179,6 +171,14 @@ impl Cpu {
 
         let new_pc = self.reg_pc.get() + 1;
         self.reg_pc.set(new_pc);
+    }
+
+    fn ld_16(&mut self) -> Reg16 {
+        let low = self.rom[(self.reg_pc.get() + 1) as usize];
+        let high = self.rom[(self.reg_pc.get() + 2) as usize];
+        let new_pc = self.reg_pc.get() + 3;
+        self.reg_pc.set(new_pc);
+        Reg16 { high: high, low: low }
     }
 
     fn cp(&mut self) {
