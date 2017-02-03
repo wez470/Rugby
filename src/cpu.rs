@@ -138,6 +138,7 @@ impl Cpu {
             0xAD => self.xor(Regs_8::L),
             0xAF => self.xor(Regs_8::A),
             0xC3 => self.ld_16(Regs_16::PC), // Note: this is a jump.
+            0xEA => self.write_mem_8(Regs_8::A),
             0xFE => self.cp(),
 
             _ => {
@@ -183,6 +184,12 @@ impl Cpu {
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
         self.set_carry_flag(false);
+    }
+
+    fn write_mem_8(&mut self, reg: Regs_8) {
+        let low = self.rom[self.base_pc + 1] as u16;
+        let high = self.rom[self.base_pc + 2] as u16;
+        self.memory.mem[((high << 8) | low) as usize] = self.get_reg_8(reg);
     }
 
     fn cp(&mut self) {
