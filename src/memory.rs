@@ -4,6 +4,14 @@ pub struct Memory {
     pub mem: Box<[u8; MEM_SIZE]>,
 }
 
+impl Clone for Memory {
+    fn clone(&self) -> Memory {
+        let mut mem = Box::new([0; MEM_SIZE]);
+        mem.copy_from_slice(&self.mem[..]);
+        Memory { mem: mem }
+    }
+}
+
 impl Memory {
     pub fn new() -> Memory {
         let mut mem = Memory {

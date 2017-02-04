@@ -1,4 +1,4 @@
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Reg16 {
     pub high: u8,
     pub low: u8

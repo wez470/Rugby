@@ -61,6 +61,7 @@ pub enum Regs_16 {
     PC,
 }
 
+#[derive(Clone)]
 pub struct Cpu {
     // Registers
     reg_af: Reg16,
@@ -282,47 +283,111 @@ impl Cpu {
 mod tests {
     use super::*;
     use memory::Memory;
+    use std::fmt::{Debug, UpperHex};
+    use std::mem;
 
-    fn setup(rom: Vec<u8>) -> Cpu {
+    fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
         let mut cpu = Cpu::new(rom.into_boxed_slice(), Memory::new());
         cpu.reg_pc.set(0);
-        cpu
+        (cpu.clone(), cpu)
+    }
+
+    /// Check if the actual and expected results are the same, pretty-printing any differences, and
+    /// panicking (failing the test) if there are any differences.
+    fn check_diff(actual: &Cpu, expected: &Cpu) {
+        let mut same = true;
+        same &= diff_hex("AF register", &actual.reg_af.get(), &expected.reg_af.get());
+        same &= diff_hex("BC register", &actual.reg_bc.get(), &expected.reg_bc.get());
+        same &= diff_hex("DE register", &actual.reg_de.get(), &expected.reg_de.get());
+        same &= diff_hex("HL register", &actual.reg_hl.get(), &expected.reg_hl.get());
+        same &= diff_hex("SP register", &actual.reg_sp.get(), &expected.reg_sp.get());
+        same &= diff_hex("PC register", &actual.reg_pc.get(), &expected.reg_pc.get());
+        same &= diff_hex("cycle count", &actual.cycles, &expected.cycles);
+
+        let actual_mem = actual.memory.mem.iter();
+        let expected_mem = expected.memory.mem.iter();
+        for (i, (actual_cell, expected_cell)) in actual_mem.zip(expected_mem).enumerate() {
+            let name = format!("memory location 0x{:02X}", i);
+            same &= diff_hex(&name, actual_cell, expected_cell);
+        }
+
+        let actual_rom = actual.rom.iter();
+        let expected_rom = expected.rom.iter();
+        for (i, (actual_cell, expected_cell)) in actual_rom.zip(expected_rom).enumerate() {
+            let name = format!("ROM location 0x{:02X}", i);
+            same &= diff_hex(&name, actual_cell, expected_cell);
+        }
+
+        if !same {
+            panic!("actual and expected results differ");
+        }
+    }
+
+    /// Returns whether the actual and expected numbers are the same. Pretty-prints the numbers in
+    /// hex if they differ.
+    fn diff_hex<T>(name: &str, actual: &T, expected: &T) -> bool
+        where T: Debug + Eq + UpperHex,
+    {
+        let same = actual == expected;
+        if !same {
+            let width = mem::size_of::<T>() * 2; // Number of hex digits for type T.
+            println!("\ndifference in {}:", name);
+            println!("  actual:   0x{0:01$X} ({0:?})", actual, width);
+            println!("  expected: 0x{0:01$X} ({0:?})", expected, width);
+        }
+        same
     }
 
     #[test]
     fn test_nop() {
-        let mut cpu = setup(vec![0x00]); // nop
-        cpu.step();
-        assert_eq!(cpu.reg_pc.get(), 1);
-        assert_eq!(cpu.cycles, 4);
+        let (mut actual, mut expected) = setup(vec![0x00]); // nop
+        actual.step();
+
+        expected.set_reg_16(Regs_16::PC, 1);
+        expected.cycles = 4;
+        check_diff(&actual, &expected);
     }
 
     #[test]
     fn test_reg_8() {
-        let mut cpu = setup(vec![
+        let (mut actual, mut expected) = setup(vec![
             0x3E, 0x13, // ld a, 0x13
             0x06, 0x42, // ld b, 0x42
         ]);
-        cpu.set_reg_8(Regs_8::A, 0);
-        cpu.set_reg_8(Regs_8::B, 0);
-        cpu.step_n(2);
-        assert_eq!(cpu.get_reg_8(Regs_8::A), 0x13);
-        assert_eq!(cpu.get_reg_8(Regs_8::B), 0x42);
+        actual.set_reg_8(Regs_8::A, 0);
+        actual.set_reg_8(Regs_8::B, 0);
+        actual.step_n(2);
+
+        expected.set_reg_8(Regs_8::A, 0x13);
+        expected.set_reg_8(Regs_8::B, 0x42);
+        expected.set_reg_16(Regs_16::PC, 4);
+        expected.cycles = 16;
+        check_diff(&actual, &expected);
     }
 
     #[test]
     fn test_reg_16() {
-        let mut cpu = setup(vec![0x11, 0x34, 0x12]); // ld de, 0x1234
-        cpu.set_reg_16(Regs_16::DE, 0);
-        cpu.step();
-        assert_eq!(cpu.get_reg_16(Regs_16::DE), 0x1234);
+        let (mut actual, mut expected) = setup(vec![
+            0x11, 0x34, 0x12, // ld de, 0x1234
+        ]);
+        actual.set_reg_16(Regs_16::DE, 0);
+        actual.step();
+
+        expected.set_reg_16(Regs_16::DE, 0x1234);
+        expected.set_reg_16(Regs_16::PC, 3);
+        expected.cycles = 12;
+        check_diff(&actual, &expected);
     }
 
     #[test]
     fn test_jp() {
-        let mut cpu = setup(vec![0xC3, 0x34, 0x12]); // jp 0x1234
-        cpu.step();
-        assert_eq!(cpu.cycles, 16);
-        assert_eq!(cpu.reg_pc.get(), 0x1234);
+        let (mut actual, mut expected) = setup(vec![
+            0xC3, 0x34, 0x12, // jp 0x1234
+        ]);
+        actual.step();
+
+        expected.set_reg_16(Regs_16::PC, 0x1234);
+        expected.cycles = 16;
+        check_diff(&actual, &expected);
     }
 }
