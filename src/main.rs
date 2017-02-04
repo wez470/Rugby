@@ -18,6 +18,9 @@ fn main() {
         .arg(Arg::with_name("ROM")
              .required(true)
              .help("The game rom"))
+        .arg(Arg::with_name("INSTRUCTIONS")
+             .required(true)
+             .help("The number of instructions to execute"))
         .get_matches();
 
     let rom_file_name = matches.value_of("ROM").unwrap();
@@ -26,8 +29,10 @@ fn main() {
     check_error(file.read_to_end(&mut file_buf), "Couldn't read rom");
     let rom = file_buf.into_boxed_slice();
 
+    let instruction_count = matches.value_of("INSTRUCTIONS").unwrap().parse().unwrap();
+
     let mut cpu = Cpu::new(rom, Memory::new());
-    cpu.step_n(10);
+    cpu.step_n(instruction_count);
 }
 
 fn check_error<T, E: Display>(res: Result<T, E>, message: &'static str) -> T {
