@@ -80,6 +80,17 @@ pub struct Cpu {
 
     /// A running total of the number of cycles taken in execution so far.
     cycles: usize,
+
+    /// True if interrupts can currently execute.
+    interrupts_enabled: bool,
+
+    /// True if the previous instruction was DI, which disables interrupts after the next
+    /// instruction.
+    pending_disable_interrupts: bool,
+
+    /// True if the previous instruction was EI, which enables interrupts after the next
+    /// instruction.
+    pending_enable_interrupts: bool,
 }
 
 impl Cpu {
@@ -95,6 +106,9 @@ impl Cpu {
             rom: rom,
             base_pc: 0,
             cycles: 0,
+            interrupts_enabled: false,
+            pending_disable_interrupts: false,
+            pending_enable_interrupts: false,
         };
         cpu.reset();
         cpu
@@ -111,6 +125,11 @@ impl Cpu {
     }
 
     pub fn step(&mut self) {
+        let pending_enable_interrupts = self.pending_enable_interrupts;
+        let pending_disable_interrupts = self.pending_disable_interrupts;
+        self.pending_enable_interrupts = false;
+        self.pending_disable_interrupts = false;
+
         self.base_pc = self.reg_pc.get() as usize;
         let opcode = self.rom[self.base_pc];
         let instruction_len = INSTRUCTION_LENGTH[opcode as usize];
@@ -140,12 +159,22 @@ impl Cpu {
             0xAF => self.xor(Regs_8::A),
             0xC3 => self.ld_16(Regs_16::PC), // Note: this is a jump.
             0xEA => self.write_mem_8(Regs_8::A),
+            0xF3 => self.pending_disable_interrupts = true,
+            0xFB => self.pending_enable_interrupts = true,
             0xFE => self.cp(),
 
             _ => {
                 println!("{:02X} Unimplemented", opcode);
             }
         };
+
+        if pending_enable_interrupts {
+            self.interrupts_enabled = true;
+        }
+
+        if pending_disable_interrupts {
+            self.interrupts_enabled = false;
+        }
     }
 
     pub fn step_n(&mut self, steps: usize) {
@@ -302,7 +331,22 @@ mod tests {
         same &= diff_hex("HL register", &actual.reg_hl.get(), &expected.reg_hl.get());
         same &= diff_hex("SP register", &actual.reg_sp.get(), &expected.reg_sp.get());
         same &= diff_hex("PC register", &actual.reg_pc.get(), &expected.reg_pc.get());
-        same &= diff_hex("cycle count", &actual.cycles, &expected.cycles);
+        same &= diff("cycles", &actual.cycles, &expected.cycles);
+        same &= diff(
+            "interrupts_enabled",
+            &actual.interrupts_enabled,
+            &expected.interrupts_enabled
+        );
+        same &= diff(
+            "pending_disable_interrupts",
+            &actual.pending_disable_interrupts,
+            &expected.pending_disable_interrupts
+        );
+        same &= diff(
+            "pending_enable_interrupts",
+            &actual.pending_enable_interrupts,
+            &expected.pending_enable_interrupts
+        );
 
         let actual_mem = actual.memory.mem.iter();
         let expected_mem = expected.memory.mem.iter();
@@ -325,15 +369,25 @@ mod tests {
 
     /// Returns whether the actual and expected numbers are the same. Pretty-prints the numbers in
     /// hex if they differ.
-    fn diff_hex<T>(name: &str, actual: &T, expected: &T) -> bool
-        where T: Debug + Eq + UpperHex,
-    {
+    fn diff_hex<T: Debug + Eq + UpperHex>(name: &str, actual: &T, expected: &T) -> bool {
         let same = actual == expected;
         if !same {
             let width = mem::size_of::<T>() * 2; // Number of hex digits for type T.
             println!("\ndifference in {}:", name);
             println!("  actual:   0x{0:01$X} ({0:?})", actual, width);
             println!("  expected: 0x{0:01$X} ({0:?})", expected, width);
+        }
+        same
+    }
+
+    /// Returns whether the actual and expected values are the same. Pretty-prints the values if
+    /// they differ.
+    fn diff<T: Debug + Eq>(name: &str, actual: &T, expected: &T) -> bool {
+        let same = actual == expected;
+        if !same {
+            println!("\ndifference in {}:", name);
+            println!("  actual:   {:?}", actual);
+            println!("  expected: {:?}", expected);
         }
         same
     }
@@ -388,6 +442,58 @@ mod tests {
 
         expected.set_reg_16(Regs_16::PC, 0x1234);
         expected.cycles = 16;
+        check_diff(&actual, &expected);
+    }
+
+    #[test]
+    fn test_di() {
+        let (mut actual, mut expected) = setup(vec![
+            0xF3, 0x00, // di; nop
+        ]);
+        actual.interrupts_enabled = true;
+        actual.step(); // di
+
+        // After DI, interrupts still aren't disabled until the next instruction executes.
+        expected.interrupts_enabled = true;
+        expected.pending_disable_interrupts = true;
+        expected.set_reg_16(Regs_16::PC, 1);
+        expected.cycles = 4;
+        check_diff(&actual, &expected);
+
+        println!("# Step 2");
+        actual.step(); // nop
+
+        // Now the instruction after DI has executed, so DI takes effect.
+        expected.interrupts_enabled = false;
+        expected.pending_disable_interrupts = false;
+        expected.set_reg_16(Regs_16::PC, 2);
+        expected.cycles = 8;
+        check_diff(&actual, &expected);
+    }
+
+    #[test]
+    fn test_ei() {
+        let (mut actual, mut expected) = setup(vec![
+            0xFB, 0x00, // ei; nop
+        ]);
+        actual.interrupts_enabled = false;
+        actual.step(); // ei
+
+        // After EI, interrupts still aren't disabled until the next instruction executes.
+        expected.interrupts_enabled = false;
+        expected.pending_enable_interrupts = true;
+        expected.set_reg_16(Regs_16::PC, 1);
+        expected.cycles = 4;
+        check_diff(&actual, &expected);
+
+        println!("# Step 2");
+        actual.step(); // nop
+
+        // Now the instruction after EI has executed, so EI takes effect.
+        expected.interrupts_enabled = true;
+        expected.pending_enable_interrupts = false;
+        expected.set_reg_16(Regs_16::PC, 2);
+        expected.cycles = 8;
         check_diff(&actual, &expected);
     }
 }
