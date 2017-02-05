@@ -145,11 +145,11 @@ impl Cpu {
 
         match opcode {
             0x00 => {}, // No-op
-            0x06 => self.ld_8(Regs_8::B),
-            0x11 => self.ld_16(Regs_16::DE),
+            0x06 => self.load_imm8(Regs_8::B),
+            0x11 => self.load_imm16(Regs_16::DE),
             0x18 => self.jr_r8(),
             0x28 => self.jr_z_signed_8(),
-            0x3E => self.ld_8(Regs_8::A),
+            0x3E => self.load_imm8(Regs_8::A),
             0xA8 => self.xor(Regs_8::B),
             0xA9 => self.xor(Regs_8::C),
             0xAA => self.xor(Regs_8::D),
@@ -157,7 +157,8 @@ impl Cpu {
             0xAC => self.xor(Regs_8::H),
             0xAD => self.xor(Regs_8::L),
             0xAF => self.xor(Regs_8::A),
-            0xC3 => self.ld_16(Regs_16::PC), // Note: this is a jump.
+            0xC3 => self.load_imm16(Regs_16::PC), // Note: this is a jump.
+            0xCD => self.call(),
             0xE0 => self.store_high_a8(Regs_8::A),
             0xEA => self.store_a16(Regs_8::A),
             0xF3 => self.pending_disable_interrupts = true,
@@ -184,12 +185,14 @@ impl Cpu {
         }
     }
 
-    fn ld_8(&mut self, reg: Regs_8) {
+    /// Load immediate 8-bit data into the given register.
+    fn load_imm8(&mut self, reg: Regs_8) {
         let n = self.rom[self.base_pc + 1];
         self.set_reg_8(reg, n);
     }
 
-    fn ld_16(&mut self, reg: Regs_16) {
+    /// Load immediate 16-bit data into the given register.
+    fn load_imm16(&mut self, reg: Regs_16) {
         let low = self.rom[self.base_pc + 1] as u16;
         let high = self.rom[self.base_pc + 2] as u16;
         self.set_reg_16(reg, (high << 8) | low);
@@ -239,6 +242,19 @@ impl Cpu {
         self.set_sub_flag(true);
         self.set_carry_flag(a < n);
         self.set_half_carry_flag(Cpu::get_sub_half_carry(a, n));
+    }
+
+    fn call(&mut self) {
+        let next_instruction_addr = self.reg_pc.get();
+        self.push(next_instruction_addr);
+        self.load_imm16(Regs_16::PC);
+    }
+
+    fn push(&mut self, val: u16) {
+        self.reg_sp.inc(-2);
+        let addr = self.reg_sp.get() as usize;
+        self.memory.mem[addr] = val as u8; // low
+        self.memory.mem[addr + 1] = (val >> 8) as u8; // high
     }
 
     fn get_add_half_carry(first: u8, second: u8) -> bool {
