@@ -161,6 +161,7 @@ impl Cpu {
             0xCD => self.call(),
             0xE0 => self.store_high_a8(Regs_8::A),
             0xEA => self.store_a16(Regs_8::A),
+            0xF0 => self.load_high_a8(Regs_8::A),
             0xF3 => self.pending_disable_interrupts = true,
             0xFB => self.pending_enable_interrupts = true,
             0xFE => self.cp(),
@@ -220,12 +221,21 @@ impl Cpu {
         self.set_carry_flag(false);
     }
 
+    /// Load an 8-bit register value from an immediate 8-bit memory address, after adding 0xFF00 to
+    /// the address.
+    fn load_high_a8(&mut self, reg: Regs_8) {
+        let addr_low = self.rom[self.base_pc + 1];
+        let addr = 0xFF00u16 | addr_low as u16;
+        let val = self.memory.mem[addr as usize];
+        self.set_reg_8(reg, val);
+    }
+
     /// Store an 8-bit register value in an immediate 8-bit memory address, after adding 0xFF00 to
     /// the address.
     fn store_high_a8(&mut self, reg: Regs_8) {
-        let val = self.rom[self.base_pc + 1];
-        let address = 0xFF00u16 | val as u16;
-        self.memory.mem[address as usize] = self.get_reg_8(reg);
+        let addr_low = self.rom[self.base_pc + 1];
+        let addr = 0xFF00u16 | addr_low as u16;
+        self.memory.mem[addr as usize] = self.get_reg_8(reg);
     }
 
     /// Store an 8-bit register value in an immediate 16-bit memory address.
