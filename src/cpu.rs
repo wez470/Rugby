@@ -91,9 +91,6 @@ pub struct Cpu {
     /// True if the previous instruction was EI, which enables interrupts after the next
     /// instruction.
     pending_enable_interrupts: bool,
-
-    /// True if the current opcode should be interpreted from the prefix cb table
-    cb_instruction: bool,
 }
 
 impl Cpu {
@@ -112,7 +109,6 @@ impl Cpu {
             interrupts_enabled: false,
             pending_disable_interrupts: false,
             pending_enable_interrupts: false,
-            cb_instruction: false,
         };
         cpu.reset();
         cpu
@@ -204,7 +200,6 @@ impl Cpu {
             0xAD => self.xor(Regs_8::L),
             0xAF => self.xor(Regs_8::A),
             0xC3 => self.load_imm16(Regs_16::PC), // Note: this is a jump.
-            0xCB => self.cb_instruction = true,
             0xCD => self.call(),
             0xE0 => self.store_high_a8(Regs_8::A),
             0xEA => self.store_a16(Regs_8::A),
