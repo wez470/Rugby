@@ -63,7 +63,7 @@ pub enum Regs_16 {
 
 #[derive(Clone)]
 pub struct Cpu {
-    // Registers
+    /// Registers
     reg_af: Reg16,
     reg_bc: Reg16,
     reg_de: Reg16,
@@ -71,7 +71,7 @@ pub struct Cpu {
     reg_sp: Reg16,
     reg_pc: Reg16,
 
-    // RAM and ROM
+    /// RAM and ROM
     memory: Memory,
     rom: Box<[u8]>,
 
