@@ -263,6 +263,13 @@ impl Cpu {
                     0x04 => self.rotate_left_carry(Regs_8::H),
                     0x05 => self.rotate_left_carry(Regs_8::L),
                     0x07 => self.rotate_left_carry(Regs_8::A),
+                    0x08 => self.rotate_right_carry(Regs_8::B),
+                    0x09 => self.rotate_right_carry(Regs_8::C),
+                    0x0A => self.rotate_right_carry(Regs_8::D),
+                    0x0B => self.rotate_right_carry(Regs_8::E),
+                    0x0C => self.rotate_right_carry(Regs_8::H),
+                    0x0D => self.rotate_right_carry(Regs_8::L),
+                    0x0F => self.rotate_right_carry(Regs_8::A),
 
                     _ => {
                         println!("unimplemented: CB {:02X}", opcode_after_cb);
@@ -459,8 +466,20 @@ impl Cpu {
         let reg_val = self.get_reg_8(reg);
         let n = self.rom[self.base_pc + 1] as u32;
         let rot_val = reg_val.rotate_left(n);
+        self.set_reg_8(reg, rot_val);
         self.set_zero_flag(rot_val == 0);
         self.set_carry_flag(reg_val & 0x80 != 0);
+    }
+
+    /// Rotate register by a one byte immediate value. The carry is the lowest order
+    /// bit value before the operation occurs. Rotation does not flow through carry bit
+    fn rotate_right_carry(&mut self, reg: Regs::8) {
+        let reg_val = self.get_reg_8(reg);
+        let n = self.rom[self.base_pc + 1] as u32;
+        let rot_val = reg_val.rotate_right(n);
+        self.set_reg_8(reg, rot_val);
+        self.set_zero_flag(rot_val == 0);
+        self.set_carry_flag(reg_val & 0x01 != 0);
     }
 }
 
