@@ -80,6 +80,7 @@ fn instruction_length(opcode: u8) -> usize {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum Regs_8 {
     A,
     F,
@@ -91,6 +92,7 @@ pub enum Regs_8 {
     L,
 }
 
+#[derive(Clone, Copy)]
 pub enum Regs_16 {
     AF,
     BC,
@@ -466,7 +468,7 @@ impl Cpu {
         let reg_val = self.get_reg_8(reg);
         let n = self.rom[self.base_pc + 1] as u32;
         let rot_val = reg_val.rotate_left(n);
-        // TODO: self.set_reg_8(reg, rot_val);
+        self.set_reg_8(reg, rot_val);
         self.set_zero_flag(rot_val == 0);
         self.set_carry_flag(reg_val & 0x80 != 0);
     }
@@ -477,7 +479,7 @@ impl Cpu {
         let reg_val = self.get_reg_8(reg);
         let n = self.rom[self.base_pc + 1] as u32;
         let rot_val = reg_val.rotate_right(n);
-        // TODO: self.set_reg_8(reg, rot_val);
+        self.set_reg_8(reg, rot_val);
         self.set_zero_flag(rot_val == 0);
         self.set_carry_flag(reg_val & 0x01 != 0);
     }
