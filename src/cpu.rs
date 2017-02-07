@@ -256,6 +256,14 @@ impl Cpu {
             0xCB => {
                 let opcode_after_cb = self.rom[self.base_pc + 1];
                 match opcode_after_cb {
+                    0x00 => self.rotate_left_carry(Regs_8::B),
+                    0x01 => self.rotate_left_carry(Regs_8::C),
+                    0x02 => self.rotate_left_carry(Regs_8::D),
+                    0x03 => self.rotate_left_carry(Regs_8::E),
+                    0x04 => self.rotate_left_carry(Regs_8::H),
+                    0x05 => self.rotate_left_carry(Regs_8::L),
+                    0x07 => self.rotate_left_carry(Regs_8::A),
+
                     _ => {
                         println!("unimplemented: CB {:02X}", opcode_after_cb);
                     }
@@ -443,6 +451,16 @@ impl Cpu {
             Regs_16::SP => self.reg_sp.get(),
             Regs_16::PC => self.reg_pc.get(),
         }
+    }
+
+    /// Rotate register by a one byte immediate value.  The carry is the highest
+    /// order bit value before the operation occurs
+    fn rotate_left_carry(&mut self, reg: Regs::8) {
+        let reg_val = self.get_reg_8(reg);
+        let n = self.rom[self.base_pc + 1] as u32;
+        let rot_val = reg_val.rotate_left(n);
+        self.set_zero_flag(rot_val == 0);
+        self.set_carry_flag(reg_val & 0x80 != 0);
     }
 }
 
