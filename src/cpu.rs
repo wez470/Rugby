@@ -611,7 +611,10 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         }
         0x11 => Ld(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
         0x18 => Jr(bytes[1] as i8, Cond::None),
+        0x20 => Jr(bytes[1] as i8, Cond::NotZero),
         0x28 => Jr(bytes[1] as i8, Cond::Zero),
+        0x30 => Jr(bytes[1] as i8, Cond::NotCarry),
+        0x38 => Jr(bytes[1] as i8, Cond::Carry),
         0x3E => Ld(Reg8(A), Imm8(bytes[1])),
         0x40 => Ld(Reg8(B), Reg8(B)),
         0x41 => Ld(Reg8(B), Reg8(C)),
