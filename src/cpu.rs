@@ -126,13 +126,22 @@ enum Operand {
     MemReg(Regs_16),
 }
 
-/// Which flag to check for a conditional instruction.
+/// Represents the condition checked by a conditional instruction (JP, JR, RET, or CALL).
 #[derive(Debug)]
 enum Cond {
+    /// Unconditional.
     None,
+
+    /// Z: zero flag is set.
     Zero,
+
+    /// NZ: zero flag is unset.
     NotZero,
+
+    /// C: carry flag is set.
     Carry,
+
+    /// NC: carry flag is unset.
     NotCarry,
 }
 
