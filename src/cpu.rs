@@ -127,6 +127,9 @@ enum Inst {
 
     /// LD
     Ld(Operand, Operand),
+
+    /// JP: Unconditional jump.
+    Jp(u16),
 }
 
 #[derive(Clone)]
@@ -707,6 +710,10 @@ mod tests {
     }
 }
 
+fn to_u16(low: u8, high: u8) -> u16 {
+    ((high as u16) << 8) | low as u16
+}
+
 /// Decode a Gameboy instruction from the given bytes.
 ///
 /// Panics if the slice is empty or if it isn't long enough for the instruction specified by its
@@ -720,7 +727,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
     let inst = match bytes[0] {
         0x00 => Nop,
         0x06 => Ld(Reg8(B), Imm8(bytes[1])),
-        // 0x11 => Ld(Reg16(DE), Imm16(/* TODO */)),
+        0x11 => Ld(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
         // 0x18 => self.jr_r8(),
         // 0x28 => self.jr_z_signed_8(),
         0x3E => Ld(Reg8(A), Imm8(bytes[1])),
@@ -773,7 +780,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         // 0xAC => self.xor(Regs_8::H),
         // 0xAD => self.xor(Regs_8::L),
         // 0xAF => self.xor(Regs_8::A),
-        // 0xC3 => self.load_imm16(Regs_16::PC), // Note: this is a jump.
+        0xC3 => Jp(to_u16(bytes[1], bytes[2])),
         // 0xCD => self.call(),
         // 0xE0 => self.store_high_a8(Regs_8::A),
         // 0xEA => self.store_a16(Regs_8::A),
