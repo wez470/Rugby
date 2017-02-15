@@ -119,6 +119,9 @@ enum Operand {
     /// Memory location at the given immediate address.
     MemImm(u16),
 
+    /// Memory location at the address `0xFF00 + byte`.
+    MemImmHigh(u8),
+
     /// Memory location at the address in the given register.
     MemReg(Regs_16),
 }
@@ -812,9 +815,9 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xAF => Xor(Reg8(A)),
         0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
         // 0xCD => self.call(),
-        // 0xE0 => self.store_high_a8(Regs_8::A),
+        0xE0 => Ld(MemImmHigh(bytes[1]), Reg8(A)),
         0xEA => Ld(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
-        // 0xF0 => self.load_high_a8(Regs_8::A),
+        0xF0 => Ld(Reg8(A), MemImmHigh(bytes[1])),
         0xF3 => Di,
         0xFB => Ei,
         0xFE => Cp(Imm8(bytes[1])),
