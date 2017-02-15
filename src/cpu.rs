@@ -141,6 +141,9 @@ enum Inst {
     /// NOP: No operation.
     Nop,
 
+    /// STOP: Halt CPU & LCD display until button pressed.
+    Stop,
+
     /// LD: Loads, stores, and moves.
     Ld(Operand, Operand),
 
@@ -589,6 +592,13 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
 
     let inst = match bytes[0] {
         0x00 => Nop,
+        0x01 => {
+            // FIXME: For some reason the STOP instruction is followed by 0x00 according to the
+            // manual. Perhaps this should result in an invalid instruction if it's not zero. For
+            // now we'll assert, so it's obvious if we ever encounter this case.
+            assert_eq!(bytes[1], 0);
+            Stop
+        }
         0x06 => Ld(Reg8(B), Imm8(bytes[1])),
         0x11 => Ld(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
         0x18 => Jr(bytes[1] as i8, Cond::None),
