@@ -116,8 +116,21 @@ enum Operand {
     /// 16-bit register.
     Reg16(Regs_16),
 
-    /// Memory address.
-    Mem(Regs_16),
+    /// Memory location at the given immediate address.
+    MemImm(u16),
+
+    /// Memory location at the address in the given register.
+    MemReg(Regs_16),
+}
+
+/// Which flag to check for a conditional instruction.
+#[derive(Debug)]
+enum Cond {
+    None,
+    Zero,
+    NotZero,
+    Carry,
+    NotCarry,
 }
 
 #[derive(Debug)]
@@ -125,11 +138,26 @@ enum Inst {
     /// NOP: No operation.
     Nop,
 
-    /// LD
+    /// LD: Loads, stores, and moves.
     Ld(Operand, Operand),
 
-    /// JP: Unconditional jump.
-    Jp(u16),
+    /// JP: Absolute jump.
+    Jp(u16, Cond),
+
+    /// JR: Relative jump.
+    Jr(i8, Cond),
+
+    /// XOR: Exclusive-or between A and the operand.
+    Xor(Operand),
+
+    /// CP: Compare A with the operand. Like `A - operand` but only for the flag side effects.
+    Cp(Operand),
+
+    /// DI: Disable interrupts.
+    Di,
+
+    /// EI: Enable interrupts.
+    Ei,
 }
 
 #[derive(Clone)]
@@ -728,8 +756,8 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x00 => Nop,
         0x06 => Ld(Reg8(B), Imm8(bytes[1])),
         0x11 => Ld(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
-        // 0x18 => self.jr_r8(),
-        // 0x28 => self.jr_z_signed_8(),
+        0x18 => Jr(bytes[1] as i8, Cond::None),
+        0x28 => Jr(bytes[1] as i8, Cond::Zero),
         0x3E => Ld(Reg8(A), Imm8(bytes[1])),
         0x40 => Ld(Reg8(B), Reg8(B)),
         0x41 => Ld(Reg8(B), Reg8(C)),
@@ -773,21 +801,21 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x6C => Ld(Reg8(L), Reg8(H)),
         0x6D => Ld(Reg8(L), Reg8(L)),
         0x6F => Ld(Reg8(L), Reg8(A)),
-        // 0xA8 => self.xor(Regs_8::B),
-        // 0xA9 => self.xor(Regs_8::C),
-        // 0xAA => self.xor(Regs_8::D),
-        // 0xAB => self.xor(Regs_8::E),
-        // 0xAC => self.xor(Regs_8::H),
-        // 0xAD => self.xor(Regs_8::L),
-        // 0xAF => self.xor(Regs_8::A),
-        0xC3 => Jp(to_u16(bytes[1], bytes[2])),
+        0xA8 => Xor(Reg8(B)),
+        0xA9 => Xor(Reg8(C)),
+        0xAA => Xor(Reg8(D)),
+        0xAB => Xor(Reg8(E)),
+        0xAC => Xor(Reg8(H)),
+        0xAD => Xor(Reg8(L)),
+        0xAF => Xor(Reg8(A)),
+        0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
         // 0xCD => self.call(),
         // 0xE0 => self.store_high_a8(Regs_8::A),
-        // 0xEA => self.store_a16(Regs_8::A),
+        0xEA => Ld(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
         // 0xF0 => self.load_high_a8(Regs_8::A),
-        // 0xF3 => self.pending_disable_interrupts = true,
-        // 0xFB => self.pending_enable_interrupts = true,
-        // 0xFE => self.cp(),
+        0xF3 => Di,
+        0xFB => Ei,
+        0xFE => Cp(Imm8(bytes[1])),
 
         0xCB => {
             match bytes[1] {
