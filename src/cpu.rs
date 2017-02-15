@@ -553,6 +553,111 @@ impl Cpu {
     }
 }
 
+/// Decode a Gameboy instruction from the given bytes.
+///
+/// Panics if the slice is empty or if it isn't long enough for the instruction specified by its
+/// first byte (the opcode).
+fn decode(bytes: &[u8]) -> Option<Inst> {
+    use self::Inst::*;
+    use self::Operand::*;
+    use self::Regs_16::*;
+    use self::Regs_8::*;
+
+    let inst = match bytes[0] {
+        0x00 => Nop,
+        0x06 => Ld(Reg8(B), Imm8(bytes[1])),
+        0x11 => Ld(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x18 => Jr(bytes[1] as i8, Cond::None),
+        0x28 => Jr(bytes[1] as i8, Cond::Zero),
+        0x3E => Ld(Reg8(A), Imm8(bytes[1])),
+        0x40 => Ld(Reg8(B), Reg8(B)),
+        0x41 => Ld(Reg8(B), Reg8(C)),
+        0x42 => Ld(Reg8(B), Reg8(D)),
+        0x43 => Ld(Reg8(B), Reg8(E)),
+        0x44 => Ld(Reg8(B), Reg8(H)),
+        0x45 => Ld(Reg8(B), Reg8(L)),
+        0x47 => Ld(Reg8(B), Reg8(A)),
+        0x48 => Ld(Reg8(C), Reg8(B)),
+        0x49 => Ld(Reg8(C), Reg8(C)),
+        0x4A => Ld(Reg8(C), Reg8(D)),
+        0x4B => Ld(Reg8(C), Reg8(E)),
+        0x4C => Ld(Reg8(C), Reg8(H)),
+        0x4D => Ld(Reg8(C), Reg8(L)),
+        0x4F => Ld(Reg8(C), Reg8(A)),
+        0x50 => Ld(Reg8(D), Reg8(B)),
+        0x51 => Ld(Reg8(D), Reg8(C)),
+        0x52 => Ld(Reg8(D), Reg8(D)),
+        0x53 => Ld(Reg8(D), Reg8(E)),
+        0x54 => Ld(Reg8(D), Reg8(H)),
+        0x55 => Ld(Reg8(D), Reg8(L)),
+        0x57 => Ld(Reg8(D), Reg8(A)),
+        0x58 => Ld(Reg8(E), Reg8(B)),
+        0x59 => Ld(Reg8(E), Reg8(C)),
+        0x5A => Ld(Reg8(E), Reg8(D)),
+        0x5B => Ld(Reg8(E), Reg8(E)),
+        0x5C => Ld(Reg8(E), Reg8(H)),
+        0x5D => Ld(Reg8(E), Reg8(L)),
+        0x5F => Ld(Reg8(E), Reg8(A)),
+        0x60 => Ld(Reg8(H), Reg8(B)),
+        0x61 => Ld(Reg8(H), Reg8(C)),
+        0x62 => Ld(Reg8(H), Reg8(D)),
+        0x63 => Ld(Reg8(H), Reg8(E)),
+        0x64 => Ld(Reg8(H), Reg8(H)),
+        0x65 => Ld(Reg8(H), Reg8(L)),
+        0x67 => Ld(Reg8(H), Reg8(A)),
+        0x68 => Ld(Reg8(L), Reg8(B)),
+        0x69 => Ld(Reg8(L), Reg8(C)),
+        0x6A => Ld(Reg8(L), Reg8(D)),
+        0x6B => Ld(Reg8(L), Reg8(E)),
+        0x6C => Ld(Reg8(L), Reg8(H)),
+        0x6D => Ld(Reg8(L), Reg8(L)),
+        0x6F => Ld(Reg8(L), Reg8(A)),
+        0xA8 => Xor(Reg8(B)),
+        0xA9 => Xor(Reg8(C)),
+        0xAA => Xor(Reg8(D)),
+        0xAB => Xor(Reg8(E)),
+        0xAC => Xor(Reg8(H)),
+        0xAD => Xor(Reg8(L)),
+        0xAF => Xor(Reg8(A)),
+        0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
+        // 0xCD => self.call(),
+        0xE0 => Ld(MemImmHigh(bytes[1]), Reg8(A)),
+        0xEA => Ld(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
+        0xF0 => Ld(Reg8(A), MemImmHigh(bytes[1])),
+        0xF3 => Di,
+        0xFB => Ei,
+        0xFE => Cp(Imm8(bytes[1])),
+
+        0xCB => {
+            match bytes[1] {
+                // 0x00 => self.rotate_left_carry(Regs_8::B),
+                // 0x01 => self.rotate_left_carry(Regs_8::C),
+                // 0x02 => self.rotate_left_carry(Regs_8::D),
+                // 0x03 => self.rotate_left_carry(Regs_8::E),
+                // 0x04 => self.rotate_left_carry(Regs_8::H),
+                // 0x05 => self.rotate_left_carry(Regs_8::L),
+                // 0x07 => self.rotate_left_carry(Regs_8::A),
+                // 0x08 => self.rotate_right_carry(Regs_8::B),
+                // 0x09 => self.rotate_right_carry(Regs_8::C),
+                // 0x0A => self.rotate_right_carry(Regs_8::D),
+                // 0x0B => self.rotate_right_carry(Regs_8::E),
+                // 0x0C => self.rotate_right_carry(Regs_8::H),
+                // 0x0D => self.rotate_right_carry(Regs_8::L),
+                // 0x0F => self.rotate_right_carry(Regs_8::A),
+                _ => return None,
+            }
+        }
+
+        _ => return None,
+    };
+
+    Some(inst)
+}
+
+fn to_u16(low: u8, high: u8) -> u16 {
+    ((high as u16) << 8) | low as u16
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -741,109 +846,4 @@ mod tests {
         expected.cycles = 8;
         check_diff(&actual, &expected);
     }
-}
-
-fn to_u16(low: u8, high: u8) -> u16 {
-    ((high as u16) << 8) | low as u16
-}
-
-/// Decode a Gameboy instruction from the given bytes.
-///
-/// Panics if the slice is empty or if it isn't long enough for the instruction specified by its
-/// first byte (the opcode).
-fn decode(bytes: &[u8]) -> Option<Inst> {
-    use self::Inst::*;
-    use self::Operand::*;
-    use self::Regs_16::*;
-    use self::Regs_8::*;
-
-    let inst = match bytes[0] {
-        0x00 => Nop,
-        0x06 => Ld(Reg8(B), Imm8(bytes[1])),
-        0x11 => Ld(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
-        0x18 => Jr(bytes[1] as i8, Cond::None),
-        0x28 => Jr(bytes[1] as i8, Cond::Zero),
-        0x3E => Ld(Reg8(A), Imm8(bytes[1])),
-        0x40 => Ld(Reg8(B), Reg8(B)),
-        0x41 => Ld(Reg8(B), Reg8(C)),
-        0x42 => Ld(Reg8(B), Reg8(D)),
-        0x43 => Ld(Reg8(B), Reg8(E)),
-        0x44 => Ld(Reg8(B), Reg8(H)),
-        0x45 => Ld(Reg8(B), Reg8(L)),
-        0x47 => Ld(Reg8(B), Reg8(A)),
-        0x48 => Ld(Reg8(C), Reg8(B)),
-        0x49 => Ld(Reg8(C), Reg8(C)),
-        0x4A => Ld(Reg8(C), Reg8(D)),
-        0x4B => Ld(Reg8(C), Reg8(E)),
-        0x4C => Ld(Reg8(C), Reg8(H)),
-        0x4D => Ld(Reg8(C), Reg8(L)),
-        0x4F => Ld(Reg8(C), Reg8(A)),
-        0x50 => Ld(Reg8(D), Reg8(B)),
-        0x51 => Ld(Reg8(D), Reg8(C)),
-        0x52 => Ld(Reg8(D), Reg8(D)),
-        0x53 => Ld(Reg8(D), Reg8(E)),
-        0x54 => Ld(Reg8(D), Reg8(H)),
-        0x55 => Ld(Reg8(D), Reg8(L)),
-        0x57 => Ld(Reg8(D), Reg8(A)),
-        0x58 => Ld(Reg8(E), Reg8(B)),
-        0x59 => Ld(Reg8(E), Reg8(C)),
-        0x5A => Ld(Reg8(E), Reg8(D)),
-        0x5B => Ld(Reg8(E), Reg8(E)),
-        0x5C => Ld(Reg8(E), Reg8(H)),
-        0x5D => Ld(Reg8(E), Reg8(L)),
-        0x5F => Ld(Reg8(E), Reg8(A)),
-        0x60 => Ld(Reg8(H), Reg8(B)),
-        0x61 => Ld(Reg8(H), Reg8(C)),
-        0x62 => Ld(Reg8(H), Reg8(D)),
-        0x63 => Ld(Reg8(H), Reg8(E)),
-        0x64 => Ld(Reg8(H), Reg8(H)),
-        0x65 => Ld(Reg8(H), Reg8(L)),
-        0x67 => Ld(Reg8(H), Reg8(A)),
-        0x68 => Ld(Reg8(L), Reg8(B)),
-        0x69 => Ld(Reg8(L), Reg8(C)),
-        0x6A => Ld(Reg8(L), Reg8(D)),
-        0x6B => Ld(Reg8(L), Reg8(E)),
-        0x6C => Ld(Reg8(L), Reg8(H)),
-        0x6D => Ld(Reg8(L), Reg8(L)),
-        0x6F => Ld(Reg8(L), Reg8(A)),
-        0xA8 => Xor(Reg8(B)),
-        0xA9 => Xor(Reg8(C)),
-        0xAA => Xor(Reg8(D)),
-        0xAB => Xor(Reg8(E)),
-        0xAC => Xor(Reg8(H)),
-        0xAD => Xor(Reg8(L)),
-        0xAF => Xor(Reg8(A)),
-        0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
-        // 0xCD => self.call(),
-        0xE0 => Ld(MemImmHigh(bytes[1]), Reg8(A)),
-        0xEA => Ld(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
-        0xF0 => Ld(Reg8(A), MemImmHigh(bytes[1])),
-        0xF3 => Di,
-        0xFB => Ei,
-        0xFE => Cp(Imm8(bytes[1])),
-
-        0xCB => {
-            match bytes[1] {
-                // 0x00 => self.rotate_left_carry(Regs_8::B),
-                // 0x01 => self.rotate_left_carry(Regs_8::C),
-                // 0x02 => self.rotate_left_carry(Regs_8::D),
-                // 0x03 => self.rotate_left_carry(Regs_8::E),
-                // 0x04 => self.rotate_left_carry(Regs_8::H),
-                // 0x05 => self.rotate_left_carry(Regs_8::L),
-                // 0x07 => self.rotate_left_carry(Regs_8::A),
-                // 0x08 => self.rotate_right_carry(Regs_8::B),
-                // 0x09 => self.rotate_right_carry(Regs_8::C),
-                // 0x0A => self.rotate_right_carry(Regs_8::D),
-                // 0x0B => self.rotate_right_carry(Regs_8::E),
-                // 0x0C => self.rotate_right_carry(Regs_8::H),
-                // 0x0D => self.rotate_right_carry(Regs_8::L),
-                // 0x0F => self.rotate_right_carry(Regs_8::A),
-                _ => return None,
-            }
-        }
-
-        _ => return None,
-    };
-
-    Some(inst)
 }
