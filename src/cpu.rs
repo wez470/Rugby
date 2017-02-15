@@ -80,7 +80,7 @@ fn instruction_length(opcode: u8) -> usize {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Regs_8 {
     A,
     F,
@@ -92,7 +92,7 @@ pub enum Regs_8 {
     L,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Regs_16 {
     AF,
     BC,
@@ -100,6 +100,33 @@ pub enum Regs_16 {
     HL,
     SP,
     PC,
+}
+
+#[derive(Debug)]
+enum Operand {
+    /// 8-bit immediate value.
+    Imm8(u8),
+
+    /// 16-bit immediate value.
+    Imm16(u16),
+
+    /// 8-bit register.
+    Reg8(Regs_8),
+
+    /// 16-bit register.
+    Reg16(Regs_16),
+
+    /// Memory address.
+    Mem(Regs_16),
+}
+
+#[derive(Debug)]
+enum Inst {
+    /// NOP: No operation.
+    Nop,
+
+    /// LD
+    Ld(Operand, Operand),
 }
 
 #[derive(Clone)]
@@ -186,9 +213,14 @@ impl Cpu {
         for &byte in &self.rom[self.base_pc .. (self.base_pc + instruction_len)] {
             print!(" {:02X}", byte);
         }
-        println!();
 
         self.reg_pc.inc(instruction_len as i8);
+
+        if let Some(inst) = decode(&self.rom[self.base_pc..(self.base_pc + instruction_len)]) {
+            println!("\t\t(decoded: {:?})", inst);
+        } else {
+            println!();
+        }
 
         match opcode {
             0x00 => {}, // No-op
@@ -673,4 +705,105 @@ mod tests {
         expected.cycles = 8;
         check_diff(&actual, &expected);
     }
+}
+
+/// Decode a Gameboy instruction from the given bytes.
+///
+/// Panics if the slice is empty or if it isn't long enough for the instruction specified by its
+/// first byte (the opcode).
+fn decode(bytes: &[u8]) -> Option<Inst> {
+    use self::Inst::*;
+    use self::Operand::*;
+    use self::Regs_16::*;
+    use self::Regs_8::*;
+
+    let inst = match bytes[0] {
+        0x00 => Nop,
+        0x06 => Ld(Reg8(B), Imm8(bytes[1])),
+        // 0x11 => Ld(Reg16(DE), Imm16(/* TODO */)),
+        // 0x18 => self.jr_r8(),
+        // 0x28 => self.jr_z_signed_8(),
+        0x3E => Ld(Reg8(A), Imm8(bytes[1])),
+        0x40 => Ld(Reg8(B), Reg8(B)),
+        0x41 => Ld(Reg8(B), Reg8(C)),
+        0x42 => Ld(Reg8(B), Reg8(D)),
+        0x43 => Ld(Reg8(B), Reg8(E)),
+        0x44 => Ld(Reg8(B), Reg8(H)),
+        0x45 => Ld(Reg8(B), Reg8(L)),
+        0x47 => Ld(Reg8(B), Reg8(A)),
+        0x48 => Ld(Reg8(C), Reg8(B)),
+        0x49 => Ld(Reg8(C), Reg8(C)),
+        0x4A => Ld(Reg8(C), Reg8(D)),
+        0x4B => Ld(Reg8(C), Reg8(E)),
+        0x4C => Ld(Reg8(C), Reg8(H)),
+        0x4D => Ld(Reg8(C), Reg8(L)),
+        0x4F => Ld(Reg8(C), Reg8(A)),
+        0x50 => Ld(Reg8(D), Reg8(B)),
+        0x51 => Ld(Reg8(D), Reg8(C)),
+        0x52 => Ld(Reg8(D), Reg8(D)),
+        0x53 => Ld(Reg8(D), Reg8(E)),
+        0x54 => Ld(Reg8(D), Reg8(H)),
+        0x55 => Ld(Reg8(D), Reg8(L)),
+        0x57 => Ld(Reg8(D), Reg8(A)),
+        0x58 => Ld(Reg8(E), Reg8(B)),
+        0x59 => Ld(Reg8(E), Reg8(C)),
+        0x5A => Ld(Reg8(E), Reg8(D)),
+        0x5B => Ld(Reg8(E), Reg8(E)),
+        0x5C => Ld(Reg8(E), Reg8(H)),
+        0x5D => Ld(Reg8(E), Reg8(L)),
+        0x5F => Ld(Reg8(E), Reg8(A)),
+        0x60 => Ld(Reg8(H), Reg8(B)),
+        0x61 => Ld(Reg8(H), Reg8(C)),
+        0x62 => Ld(Reg8(H), Reg8(D)),
+        0x63 => Ld(Reg8(H), Reg8(E)),
+        0x64 => Ld(Reg8(H), Reg8(H)),
+        0x65 => Ld(Reg8(H), Reg8(L)),
+        0x67 => Ld(Reg8(H), Reg8(A)),
+        0x68 => Ld(Reg8(L), Reg8(B)),
+        0x69 => Ld(Reg8(L), Reg8(C)),
+        0x6A => Ld(Reg8(L), Reg8(D)),
+        0x6B => Ld(Reg8(L), Reg8(E)),
+        0x6C => Ld(Reg8(L), Reg8(H)),
+        0x6D => Ld(Reg8(L), Reg8(L)),
+        0x6F => Ld(Reg8(L), Reg8(A)),
+        // 0xA8 => self.xor(Regs_8::B),
+        // 0xA9 => self.xor(Regs_8::C),
+        // 0xAA => self.xor(Regs_8::D),
+        // 0xAB => self.xor(Regs_8::E),
+        // 0xAC => self.xor(Regs_8::H),
+        // 0xAD => self.xor(Regs_8::L),
+        // 0xAF => self.xor(Regs_8::A),
+        // 0xC3 => self.load_imm16(Regs_16::PC), // Note: this is a jump.
+        // 0xCD => self.call(),
+        // 0xE0 => self.store_high_a8(Regs_8::A),
+        // 0xEA => self.store_a16(Regs_8::A),
+        // 0xF0 => self.load_high_a8(Regs_8::A),
+        // 0xF3 => self.pending_disable_interrupts = true,
+        // 0xFB => self.pending_enable_interrupts = true,
+        // 0xFE => self.cp(),
+
+        0xCB => {
+            match bytes[1] {
+                // 0x00 => self.rotate_left_carry(Regs_8::B),
+                // 0x01 => self.rotate_left_carry(Regs_8::C),
+                // 0x02 => self.rotate_left_carry(Regs_8::D),
+                // 0x03 => self.rotate_left_carry(Regs_8::E),
+                // 0x04 => self.rotate_left_carry(Regs_8::H),
+                // 0x05 => self.rotate_left_carry(Regs_8::L),
+                // 0x07 => self.rotate_left_carry(Regs_8::A),
+                // 0x08 => self.rotate_right_carry(Regs_8::B),
+                // 0x09 => self.rotate_right_carry(Regs_8::C),
+                // 0x0A => self.rotate_right_carry(Regs_8::D),
+                // 0x0B => self.rotate_right_carry(Regs_8::E),
+                // 0x0C => self.rotate_right_carry(Regs_8::H),
+                // 0x0D => self.rotate_right_carry(Regs_8::L),
+                // 0x0F => self.rotate_right_carry(Regs_8::A),
+                _ => return None,
+            }
+        }
+
+        _ => return None,
+    };
+
+    Some(inst)
 }
