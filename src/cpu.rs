@@ -164,6 +164,18 @@ enum Inst {
 
     /// EI: Enable interrupts.
     Ei,
+
+    /// RLC: Rotate left 1 bit. Does not flow through carry, despite the name. :)
+    Rlc(Operand),
+
+    /// RL: Rotate left 1 bit. This one does flow through carry, despite the name. :)
+    Rl(Operand),
+
+    /// RRC: Rotate right 1 bit. Does not flow through carry, despite the name. :)
+    Rrc(Operand),
+
+    /// RR: Rotate right 1 bit. This one does flow through carry, despite the name. :)
+    Rr(Operand),
 }
 
 #[derive(Clone)]
@@ -640,20 +652,20 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
 
         0xCB => {
             match bytes[1] {
-                // 0x00 => self.rotate_left_carry(Regs_8::B),
-                // 0x01 => self.rotate_left_carry(Regs_8::C),
-                // 0x02 => self.rotate_left_carry(Regs_8::D),
-                // 0x03 => self.rotate_left_carry(Regs_8::E),
-                // 0x04 => self.rotate_left_carry(Regs_8::H),
-                // 0x05 => self.rotate_left_carry(Regs_8::L),
-                // 0x07 => self.rotate_left_carry(Regs_8::A),
-                // 0x08 => self.rotate_right_carry(Regs_8::B),
-                // 0x09 => self.rotate_right_carry(Regs_8::C),
-                // 0x0A => self.rotate_right_carry(Regs_8::D),
-                // 0x0B => self.rotate_right_carry(Regs_8::E),
-                // 0x0C => self.rotate_right_carry(Regs_8::H),
-                // 0x0D => self.rotate_right_carry(Regs_8::L),
-                // 0x0F => self.rotate_right_carry(Regs_8::A),
+                0x00 => Rlc(Reg8(B)),
+                0x01 => Rlc(Reg8(C)),
+                0x02 => Rlc(Reg8(D)),
+                0x03 => Rlc(Reg8(E)),
+                0x04 => Rlc(Reg8(H)),
+                0x05 => Rlc(Reg8(L)),
+                0x07 => Rlc(Reg8(A)),
+                0x08 => Rrc(Reg8(B)),
+                0x09 => Rrc(Reg8(C)),
+                0x0A => Rrc(Reg8(D)),
+                0x0B => Rrc(Reg8(E)),
+                0x0C => Rrc(Reg8(H)),
+                0x0D => Rrc(Reg8(L)),
+                0x0F => Rrc(Reg8(A)),
                 _ => return None,
             }
         }
