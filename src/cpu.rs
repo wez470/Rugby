@@ -268,6 +268,8 @@ impl Cpu {
         if let Some(inst) = decode(&self.rom[self.base_pc..(self.base_pc + instruction_len)]) {
             println!("\t\t(decoded: {:?})", inst);
             self.execute(inst);
+        } else {
+            println!();
         }
 
         match opcode {
