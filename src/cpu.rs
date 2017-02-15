@@ -255,8 +255,7 @@ impl Cpu {
 
         if let Some(inst) = decode(&self.rom[self.base_pc..(self.base_pc + instruction_len)]) {
             println!("\t\t(decoded: {:?})", inst);
-        } else {
-            println!();
+            self.execute(inst);
         }
 
         match opcode {
@@ -365,6 +364,14 @@ impl Cpu {
     pub fn step_n(&mut self, steps: usize) {
         for _ in 0..steps {
             self.step();
+        }
+    }
+
+    fn execute(&mut self, inst: Inst) {
+        match inst {
+            _ => {
+                println!("unimplemented");
+            }
         }
     }
 
