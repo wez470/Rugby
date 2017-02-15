@@ -150,6 +150,9 @@ enum Inst {
     /// JR: Relative jump.
     Jr(i8, Cond),
 
+    /// CALL: Call the function at the given immediate address.
+    Call(u16, Cond),
+
     /// XOR: Exclusive-or between A and the operand.
     Xor(Operand),
 
@@ -620,7 +623,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xAD => Xor(Reg8(L)),
         0xAF => Xor(Reg8(A)),
         0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
-        // 0xCD => self.call(),
+        0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
         0xE0 => Ld(MemImmHigh(bytes[1]), Reg8(A)),
         0xEA => Ld(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
         0xF0 => Ld(Reg8(A), MemImmHigh(bytes[1])),
