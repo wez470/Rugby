@@ -281,7 +281,7 @@ impl Cpu {
             println!("\t\t(decoded: {:?})", inst);
             self.execute(inst);
         } else {
-            println!();
+            println!("\t\t(could not decode)");
         }
 
         match opcode {
