@@ -357,6 +357,7 @@ impl Cpu {
             0xAF => self.xor(Regs_8::A),
             0xC3 => self.load_imm16(Regs_16::PC), // Note: this is a jump.
             0xCD => self.call(),
+            0xC9 => self.ret(),
             0xE0 => self.store_high_a8(Regs_8::A),
             0xEA => self.store_a16(Regs_8::A),
             0xF0 => self.load_high_a8(Regs_8::A),
@@ -491,16 +492,30 @@ impl Cpu {
     }
 
     fn call(&mut self) {
-        let next_instruction_addr = self.reg_pc.get();
-        self.push(next_instruction_addr);
+        // The return address is the address of the instruction after the call.
+        let return_addr = self.reg_pc.get();
+        self.push_stack(return_addr);
         self.load_imm16(Regs_16::PC);
     }
 
-    fn push(&mut self, val: u16) {
+    fn ret(&mut self) {
+        let return_addr = self.pop_stack();
+        self.set_reg_16(Regs_16::PC, return_addr);
+    }
+
+    fn push_stack(&mut self, val: u16) {
         self.reg_sp.inc(-2);
         let addr = self.reg_sp.get() as usize;
         self.memory.mem[addr] = val as u8; // low
         self.memory.mem[addr + 1] = (val >> 8) as u8; // high
+    }
+
+    fn pop_stack(&mut self) -> u16 {
+        let addr = self.reg_sp.get() as usize;
+        self.reg_sp.inc(2);
+        let low = self.memory.mem[addr];
+        let high = self.memory.mem[addr + 1];
+        to_u16(low, high)
     }
 
     fn get_add_half_carry(first: u8, second: u8) -> bool {
