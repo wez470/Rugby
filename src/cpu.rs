@@ -156,8 +156,11 @@ enum Inst {
     /// HALT: Power down CPU until an interrupt occurs. The Gameboy uses this to save power.
     Halt,
 
-    /// LD: Loads, stores, and moves.
-    Ld(Operand, Operand),
+    /// DI: Disable interrupts.
+    Di,
+
+    /// EI: Enable interrupts.
+    Ei,
 
     /// JP: Absolute jump.
     Jp(u16, Cond),
@@ -168,17 +171,17 @@ enum Inst {
     /// CALL: Call the function at the given immediate address.
     Call(u16, Cond),
 
+    /// RET: Return from the current function by jumping to an address popped from the stack.
+    Ret,
+
+    /// LD: Loads, stores, and moves.
+    Ld(Operand, Operand),
+
     /// XOR: Exclusive-or between A and the operand.
     Xor(Operand),
 
     /// CP: Compare A with the operand. Like `A - operand` but only for the flag side effects.
     Cp(Operand),
-
-    /// DI: Disable interrupts.
-    Di,
-
-    /// EI: Enable interrupts.
-    Ei,
 
     /// RLC: Rotate left 1 bit. Does not flow through carry, despite the name. :)
     Rlc(Operand),
@@ -700,6 +703,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xAD => Xor(Reg8(L)),
         0xAF => Xor(Reg8(A)),
         0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
+        0xC9 => Ret,
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
         0xE0 => Ld(MemImmHigh(bytes[1]), Reg8(A)),
         0xEA => Ld(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
