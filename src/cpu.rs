@@ -153,6 +153,9 @@ enum Inst {
     /// STOP: Halt CPU & LCD display until button pressed.
     Stop,
 
+    /// HALT: Power down CPU until an interrupt occurs. The Gameboy uses this to save power.
+    Halt,
+
     /// LD: Loads, stores, and moves.
     Ld(Operand, Operand),
 
@@ -679,6 +682,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x73 => Ld(MemReg(HL), Reg8(E)),
         0x74 => Ld(MemReg(HL), Reg8(H)),
         0x75 => Ld(MemReg(HL), Reg8(L)),
+        0x76 => Halt,
         0x77 => Ld(MemReg(HL), Reg8(A)),
         0x78 => Ld(Reg8(A), Reg8(B)),
         0x79 => Ld(Reg8(A), Reg8(C)),
