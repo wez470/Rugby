@@ -417,7 +417,7 @@ impl Cpu {
 
     fn set_operand_8(&mut self, dest: Operand8, val: u8) {
         match dest {
-            Operand8::Imm8(_) => panic!("Attempt to store to an 8 bit immediate value"),
+            Operand8::Imm8(_) => panic!("Attempt to store to an 8-bit immediate value"),
             Operand8::Reg8(reg) => self.set_reg_8(reg, val),
             Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize] = val,
             Operand8::MemImmHigh(mem_offset) => self.memory.mem[0xFF00 + mem_offset as usize] = val,
@@ -433,15 +433,15 @@ impl Cpu {
 
     fn get_operand_16(&self, src: Operand16) -> u16 {
         match src {
-            Operand16::Reg16(reg) => self.get_reg_16(reg),
             Operand16::Imm16(val) => val,
+            Operand16::Reg16(reg) => self.get_reg_16(reg),
         }
     }
 
     fn set_operand_16(&mut self, dest: Operand16, val: u16) {
         match dest {
+            Operand16::Imm16(_) => panic!("Attempt to store to a 16-bit immediate value"),
             Operand16::Reg16(reg) => self.set_reg_16(reg, val),
-            Operand16::Imm16(val) => panic!("Attempt to store to a 16 bit immediate value"),
         }
     }
 
