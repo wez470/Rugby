@@ -323,7 +323,6 @@ impl Cpu {
 
         let mut handled_by_opcode_match = true;
         match opcode {
-            0x00 => {}, // No-op
             0x18 => self.jr_r8(),
             0x28 => self.jr_z_signed_8(),
             0xA8 => self.xor(Regs_8::B),
@@ -336,8 +335,6 @@ impl Cpu {
             0xC3 => self.load_imm16(Regs_16::PC), // Note: this is a jump.
             0xCD => self.call(),
             0xC9 => self.ret(),
-            0xF3 => self.pending_disable_interrupts = true,
-            0xFB => self.pending_enable_interrupts = true,
             0xFE => self.cp(),
             0xCB => {
                 let opcode_after_cb = self.rom[self.base_pc + 1];
