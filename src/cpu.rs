@@ -307,13 +307,21 @@ impl Cpu {
 
         self.reg_pc.inc(instruction_len as i8);
 
+        // TODO(solson): We're in the middle of incrementally porting from the old `match opcode`
+        // below to the new `self.execute(inst)` method. While this is happening we're tracking
+        // which instructions are handled by each part with the `handled_*` bools.
+        //
+        // These should be removed when the porting is done.
+        let handled_by_execute;
         if let Some(inst) = decode(&self.rom[self.base_pc..(self.base_pc + instruction_len)]) {
             println!("\t\t(decoded: {:?})", inst);
-            self.execute(inst);
+            handled_by_execute = self.execute(inst);
         } else {
             println!("\t\t(could not decode)");
+            handled_by_execute = false;
         }
 
+        let mut handled_by_opcode_match = true;
         match opcode {
             0x00 => {}, // No-op
             0x06 => self.load_imm8(Regs_8::B),
@@ -379,7 +387,6 @@ impl Cpu {
             0xF3 => self.pending_disable_interrupts = true,
             0xFB => self.pending_enable_interrupts = true,
             0xFE => self.cp(),
-
             0xCB => {
                 let opcode_after_cb = self.rom[self.base_pc + 1];
                 match opcode_after_cb {
@@ -397,17 +404,17 @@ impl Cpu {
                     0x0C => self.rotate_right_carry(Regs_8::H),
                     0x0D => self.rotate_right_carry(Regs_8::L),
                     0x0F => self.rotate_right_carry(Regs_8::A),
-
-                    _ => {
-                        println!("unimplemented: CB {:02X}", opcode_after_cb);
-                    }
+                    _ => handled_by_opcode_match = false,
                 }
             }
-
-            _ => {
-                println!("unimplemented: {:02X}", opcode);
-            }
+            _ => handled_by_opcode_match = false,
         };
+
+        if handled_by_execute && handled_by_opcode_match {
+            panic!("instruction was handled twice");
+        } else if !handled_by_execute && !handled_by_opcode_match {
+            println!("  unimplemented");
+        }
 
         if pending_enable_interrupts {
             self.interrupts_enabled = true;
@@ -424,18 +431,20 @@ impl Cpu {
         }
     }
 
-    fn execute(&mut self, inst: Inst) {
+    // TODO(solson): We should remove the "was handled" return value once all instructions are
+    // handled.
+    /// Execute the given instruction. Returns true if the instruction was handled.
+    fn execute(&mut self, inst: Inst) -> bool {
         match inst {
             Inst::Nop => {},
             Inst::Di => self.pending_disable_interrupts = true,
             Inst::Ei => self.pending_enable_interrupts = true,
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
-
-            _ => {
-                println!("unimplemented");
-            }
+            _ => return false,
         }
+
+        true
     }
 
     /// Load 8 bits from `src` and store them into `dest`.
