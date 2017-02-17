@@ -324,53 +324,8 @@ impl Cpu {
         let mut handled_by_opcode_match = true;
         match opcode {
             0x00 => {}, // No-op
-            0x06 => self.load_imm8(Regs_8::B),
-            0x11 => self.load_imm16(Regs_16::DE),
             0x18 => self.jr_r8(),
             0x28 => self.jr_z_signed_8(),
-            0x3E => self.load_imm8(Regs_8::A),
-            0x40 => self.copy_reg_8(Regs_8::B, Regs_8::B),
-            0x41 => self.copy_reg_8(Regs_8::B, Regs_8::C),
-            0x42 => self.copy_reg_8(Regs_8::B, Regs_8::D),
-            0x43 => self.copy_reg_8(Regs_8::B, Regs_8::E),
-            0x44 => self.copy_reg_8(Regs_8::B, Regs_8::H),
-            0x45 => self.copy_reg_8(Regs_8::B, Regs_8::L),
-            0x47 => self.copy_reg_8(Regs_8::B, Regs_8::A),
-            0x48 => self.copy_reg_8(Regs_8::C, Regs_8::B),
-            0x49 => self.copy_reg_8(Regs_8::C, Regs_8::C),
-            0x4A => self.copy_reg_8(Regs_8::C, Regs_8::D),
-            0x4B => self.copy_reg_8(Regs_8::C, Regs_8::E),
-            0x4C => self.copy_reg_8(Regs_8::C, Regs_8::H),
-            0x4D => self.copy_reg_8(Regs_8::C, Regs_8::L),
-            0x4F => self.copy_reg_8(Regs_8::C, Regs_8::A),
-            0x50 => self.copy_reg_8(Regs_8::D, Regs_8::B),
-            0x51 => self.copy_reg_8(Regs_8::D, Regs_8::C),
-            0x52 => self.copy_reg_8(Regs_8::D, Regs_8::D),
-            0x53 => self.copy_reg_8(Regs_8::D, Regs_8::E),
-            0x54 => self.copy_reg_8(Regs_8::D, Regs_8::H),
-            0x55 => self.copy_reg_8(Regs_8::D, Regs_8::L),
-            0x57 => self.copy_reg_8(Regs_8::D, Regs_8::A),
-            0x58 => self.copy_reg_8(Regs_8::E, Regs_8::B),
-            0x59 => self.copy_reg_8(Regs_8::E, Regs_8::C),
-            0x5A => self.copy_reg_8(Regs_8::E, Regs_8::D),
-            0x5B => self.copy_reg_8(Regs_8::E, Regs_8::E),
-            0x5C => self.copy_reg_8(Regs_8::E, Regs_8::H),
-            0x5D => self.copy_reg_8(Regs_8::E, Regs_8::L),
-            0x5F => self.copy_reg_8(Regs_8::E, Regs_8::A),
-            0x60 => self.copy_reg_8(Regs_8::H, Regs_8::B),
-            0x61 => self.copy_reg_8(Regs_8::H, Regs_8::C),
-            0x62 => self.copy_reg_8(Regs_8::H, Regs_8::D),
-            0x63 => self.copy_reg_8(Regs_8::H, Regs_8::E),
-            0x64 => self.copy_reg_8(Regs_8::H, Regs_8::H),
-            0x65 => self.copy_reg_8(Regs_8::H, Regs_8::L),
-            0x67 => self.copy_reg_8(Regs_8::H, Regs_8::A),
-            0x68 => self.copy_reg_8(Regs_8::L, Regs_8::B),
-            0x69 => self.copy_reg_8(Regs_8::L, Regs_8::C),
-            0x6A => self.copy_reg_8(Regs_8::L, Regs_8::D),
-            0x6B => self.copy_reg_8(Regs_8::L, Regs_8::E),
-            0x6C => self.copy_reg_8(Regs_8::L, Regs_8::H),
-            0x6D => self.copy_reg_8(Regs_8::L, Regs_8::L),
-            0x6F => self.copy_reg_8(Regs_8::L, Regs_8::A),
             0xA8 => self.xor(Regs_8::B),
             0xA9 => self.xor(Regs_8::C),
             0xAA => self.xor(Regs_8::D),
@@ -381,9 +336,6 @@ impl Cpu {
             0xC3 => self.load_imm16(Regs_16::PC), // Note: this is a jump.
             0xCD => self.call(),
             0xC9 => self.ret(),
-            0xE0 => self.store_high_a8(Regs_8::A),
-            0xEA => self.store_a16(Regs_8::A),
-            0xF0 => self.load_high_a8(Regs_8::A),
             0xF3 => self.pending_disable_interrupts = true,
             0xFB => self.pending_enable_interrupts = true,
             0xFE => self.cp(),
@@ -493,18 +445,6 @@ impl Cpu {
         }
     }
 
-    /// Load immediate 8-bit data into the given register.
-    fn copy_reg_8(&mut self, dest: Regs_8, src: Regs_8) {
-        let n = self.get_reg_8(src);
-        self.set_reg_8(dest, n);
-    }
-
-    /// Load immediate 8-bit data into the given register.
-    fn load_imm8(&mut self, reg: Regs_8) {
-        let n = self.rom[self.base_pc + 1];
-        self.set_reg_8(reg, n);
-    }
-
     /// Load immediate 16-bit data into the given register.
     fn load_imm16(&mut self, reg: Regs_16) {
         let low = self.rom[self.base_pc + 1] as u16;
@@ -532,30 +472,6 @@ impl Cpu {
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
         self.set_carry_flag(false);
-    }
-
-    /// Load an 8-bit register value from an immediate 8-bit memory address, after adding 0xFF00 to
-    /// the address.
-    fn load_high_a8(&mut self, reg: Regs_8) {
-        let addr_low = self.rom[self.base_pc + 1];
-        let addr = 0xFF00u16 | addr_low as u16;
-        let val = self.memory.mem[addr as usize];
-        self.set_reg_8(reg, val);
-    }
-
-    /// Store an 8-bit register value in an immediate 8-bit memory address, after adding 0xFF00 to
-    /// the address.
-    fn store_high_a8(&mut self, reg: Regs_8) {
-        let addr_low = self.rom[self.base_pc + 1];
-        let addr = 0xFF00u16 | addr_low as u16;
-        self.memory.mem[addr as usize] = self.get_reg_8(reg);
-    }
-
-    /// Store an 8-bit register value in an immediate 16-bit memory address.
-    fn store_a16(&mut self, reg: Regs_8) {
-        let low = self.rom[self.base_pc + 1] as u16;
-        let high = self.rom[self.base_pc + 2] as u16;
-        self.memory.mem[((high << 8) | low) as usize] = self.get_reg_8(reg);
     }
 
     fn cp(&mut self) {
