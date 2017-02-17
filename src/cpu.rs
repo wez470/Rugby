@@ -421,6 +421,7 @@ impl Cpu {
     fn execute(&mut self, inst: Inst) {
         match inst {
             Inst::Ld8(oper_1, oper_2) => self.ld_8(oper_1, oper_2),
+            Inst::Ld16(oper_1, oper_2) => self.ld_16(oper_1, oper_2),
 
             _ => {
                 println!("unimplemented");
@@ -451,6 +452,26 @@ impl Cpu {
             Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize] = val,
             Operand8::MemImmHigh(mem_offset) => self.memory.mem[0xFF00 + mem_offset as usize] = val,
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize] = val,
+        }
+    }
+
+    /// Load 16 bit operand two into 16 bit operand one
+    fn ld_16(&mut self, op_1: Operand16, op_2: Operand16) {
+        let val = self.get_operand_16(op_2);
+        self.set_operand_16(op_1, val);
+    }
+
+    fn get_operand_16(&self, op: Operand16) -> u16 {
+        match op {
+            Operand16::Reg16(reg) => self.get_reg_16(reg),
+            Operand16::Imm16(val) => val,
+        }
+    }
+
+    fn set_operand_16(&mut self, op: Operand16, val: u16) {
+        match op {
+            Operand16::Reg16(reg) => self.set_reg_16(reg, val),
+            Operand16::Imm16(val) => panic!("Attempt to store to a 16 bit immediate value"),
         }
     }
 
