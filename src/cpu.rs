@@ -426,6 +426,9 @@ impl Cpu {
 
     fn execute(&mut self, inst: Inst) {
         match inst {
+            Inst::Nop => {},
+            Inst::Di => self.pending_disable_interrupts = true,
+            Inst::Ei => self.pending_enable_interrupts = true,
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
 
