@@ -102,19 +102,14 @@ pub enum Regs_16 {
     PC,
 }
 
+/// Represents an operand resolving to an 8 bit value
 #[derive(Debug)]
-enum Operand {
+enum Operand8 {
     /// 8-bit immediate value.
     Imm8(u8),
 
-    /// 16-bit immediate value.
-    Imm16(u16),
-
     /// 8-bit register.
     Reg8(Regs_8),
-
-    /// 16-bit register.
-    Reg16(Regs_16),
 
     /// Memory location at the given immediate address.
     MemImm(u16),
@@ -125,6 +120,17 @@ enum Operand {
     /// Memory location at the address in the given register.
     MemReg(Regs_16),
 }
+
+/// Represents an operand resolving to a 16 bit value
+#[derive(Debug)]
+enum Operand16 {
+    /// 16-bit register.
+    Reg16(Regs_16),
+
+    /// 16-bit immediate value.
+    Imm16(u16),
+}
+
 
 /// Represents the condition checked by a conditional instruction (JP, JR, RET, or CALL).
 #[derive(Debug)]
@@ -174,35 +180,38 @@ enum Inst {
     /// RET: Return from the current function by jumping to an address popped from the stack.
     Ret,
 
-    /// LD: Loads, stores, and moves.
-    Ld(Operand, Operand),
+    /// LD: Loads, stores, and moves for 8 bit values
+    Ld8(Operand8, Operand8),
+
+    /// LD: Loads, stores, and moves for 16 bit values
+    Ld16(Operand16, Operand16),
 
     /// XOR: Exclusive-or between A and the operand.
-    Xor(Operand),
+    Xor(Operand8),
 
     /// CP: Compare A with the operand. Like `A - operand` but only for the flag side effects.
-    Cp(Operand),
+    Cp(Operand8),
 
     /// RLC: Rotate left 1 bit. Does not flow through carry, despite the name. :)
-    Rlc(Operand),
+    Rlc(Operand8),
 
     /// RL: Rotate left 1 bit. This one does flow through carry, despite the name. :)
-    Rl(Operand),
+    Rl(Operand8),
 
     /// RRC: Rotate right 1 bit. Does not flow through carry, despite the name. :)
-    Rrc(Operand),
+    Rrc(Operand8),
 
     /// RR: Rotate right 1 bit. This one does flow through carry, despite the name. :)
-    Rr(Operand),
+    Rr(Operand8),
 
     /// BIT: Test the bit at the given index in the given operand. Sets the zero flag accordingly.
-    Bit(u8, Operand),
+    Bit(u8, Operand8),
 
     /// RES: Reset the bit at the given index in the given operand. (Set to zero.)
-    Res(u8, Operand),
+    Res(u8, Operand8),
 
     /// SET: Set the bit at the given index in the given operand. (Set to one.)
-    Set(u8, Operand),
+    Set(u8, Operand8),
 }
 
 #[derive(Clone)]
@@ -625,13 +634,14 @@ impl Cpu {
 /// first byte (the opcode).
 fn decode(bytes: &[u8]) -> Option<Inst> {
     use self::Inst::*;
-    use self::Operand::*;
+    use self::Operand8::*;
+    use self::Operand16::*;
     use self::Regs_16::*;
     use self::Regs_8::*;
 
     let inst = match bytes[0] {
         0x00 => Nop,
-        0x06 => Ld(Reg8(B), Imm8(bytes[1])),
+        0x06 => Ld8(Reg8(B), Imm8(bytes[1])),
         0x10 => {
             // FIXME: For some reason the STOP instruction is followed by 0x00 according to the
             // manual. Perhaps this should result in an invalid instruction if it's not zero. For
@@ -639,77 +649,77 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
             assert_eq!(bytes[1], 0);
             Stop
         }
-        0x11 => Ld(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x11 => Ld16(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
         0x18 => Jr(bytes[1] as i8, Cond::None),
         0x20 => Jr(bytes[1] as i8, Cond::NotZero),
         0x28 => Jr(bytes[1] as i8, Cond::Zero),
         0x30 => Jr(bytes[1] as i8, Cond::NotCarry),
         0x38 => Jr(bytes[1] as i8, Cond::Carry),
-        0x3E => Ld(Reg8(A), Imm8(bytes[1])),
-        0x40 => Ld(Reg8(B), Reg8(B)),
-        0x41 => Ld(Reg8(B), Reg8(C)),
-        0x42 => Ld(Reg8(B), Reg8(D)),
-        0x43 => Ld(Reg8(B), Reg8(E)),
-        0x44 => Ld(Reg8(B), Reg8(H)),
-        0x45 => Ld(Reg8(B), Reg8(L)),
-        0x46 => Ld(Reg8(B), MemReg(HL)),
-        0x47 => Ld(Reg8(B), Reg8(A)),
-        0x48 => Ld(Reg8(C), Reg8(B)),
-        0x49 => Ld(Reg8(C), Reg8(C)),
-        0x4A => Ld(Reg8(C), Reg8(D)),
-        0x4B => Ld(Reg8(C), Reg8(E)),
-        0x4C => Ld(Reg8(C), Reg8(H)),
-        0x4D => Ld(Reg8(C), Reg8(L)),
-        0x4E => Ld(Reg8(C), MemReg(HL)),
-        0x4F => Ld(Reg8(C), Reg8(A)),
-        0x50 => Ld(Reg8(D), Reg8(B)),
-        0x51 => Ld(Reg8(D), Reg8(C)),
-        0x52 => Ld(Reg8(D), Reg8(D)),
-        0x53 => Ld(Reg8(D), Reg8(E)),
-        0x54 => Ld(Reg8(D), Reg8(H)),
-        0x55 => Ld(Reg8(D), Reg8(L)),
-        0x56 => Ld(Reg8(D), MemReg(HL)),
-        0x57 => Ld(Reg8(D), Reg8(A)),
-        0x58 => Ld(Reg8(E), Reg8(B)),
-        0x59 => Ld(Reg8(E), Reg8(C)),
-        0x5A => Ld(Reg8(E), Reg8(D)),
-        0x5B => Ld(Reg8(E), Reg8(E)),
-        0x5C => Ld(Reg8(E), Reg8(H)),
-        0x5D => Ld(Reg8(E), Reg8(L)),
-        0x5E => Ld(Reg8(E), MemReg(HL)),
-        0x5F => Ld(Reg8(E), Reg8(A)),
-        0x60 => Ld(Reg8(H), Reg8(B)),
-        0x61 => Ld(Reg8(H), Reg8(C)),
-        0x62 => Ld(Reg8(H), Reg8(D)),
-        0x63 => Ld(Reg8(H), Reg8(E)),
-        0x64 => Ld(Reg8(H), Reg8(H)),
-        0x65 => Ld(Reg8(H), Reg8(L)),
-        0x66 => Ld(Reg8(H), MemReg(HL)),
-        0x67 => Ld(Reg8(H), Reg8(A)),
-        0x68 => Ld(Reg8(L), Reg8(B)),
-        0x69 => Ld(Reg8(L), Reg8(C)),
-        0x6A => Ld(Reg8(L), Reg8(D)),
-        0x6B => Ld(Reg8(L), Reg8(E)),
-        0x6C => Ld(Reg8(L), Reg8(H)),
-        0x6D => Ld(Reg8(L), Reg8(L)),
-        0x6E => Ld(Reg8(L), MemReg(HL)),
-        0x6F => Ld(Reg8(L), Reg8(A)),
-        0x70 => Ld(MemReg(HL), Reg8(B)),
-        0x71 => Ld(MemReg(HL), Reg8(C)),
-        0x72 => Ld(MemReg(HL), Reg8(D)),
-        0x73 => Ld(MemReg(HL), Reg8(E)),
-        0x74 => Ld(MemReg(HL), Reg8(H)),
-        0x75 => Ld(MemReg(HL), Reg8(L)),
+        0x3E => Ld8(Reg8(A), Imm8(bytes[1])),
+        0x40 => Ld8(Reg8(B), Reg8(B)),
+        0x41 => Ld8(Reg8(B), Reg8(C)),
+        0x42 => Ld8(Reg8(B), Reg8(D)),
+        0x43 => Ld8(Reg8(B), Reg8(E)),
+        0x44 => Ld8(Reg8(B), Reg8(H)),
+        0x45 => Ld8(Reg8(B), Reg8(L)),
+        0x46 => Ld8(Reg8(B), MemReg(HL)),
+        0x47 => Ld8(Reg8(B), Reg8(A)),
+        0x48 => Ld8(Reg8(C), Reg8(B)),
+        0x49 => Ld8(Reg8(C), Reg8(C)),
+        0x4A => Ld8(Reg8(C), Reg8(D)),
+        0x4B => Ld8(Reg8(C), Reg8(E)),
+        0x4C => Ld8(Reg8(C), Reg8(H)),
+        0x4D => Ld8(Reg8(C), Reg8(L)),
+        0x4E => Ld8(Reg8(C), MemReg(HL)),
+        0x4F => Ld8(Reg8(C), Reg8(A)),
+        0x50 => Ld8(Reg8(D), Reg8(B)),
+        0x51 => Ld8(Reg8(D), Reg8(C)),
+        0x52 => Ld8(Reg8(D), Reg8(D)),
+        0x53 => Ld8(Reg8(D), Reg8(E)),
+        0x54 => Ld8(Reg8(D), Reg8(H)),
+        0x55 => Ld8(Reg8(D), Reg8(L)),
+        0x56 => Ld8(Reg8(D), MemReg(HL)),
+        0x57 => Ld8(Reg8(D), Reg8(A)),
+        0x58 => Ld8(Reg8(E), Reg8(B)),
+        0x59 => Ld8(Reg8(E), Reg8(C)),
+        0x5A => Ld8(Reg8(E), Reg8(D)),
+        0x5B => Ld8(Reg8(E), Reg8(E)),
+        0x5C => Ld8(Reg8(E), Reg8(H)),
+        0x5D => Ld8(Reg8(E), Reg8(L)),
+        0x5E => Ld8(Reg8(E), MemReg(HL)),
+        0x5F => Ld8(Reg8(E), Reg8(A)),
+        0x60 => Ld8(Reg8(H), Reg8(B)),
+        0x61 => Ld8(Reg8(H), Reg8(C)),
+        0x62 => Ld8(Reg8(H), Reg8(D)),
+        0x63 => Ld8(Reg8(H), Reg8(E)),
+        0x64 => Ld8(Reg8(H), Reg8(H)),
+        0x65 => Ld8(Reg8(H), Reg8(L)),
+        0x66 => Ld8(Reg8(H), MemReg(HL)),
+        0x67 => Ld8(Reg8(H), Reg8(A)),
+        0x68 => Ld8(Reg8(L), Reg8(B)),
+        0x69 => Ld8(Reg8(L), Reg8(C)),
+        0x6A => Ld8(Reg8(L), Reg8(D)),
+        0x6B => Ld8(Reg8(L), Reg8(E)),
+        0x6C => Ld8(Reg8(L), Reg8(H)),
+        0x6D => Ld8(Reg8(L), Reg8(L)),
+        0x6E => Ld8(Reg8(L), MemReg(HL)),
+        0x6F => Ld8(Reg8(L), Reg8(A)),
+        0x70 => Ld8(MemReg(HL), Reg8(B)),
+        0x71 => Ld8(MemReg(HL), Reg8(C)),
+        0x72 => Ld8(MemReg(HL), Reg8(D)),
+        0x73 => Ld8(MemReg(HL), Reg8(E)),
+        0x74 => Ld8(MemReg(HL), Reg8(H)),
+        0x75 => Ld8(MemReg(HL), Reg8(L)),
         0x76 => Halt,
-        0x77 => Ld(MemReg(HL), Reg8(A)),
-        0x78 => Ld(Reg8(A), Reg8(B)),
-        0x79 => Ld(Reg8(A), Reg8(C)),
-        0x7A => Ld(Reg8(A), Reg8(D)),
-        0x7B => Ld(Reg8(A), Reg8(E)),
-        0x7C => Ld(Reg8(A), Reg8(H)),
-        0x7D => Ld(Reg8(A), Reg8(L)),
-        0x7E => Ld(Reg8(A), MemReg(HL)),
-        0x7F => Ld(Reg8(A), Reg8(A)),
+        0x77 => Ld8(MemReg(HL), Reg8(A)),
+        0x78 => Ld8(Reg8(A), Reg8(B)),
+        0x79 => Ld8(Reg8(A), Reg8(C)),
+        0x7A => Ld8(Reg8(A), Reg8(D)),
+        0x7B => Ld8(Reg8(A), Reg8(E)),
+        0x7C => Ld8(Reg8(A), Reg8(H)),
+        0x7D => Ld8(Reg8(A), Reg8(L)),
+        0x7E => Ld8(Reg8(A), MemReg(HL)),
+        0x7F => Ld8(Reg8(A), Reg8(A)),
         0xA8 => Xor(Reg8(B)),
         0xA9 => Xor(Reg8(C)),
         0xAA => Xor(Reg8(D)),
@@ -720,9 +730,9 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
         0xC9 => Ret,
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
-        0xE0 => Ld(MemImmHigh(bytes[1]), Reg8(A)),
-        0xEA => Ld(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
-        0xF0 => Ld(Reg8(A), MemImmHigh(bytes[1])),
+        0xE0 => Ld8(MemImmHigh(bytes[1]), Reg8(A)),
+        0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
+        0xF0 => Ld8(Reg8(A), MemImmHigh(bytes[1])),
         0xF3 => Di,
         0xFB => Ei,
         0xFE => Cp(Imm8(bytes[1])),
