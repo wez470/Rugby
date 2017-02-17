@@ -420,9 +420,37 @@ impl Cpu {
 
     fn execute(&mut self, inst: Inst) {
         match inst {
+            Inst::Ld8(oper_1, oper_2) => self.ld_8(oper_1, oper_2),
+
             _ => {
                 println!("unimplemented");
             }
+        }
+    }
+
+    /// Load 8 bit operand two into 8 bit operand one
+    fn ld_8(&mut self, op_1: Operand8, op_2: Operand8) {
+        let val = self.get_operand_8(op_2);
+        self.set_operand_8(op_1, val);
+    }
+
+    fn get_operand_8(&self, op: Operand8) -> u8 {
+        match op {
+            Operand8::Imm8(val) => val,
+            Operand8::Reg8(reg) => self.get_reg_8(reg),
+            Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize],
+            Operand8::MemImmHigh(mem_offset) => self.memory.mem[0xFF00 + mem_offset as usize],
+            Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize],
+        }
+    }
+
+    fn set_operand_8(&mut self, op: Operand8, val: u8) {
+        match op {
+            Operand8::Imm8(_) => panic!("Attempt to store to an 8 bit immediate value"),
+            Operand8::Reg8(reg) => self.set_reg_8(reg, val),
+            Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize] = val,
+            Operand8::MemImmHigh(mem_offset) => self.memory.mem[0xFF00 + mem_offset as usize] = val,
+            Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize] = val,
         }
     }
 
