@@ -102,7 +102,7 @@ pub enum Regs_16 {
     PC,
 }
 
-/// Represents an operand resolving to an 8 bit value
+/// Represents an operand resolving to an 8-bit value.
 #[derive(Debug)]
 enum Operand8 {
     /// 8-bit immediate value.
@@ -121,14 +121,14 @@ enum Operand8 {
     MemReg(Regs_16),
 }
 
-/// Represents an operand resolving to a 16 bit value
+/// Represents an operand resolving to a 16-bit value.
 #[derive(Debug)]
 enum Operand16 {
-    /// 16-bit register.
-    Reg16(Regs_16),
-
     /// 16-bit immediate value.
     Imm16(u16),
+
+    /// 16-bit register.
+    Reg16(Regs_16),
 }
 
 
@@ -420,8 +420,8 @@ impl Cpu {
 
     fn execute(&mut self, inst: Inst) {
         match inst {
-            Inst::Ld8(oper_1, oper_2) => self.ld_8(oper_1, oper_2),
-            Inst::Ld16(oper_1, oper_2) => self.ld_16(oper_1, oper_2),
+            Inst::Ld8(dest, src) => self.ld_8(dest, src),
+            Inst::Ld16(dest, src) => self.ld_16(dest, src),
 
             _ => {
                 println!("unimplemented");
@@ -429,14 +429,14 @@ impl Cpu {
         }
     }
 
-    /// Load 8 bit operand two into 8 bit operand one
-    fn ld_8(&mut self, op_1: Operand8, op_2: Operand8) {
-        let val = self.get_operand_8(op_2);
-        self.set_operand_8(op_1, val);
+    /// Load 8 bits from `src` and store them into `dest`.
+    fn ld_8(&mut self, dest: Operand8, src: Operand8) {
+        let val = self.get_operand_8(src);
+        self.set_operand_8(dest, val);
     }
 
-    fn get_operand_8(&self, op: Operand8) -> u8 {
-        match op {
+    fn get_operand_8(&self, src: Operand8) -> u8 {
+        match src {
             Operand8::Imm8(val) => val,
             Operand8::Reg8(reg) => self.get_reg_8(reg),
             Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize],
@@ -445,8 +445,8 @@ impl Cpu {
         }
     }
 
-    fn set_operand_8(&mut self, op: Operand8, val: u8) {
-        match op {
+    fn set_operand_8(&mut self, dest: Operand8, val: u8) {
+        match dest {
             Operand8::Imm8(_) => panic!("Attempt to store to an 8 bit immediate value"),
             Operand8::Reg8(reg) => self.set_reg_8(reg, val),
             Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize] = val,
@@ -455,21 +455,21 @@ impl Cpu {
         }
     }
 
-    /// Load 16 bit operand two into 16 bit operand one
-    fn ld_16(&mut self, op_1: Operand16, op_2: Operand16) {
-        let val = self.get_operand_16(op_2);
-        self.set_operand_16(op_1, val);
+    /// Load 16 bits from `src` and store them into `dest`.
+    fn ld_16(&mut self, dest: Operand16, src: Operand16) {
+        let val = self.get_operand_16(src);
+        self.set_operand_16(dest, val);
     }
 
-    fn get_operand_16(&self, op: Operand16) -> u16 {
-        match op {
+    fn get_operand_16(&self, src: Operand16) -> u16 {
+        match src {
             Operand16::Reg16(reg) => self.get_reg_16(reg),
             Operand16::Imm16(val) => val,
         }
     }
 
-    fn set_operand_16(&mut self, op: Operand16, val: u16) {
-        match op {
+    fn set_operand_16(&mut self, dest: Operand16, val: u16) {
+        match dest {
             Operand16::Reg16(reg) => self.set_reg_16(reg, val),
             Operand16::Imm16(val) => panic!("Attempt to store to a 16 bit immediate value"),
         }
