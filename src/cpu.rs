@@ -218,19 +218,25 @@ enum Inst {
 pub struct Cpu {
     /// Register containing the flags register and register 'A'
     reg_af: Reg16,
+
     /// Register containing registers 'B' and 'C'
     reg_bc: Reg16,
+
     /// Register containing registers 'D' and 'E'
     reg_de: Reg16,
+
     /// Register containing registers 'H' and 'L'
     reg_hl: Reg16,
+
     /// Register that contains the stack pointer
     reg_sp: Reg16,
+
     /// Register that contains the program counter
     reg_pc: Reg16,
 
     /// RAM
     memory: Memory,
+
     /// ROM (game cartridge)
     rom: Box<[u8]>,
 
