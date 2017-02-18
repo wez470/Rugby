@@ -1,6 +1,11 @@
 use reg_16::Reg16;
 use memory::Memory;
 
+pub const ZERO_FLAG: u8 = 7;
+pub const SUB_FLAG: u8 = 6;
+pub const HALF_CARRY_FLAG: u8 = 5;
+pub const CARRY_FLAG: u8 = 4;
+
 pub const BASE_CYCLES: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      4, 12,  8,  8,  4,  4,  8,  4, 20,  8,  8,  8,  4,  4,  8,  4, // 0
@@ -353,7 +358,6 @@ impl Cpu {
             0xAC => self.xor(Regs_8::H),
             0xAD => self.xor(Regs_8::L),
             0xAF => self.xor(Regs_8::A),
-            0xC3 => self.load_imm16(Regs_16::PC), // Note: this is a jump.
             0xCD => self.call(),
             0xC9 => self.ret(),
             0xFE => self.cp(),
@@ -410,12 +414,32 @@ impl Cpu {
             Inst::Nop => {},
             Inst::Di => self.pending_disable_interrupts = true,
             Inst::Ei => self.pending_enable_interrupts = true,
+            Inst::Jp(location, cond) => self.jp(location, cond),
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
             _ => return false,
         }
 
         true
+    }
+    
+    // TODO(wcarlson): verify if cycle count will need to be increased based on the
+    // condition.
+    /// Jump to the specified location if the condition is met
+    fn jp(&mut self, loc: u16, cond: Cond) {
+        if self.is_cond_met(cond) {
+            self.reg_pc.set(loc);
+        }
+    }
+
+    fn is_cond_met(&self, cond: Cond) -> bool {
+        match cond {
+            Cond::None => true,
+            Cond::Zero => self.get_zero_flag(),
+            Cond::NotZero => !self.get_zero_flag(),
+            Cond::Carry => self.get_carry_flag(),
+            Cond::NotCarry => !self.get_carry_flag(),
+        }
     }
 
     /// Load 8 bits from `src` and store them into `dest`.
@@ -540,23 +564,27 @@ impl Cpu {
     }
 
     fn set_zero_flag(&mut self, set: bool) {
-        self.reg_af.set_bit_8(set);
-    }
-
-    fn set_sub_flag(&mut self, set: bool) {
-        self.reg_af.set_bit_7(set);
-    }
-
-    fn set_half_carry_flag(&mut self, set: bool) {
-        self.reg_af.set_bit_6(set);
-    }
-
-    fn set_carry_flag(&mut self, set: bool) {
-        self.reg_af.set_bit_5(set);
+        self.reg_af.set_bit(ZERO_FLAG, set);
     }
 
     fn get_zero_flag(&self) -> bool {
-        self.reg_af.is_bit_8_set()
+        self.reg_af.is_bit_set(ZERO_FLAG)
+    }
+
+    fn set_sub_flag(&mut self, set: bool) {
+        self.reg_af.set_bit(SUB_FLAG, set);
+    }
+
+    fn set_half_carry_flag(&mut self, set: bool) {
+        self.reg_af.set_bit(HALF_CARRY_FLAG, set);
+    }
+
+    fn set_carry_flag(&mut self, set: bool) {
+        self.reg_af.set_bit(CARRY_FLAG, set);
+    }
+
+    fn get_carry_flag(&self) -> bool {
+        self.reg_af.is_bit_set(CARRY_FLAG)
     }
 
     fn set_reg_8(&mut self, reg: Regs_8, val: u8) {

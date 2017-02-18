@@ -19,43 +19,17 @@ impl Reg16 {
         self.set(new_val);
     }
 
-    pub fn set_bit_8(&mut self, set: bool) {
-        if set {
-            self.low |= 128;
-        }
-        else {
-            self.low &= 127;
-        }
+    pub fn is_bit_set(&self, bit: u8) -> bool {
+        self.get() & (1 << bit) != 0
     }
 
-    pub fn is_bit_8_set(&self) -> bool {
-        self.low & 128 == 128
-    }
-
-    pub fn set_bit_7(&mut self, set: bool) {
+    pub fn set_bit(&mut self, bit: u8, set: bool) {
+        let val = self.get();
         if set {
-            self.low |= 64;
+            self.set(val | (1 << bit));
         }
         else {
-            self.low &= 191;
-        }
-    }
-
-    pub fn set_bit_6(&mut self, set: bool) {
-        if set {
-            self.low |= 32;
-        }
-        else {
-            self.low &= 223;
-        }
-    }
-
-    pub fn set_bit_5(&mut self, set: bool) {
-        if set {
-            self.low |= 16;
-        }
-        else {
-            self.low &= 239;
+            self.set(val & !(1 << bit));
         }
     }
 }
