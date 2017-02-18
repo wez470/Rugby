@@ -176,6 +176,10 @@ enum Inst {
     /// EI: Enable interrupts.
     Ei,
 
+    // TODO(wcarlson): Consider splitting this out into 3 jump instructions (JpCond, Jp, JpHl).
+    // The gameboy cpu manual lists them as three distinct instructions.
+    // Alternatively could be two instructions with one of them taking an Operand16. Also should
+    // consider removing None from the Cond enum. Jp is broken in it's current state
     /// JP: Absolute jump.
     Jp(u16, Cond),
 
@@ -423,11 +427,10 @@ impl Cpu {
         true
     }
     
-    // TODO(wcarlson): verify if cycle count will need to be increased based on the
-    // condition or instruction.
     /// Jump to the specified location if the condition is met
     fn jp(&mut self, loc: u16, cond: Cond) {
         if self.is_cond_met(cond) {
+            self.cycles += 4;
             self.reg_pc.set(loc);
         }
     }
