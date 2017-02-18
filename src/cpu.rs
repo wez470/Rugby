@@ -424,7 +424,7 @@ impl Cpu {
     }
     
     // TODO(wcarlson): verify if cycle count will need to be increased based on the
-    // condition.
+    // condition or instruction.
     /// Jump to the specified location if the condition is met
     fn jp(&mut self, loc: u16, cond: Cond) {
         if self.is_cond_met(cond) {
