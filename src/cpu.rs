@@ -359,10 +359,11 @@ impl Cpu {
             _ => handled_by_opcode_match = false,
         };
 
-        if handled_by_execute && handled_by_opcode_match {
-            panic!("instruction was handled twice");
-        } else if !handled_by_execute && !handled_by_opcode_match {
-            println!("  unimplemented");
+        match (handled_by_execute, handled_by_opcode_match) {
+            (true, true) => panic!("instruction was handled twice"),
+            (true, false) => {}, // Good case: only handled by new code.
+            (false, true) => println!("  handled by old match"),
+            (false, false) => println!("  unimplemented"),
         }
 
         if pending_enable_interrupts {
