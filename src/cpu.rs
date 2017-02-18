@@ -436,7 +436,7 @@ impl Cpu {
         match src {
             Operand16::Imm16(val) => val,
             Operand16::Reg16(reg) => self.get_reg_16(reg),
-            Operand16::MemImm16(addr) => unimplemented!(),
+            Operand16::MemImm16(_) => panic!("no gameboy CPU instruction actually uses this"),
         }
     }
 
@@ -444,7 +444,7 @@ impl Cpu {
         match dest {
             Operand16::Imm16(_) => panic!("Attempt to store to a 16-bit immediate value"),
             Operand16::Reg16(reg) => self.set_reg_16(reg, val),
-            Operand16::MemImm16(addr) => unimplemented!(),
+            Operand16::MemImm16(_) => unimplemented!(),
         }
     }
 
