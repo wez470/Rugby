@@ -207,6 +207,24 @@ enum Inst {
     /// RR: Rotate right 1 bit. This one does flow through carry, despite the name. :)
     Rr(Operand8),
 
+    /// SLA: Arithmetic shift left by 1 bit.
+    ///   * carry = old high bit
+    ///   * low bit = 0
+    Sla(Operand8),
+
+    /// SRA: Arithmetic shift right.
+    ///   * high bit unchanged
+    ///   * carry = old low bit
+    Sra(Operand8),
+
+    /// SRL: Logical shift right.
+    ///   * high bit = 0
+    ///   * carry = old low bit
+    Srl(Operand8),
+
+    /// SWAP: Swap high and low nibbles (4 bits).
+    Swap(Operand8),
+
     /// BIT: Test the bit at the given index in the given operand. Sets the zero flag accordingly.
     Bit(u8, Operand8),
 
@@ -737,7 +755,6 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xFA => Ld8(Reg8(A), MemImm(to_u16(bytes[1], bytes[2]))),
         0xFB => Ei,
         0xFE => Cp(Imm8(bytes[1])),
-
         0xCB => {
             match bytes[1] {
                 0x00 => Rlc(Reg8(B)),
@@ -746,6 +763,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
                 0x03 => Rlc(Reg8(E)),
                 0x04 => Rlc(Reg8(H)),
                 0x05 => Rlc(Reg8(L)),
+                0x06 => Rlc(MemReg(HL)),
                 0x07 => Rlc(Reg8(A)),
                 0x08 => Rrc(Reg8(B)),
                 0x09 => Rrc(Reg8(C)),
@@ -753,7 +771,56 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
                 0x0B => Rrc(Reg8(E)),
                 0x0C => Rrc(Reg8(H)),
                 0x0D => Rrc(Reg8(L)),
+                0x0E => Rrc(MemReg(HL)),
                 0x0F => Rrc(Reg8(A)),
+                0x10 => Rl(Reg8(B)),
+                0x11 => Rl(Reg8(C)),
+                0x12 => Rl(Reg8(D)),
+                0x13 => Rl(Reg8(E)),
+                0x14 => Rl(Reg8(H)),
+                0x15 => Rl(Reg8(L)),
+                0x16 => Rl(MemReg(HL)),
+                0x17 => Rl(Reg8(A)),
+                0x18 => Rr(Reg8(B)),
+                0x19 => Rr(Reg8(C)),
+                0x1A => Rr(Reg8(D)),
+                0x1B => Rr(Reg8(E)),
+                0x1C => Rr(Reg8(H)),
+                0x1D => Rr(Reg8(L)),
+                0x1E => Rr(MemReg(HL)),
+                0x1F => Rr(Reg8(A)),
+                0x20 => Sla(Reg8(B)),
+                0x21 => Sla(Reg8(C)),
+                0x22 => Sla(Reg8(D)),
+                0x23 => Sla(Reg8(E)),
+                0x24 => Sla(Reg8(H)),
+                0x25 => Sla(Reg8(L)),
+                0x26 => Sla(MemReg(HL)),
+                0x27 => Sla(Reg8(A)),
+                0x28 => Sra(Reg8(B)),
+                0x29 => Sra(Reg8(C)),
+                0x2A => Sra(Reg8(D)),
+                0x2B => Sra(Reg8(E)),
+                0x2C => Sra(Reg8(H)),
+                0x2D => Sra(Reg8(L)),
+                0x2E => Sra(MemReg(HL)),
+                0x2F => Sra(Reg8(A)),
+                0x30 => Swap(Reg8(B)),
+                0x31 => Swap(Reg8(C)),
+                0x32 => Swap(Reg8(D)),
+                0x33 => Swap(Reg8(E)),
+                0x34 => Swap(Reg8(H)),
+                0x35 => Swap(Reg8(L)),
+                0x36 => Swap(MemReg(HL)),
+                0x37 => Swap(Reg8(A)),
+                0x38 => Srl(Reg8(B)),
+                0x39 => Srl(Reg8(C)),
+                0x3A => Srl(Reg8(D)),
+                0x3B => Srl(Reg8(E)),
+                0x3C => Srl(Reg8(H)),
+                0x3D => Srl(Reg8(L)),
+                0x3E => Srl(MemReg(HL)),
+                0x3F => Srl(Reg8(A)),
                 0x40 => Bit(0, Reg8(B)),
                 0x41 => Bit(0, Reg8(C)),
                 0x42 => Bit(0, Reg8(D)),
@@ -946,7 +1013,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
                 0xFD => Set(7, Reg8(L)),
                 0xFE => Set(7, MemReg(HL)),
                 0xFF => Set(7, Reg8(A)),
-                _ => return None,
+                _ => unreachable!(),
             }
         }
 
