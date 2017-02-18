@@ -747,6 +747,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xAF => Xor(Reg8(A)),
         0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
         0xC9 => Ret,
+        // 0xCB was moved to the bottom since it contains its own big match.
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
         0xE0 => Ld8(MemImmHigh(bytes[1]), Reg8(A)),
         0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
