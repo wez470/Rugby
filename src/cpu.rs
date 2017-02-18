@@ -129,6 +129,9 @@ enum Operand16 {
 
     /// 16-bit register.
     Reg16(Regs_16),
+
+    /// 16-bit memory location at the given immediate address (and the byte above).
+    MemImm16(u16),
 }
 
 
@@ -433,6 +436,7 @@ impl Cpu {
         match src {
             Operand16::Imm16(val) => val,
             Operand16::Reg16(reg) => self.get_reg_16(reg),
+            Operand16::MemImm16(addr) => unimplemented!(),
         }
     }
 
@@ -440,6 +444,7 @@ impl Cpu {
         match dest {
             Operand16::Imm16(_) => panic!("Attempt to store to a 16-bit immediate value"),
             Operand16::Reg16(reg) => self.set_reg_16(reg, val),
+            Operand16::MemImm16(addr) => unimplemented!(),
         }
     }
 
@@ -622,7 +627,12 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
 
     let inst = match bytes[0] {
         0x00 => Nop,
+        0x01 => Ld16(Reg16(BC), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x02 => Ld8(MemReg(BC), Reg8(A)),
         0x06 => Ld8(Reg8(B), Imm8(bytes[1])),
+        0x08 => Ld16(MemImm16(to_u16(bytes[1], bytes[2])), Reg16(SP)),
+        0x0A => Ld8(Reg8(A), MemReg(BC)),
+        0x0E => Ld8(Reg8(C), Imm8(bytes[1])),
         0x10 => {
             // FIXME: For some reason the STOP instruction is followed by 0x00 according to the
             // manual. Perhaps this should result in an invalid instruction if it's not zero. For
@@ -631,10 +641,19 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
             Stop
         }
         0x11 => Ld16(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x12 => Ld8(MemReg(DE), Reg8(A)),
+        0x16 => Ld8(Reg8(D), Imm8(bytes[1])),
         0x18 => Jr(bytes[1] as i8, Cond::None),
+        0x1A => Ld8(Reg8(A), MemReg(DE)),
+        0x1E => Ld8(Reg8(E), Imm8(bytes[1])),
         0x20 => Jr(bytes[1] as i8, Cond::NotZero),
+        0x21 => Ld16(Reg16(HL), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x26 => Ld8(Reg8(H), Imm8(bytes[1])),
         0x28 => Jr(bytes[1] as i8, Cond::Zero),
+        0x2E => Ld8(Reg8(L), Imm8(bytes[1])),
         0x30 => Jr(bytes[1] as i8, Cond::NotCarry),
+        0x31 => Ld16(Reg16(SP), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x36 => Ld8(MemReg(HL), Imm8(bytes[1])),
         0x38 => Jr(bytes[1] as i8, Cond::Carry),
         0x3E => Ld8(Reg8(A), Imm8(bytes[1])),
         0x40 => Ld8(Reg8(B), Reg8(B)),
@@ -715,6 +734,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
         0xF0 => Ld8(Reg8(A), MemImmHigh(bytes[1])),
         0xF3 => Di,
+        0xFA => Ld8(Reg8(A), MemImm(to_u16(bytes[1], bytes[2]))),
         0xFB => Ei,
         0xFE => Cp(Imm8(bytes[1])),
 
