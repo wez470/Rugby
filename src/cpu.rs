@@ -205,11 +205,23 @@ enum Inst {
     /// RET: Return from the current function by jumping to an address popped from the stack.
     Ret,
 
-    /// LD: Loads, stores, and moves for 8 bit values
+    /// LD: Loads, stores, and moves for 8-bit values.
     Ld8(Operand8, Operand8),
 
-    /// LD: Loads, stores, and moves for 16 bit values
+    /// LD: Loads, stores, and moves for 16-bit values.
     Ld16(Operand16, Operand16),
+
+    /// INC: 8-bit increment.
+    Inc8(Operand8),
+
+    /// INC: 16-bit increment.
+    Inc16(Operand16),
+
+    /// DEC: 8-bit decrement.
+    Dec8(Operand8),
+
+    /// DEC: 16-bit decrement.
+    Dec16(Operand16),
 
     /// XOR: Exclusive-or between A and the operand.
     Xor(Operand8),
@@ -716,9 +728,15 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x00 => Nop,
         0x01 => Ld16(Reg16(BC), Imm16(to_u16(bytes[1], bytes[2]))),
         0x02 => Ld8(MemReg(BC), Reg8(A)),
+        0x03 => Inc16(Reg16(BC)),
+        0x04 => Inc8(Reg8(B)),
+        0x05 => Dec8(Reg8(B)),
         0x06 => Ld8(Reg8(B), Imm8(bytes[1])),
         0x08 => Ld16(MemImm16(to_u16(bytes[1], bytes[2])), Reg16(SP)),
         0x0A => Ld8(Reg8(A), MemReg(BC)),
+        0x0B => Dec16(Reg16(BC)),
+        0x0C => Inc8(Reg8(C)),
+        0x0D => Dec8(Reg8(C)),
         0x0E => Ld8(Reg8(C), Imm8(bytes[1])),
         0x10 => {
             // FIXME: For some reason the STOP instruction is followed by 0x00 according to the
@@ -729,19 +747,37 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         }
         0x11 => Ld16(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
         0x12 => Ld8(MemReg(DE), Reg8(A)),
+        0x13 => Inc16(Reg16(DE)),
+        0x14 => Inc8(Reg8(D)),
+        0x15 => Dec8(Reg8(D)),
         0x16 => Ld8(Reg8(D), Imm8(bytes[1])),
         0x18 => Jr(bytes[1] as i8, Cond::None),
         0x1A => Ld8(Reg8(A), MemReg(DE)),
+        0x1B => Dec16(Reg16(DE)),
+        0x1C => Inc8(Reg8(E)),
+        0x1D => Dec8(Reg8(E)),
         0x1E => Ld8(Reg8(E), Imm8(bytes[1])),
         0x20 => Jr(bytes[1] as i8, Cond::NotZero),
         0x21 => Ld16(Reg16(HL), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x23 => Inc16(Reg16(HL)),
+        0x24 => Inc8(Reg8(H)),
+        0x25 => Dec8(Reg8(H)),
         0x26 => Ld8(Reg8(H), Imm8(bytes[1])),
         0x28 => Jr(bytes[1] as i8, Cond::Zero),
+        0x2B => Dec16(Reg16(HL)),
+        0x2C => Inc8(Reg8(L)),
+        0x2D => Dec8(Reg8(L)),
         0x2E => Ld8(Reg8(L), Imm8(bytes[1])),
         0x30 => Jr(bytes[1] as i8, Cond::NotCarry),
         0x31 => Ld16(Reg16(SP), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x33 => Inc16(Reg16(SP)),
+        0x34 => Inc8(MemReg(HL)),
+        0x35 => Dec8(MemReg(HL)),
         0x36 => Ld8(MemReg(HL), Imm8(bytes[1])),
         0x38 => Jr(bytes[1] as i8, Cond::Carry),
+        0x3B => Dec16(Reg16(SP)),
+        0x3C => Inc8(Reg8(A)),
+        0x3D => Dec8(Reg8(A)),
         0x3E => Ld8(Reg8(A), Imm8(bytes[1])),
         0x40 => Ld8(Reg8(B), Reg8(B)),
         0x41 => Ld8(Reg8(B), Reg8(C)),
