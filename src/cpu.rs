@@ -1,12 +1,19 @@
 use reg_16::Reg16;
 use memory::Memory;
 
-pub const ZERO_FLAG: u8 = 7;
-pub const SUB_FLAG: u8 = 6;
-pub const HALF_CARRY_FLAG: u8 = 5;
-pub const CARRY_FLAG: u8 = 4;
+const ZERO_FLAG: u8 = 7;
+const SUB_FLAG: u8 = 6;
+const HALF_CARRY_FLAG: u8 = 5;
+const CARRY_FLAG: u8 = 4;
 
-pub const BASE_CYCLES: [usize; 0x100] = [
+// The below tables are based on the tables at
+// http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html.
+
+/// The number of cycles taken by each instruction, ignoring any conditional actions (see
+/// `CONDITIONAL_CYCLES` below).
+///
+/// `0xCB`-prefixed instructions are handled by a separate table.
+const BASE_CYCLES: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      4, 12,  8,  8,  4,  4,  8,  4, 20,  8,  8,  8,  4,  4,  8,  4, // 0
      4, 12,  8,  8,  4,  4,  8,  4, 12,  8,  8,  8,  4,  4,  8,  4, // 1
@@ -26,27 +33,32 @@ pub const BASE_CYCLES: [usize; 0x100] = [
     12, 12,  8,  4,  0, 16,  8, 16, 12,  8, 16,  4,  0,  0,  8, 16, // F
 ];
 
-pub const INSTRUCTION_LENGTH: [usize; 0x100] = [
+/// Cycles that get added if a conditional action is taken.
+///
+/// For example, `JP Z, a16` will have cycles added based on this table only if the zero flag is
+/// set, which causes it to actually jump.
+const CONDITIONAL_CYCLES: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
-     1,  3,  1,  1,  1,  1,  2,  1,  3,  1,  1,  1,  1,  1,  2,  1, // 0
-     2,  3,  1,  1,  1,  1,  2,  1,  2,  1,  1,  1,  1,  1,  2,  1, // 1
-     2,  3,  1,  1,  1,  1,  2,  1,  2,  1,  1,  1,  1,  1,  2,  1, // 2
-     2,  3,  1,  1,  1,  1,  2,  1,  2,  1,  1,  1,  1,  1,  2,  1, // 3
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 4
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 5
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 6
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 7
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 8
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 9
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // A
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  1,  1,  1, // B
-     1,  1,  3,  3,  3,  1,  2,  1,  1,  1,  3,  1,  3,  3,  2,  1, // C
-     1,  1,  3,  0,  3,  1,  2,  1,  1,  1,  3,  0,  3,  0,  2,  1, // D
-     2,  1,  2,  0,  0,  1,  2,  1,  2,  1,  3,  0,  0,  0,  2,  1, // E
-     2,  1,  2,  1,  0,  1,  2,  1,  2,  1,  3,  1,  0,  0,  2,  1, // F
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 0
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 1
+     4,  0,  0,  0,  0,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,  0, // 2
+     4,  0,  0,  0,  0,  0,  0,  0,  4,  0,  0,  0,  0,  0,  0,  0, // 3
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 4
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 5
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 6
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 7
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 8
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 9
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // A
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // B
+    12,  0,  4,  0, 12,  0,  0,  0, 12,  0,  4,  0, 12,  0,  0,  0, // C
+    12,  0,  4,  0, 12,  0,  0,  0, 12,  0,  4,  0, 12,  0,  0,  0, // D
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // E
+     0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // F
 ];
 
-pub const PREFIX_CB_BASE_CYCLES: [usize; 0x100] = [
+/// The number of cycles taken by each `0xCB`-prefixed instruction. These are never conditional.
+const PREFIX_CB_BASE_CYCLES: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 0
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 1
@@ -66,8 +78,31 @@ pub const PREFIX_CB_BASE_CYCLES: [usize; 0x100] = [
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // F
 ];
 
-// Every CB-prefixed instruction has length 2 (counting the CB opcode).
-pub const PREFIX_CB_INSTRUCTION_LENGTH: usize = 2;
+/// The length of every instruction. (1 byte for the opcode plus options bytes for operands.)
+///
+/// `0xCB`-prefixed instructions are handled separately.
+const INSTRUCTION_LENGTH: [usize; 0x100] = [
+//   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
+     1,  3,  1,  1,  1,  1,  2,  1,  3,  1,  1,  1,  1,  1,  2,  1, // 0
+     2,  3,  1,  1,  1,  1,  2,  1,  2,  1,  1,  1,  1,  1,  2,  1, // 1
+     2,  3,  1,  1,  1,  1,  2,  1,  2,  1,  1,  1,  1,  1,  2,  1, // 2
+     2,  3,  1,  1,  1,  1,  2,  1,  2,  1,  1,  1,  1,  1,  2,  1, // 3
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 4
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 5
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 6
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 7
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 8
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 9
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // A
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  1,  1,  1, // B
+     1,  1,  3,  3,  3,  1,  2,  1,  1,  1,  3,  1,  3,  3,  2,  1, // C
+     1,  1,  3,  0,  3,  1,  2,  1,  1,  1,  3,  0,  3,  0,  2,  1, // D
+     2,  1,  2,  0,  0,  1,  2,  1,  2,  1,  3,  0,  0,  0,  2,  1, // E
+     2,  1,  2,  1,  0,  1,  2,  1,  2,  1,  3,  1,  0,  0,  2,  1, // F
+];
+
+/// Every `0xCB`-prefixed instruction has length 2 (counting the `CB` opcode).
+const PREFIX_CB_INSTRUCTION_LENGTH: usize = 2;
 
 fn base_cycles(opcode: u8) -> usize {
     if opcode == 0xCB {
@@ -420,7 +455,7 @@ impl Cpu {
 
     // TODO(solson): We should remove the "was handled" return value once all instructions are
     // handled.
-    /// Execute the given instruction. Returns true if the instruction was handled.
+    /// Execute the given instruction. Return true if the instruction was handled.
     fn execute(&mut self, inst: Inst) -> bool {
         match inst {
             Inst::Nop => {},
@@ -437,13 +472,23 @@ impl Cpu {
 
     /// Jump to the specified location if the condition is met.
     fn jp(&mut self, loc: u16, cond: Cond) {
-        if self.is_cond_met(cond) {
-            self.cycles += 4;
+        if self.check_cond_and_update_cycles(cond) {
             self.reg_pc.set(loc);
         }
     }
 
-    fn is_cond_met(&self, cond: Cond) -> bool {
+    /// If the given condition is met, increment the cycle count accordingly and return true.
+    fn check_cond_and_update_cycles(&mut self, cond: Cond) -> bool {
+        let condition_met = self.check_cond(cond);
+        if condition_met {
+            let opcode = self.rom[self.base_pc];
+            self.cycles += CONDITIONAL_CYCLES[opcode as usize];
+        }
+        condition_met
+    }
+
+    /// Return true if the given condition is met.
+    fn check_cond(&self, cond: Cond) -> bool {
         match cond {
             Cond::None => true,
             Cond::Zero => self.get_zero_flag(),
