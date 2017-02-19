@@ -204,17 +204,19 @@ enum Inst {
     /// `EI`: Enable interrupts.
     Ei,
 
-    /// `JP cond, xx`: Absolute jump.
+    /// `JP cond?, xx`: Absolute jump. Optionally conditional.
     Jp(Operand16, Cond),
 
-    /// `JR cond, x`: Relative jump.
+    /// `JR cond?, x`: Relative jump. Optionally conditional.
     Jr(i8, Cond),
 
-    /// `CALL addr`: Call the function at the given immediate address.
+    /// `CALL cond?, addr`: Call the function at the given immediate address. Optionally
+    /// conditional.
     Call(u16, Cond),
 
-    /// `RET`: Return from the current function by jumping to an address popped from the stack.
-    Ret,
+    /// `RET cond?`: Return from the current function by jumping to an address popped from the
+    /// stack. Optionally conditional.
+    Ret(Cond),
 
     /// `PUSH xx`: Push the given register onto the stack.
     Push(Regs_16),
@@ -984,20 +986,24 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xB5 => Or(Reg8(L)),
         0xB6 => Or(MemReg(HL)),
         0xB7 => Or(Reg8(A)),
+        0xC0 => Ret(Cond::NotZero),
         0xC1 => Pop(BC),
         0xC2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotZero),
         0xC3 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::None),
         0xC5 => Push(BC),
         0xC6 => AddA(Imm8(bytes[1])),
-        0xC9 => Ret,
+        0xC8 => Ret(Cond::Zero),
+        0xC9 => Ret(Cond::None),
         // 0xCB was moved to the bottom since it contains its own big match.
         0xCA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Zero),
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
         0xCE => AdcA(Imm8(bytes[1])),
+        0xD0 => Ret(Cond::NotCarry),
         0xD1 => Pop(DE),
         0xD2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotCarry),
         0xD5 => Push(DE),
         0xD6 => Sub(Imm8(bytes[1])),
+        0xD8 => Ret(Cond::Carry),
         0xDA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Carry),
         0xDE => SbcA(Imm8(bytes[1])),
         0xE0 => Ld8(MemHighImm(bytes[1]), Reg8(A)),
