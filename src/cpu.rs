@@ -1003,8 +1003,8 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xC6 => AddA(Imm8(bytes[1])),
         0xC8 => Ret(Cond::Zero),
         0xC9 => Ret(Cond::None),
-        // 0xCB was moved to the bottom since it contains its own big match.
         0xCA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Zero),
+        // 0xCB was moved to the bottom since it contains its own big match.
         0xCC => Call(to_u16(bytes[1], bytes[2]), Cond::Zero),
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
         0xCE => AdcA(Imm8(bytes[1])),
