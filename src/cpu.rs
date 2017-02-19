@@ -205,6 +205,12 @@ enum Inst {
     /// `RET`: Return from the current function by jumping to an address popped from the stack.
     Ret,
 
+    /// `PUSH xx`: Push the given register onto the stack.
+    Push(Regs_16),
+
+    /// `POP xx`: Pop the top of the stack into the given register.
+    Pop(Regs_16),
+
     /// `LD x, x`: 8-bit loads, stores, and moves.
     Ld8(Operand8, Operand8),
 
@@ -925,25 +931,33 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xB5 => Or(Reg8(L)),
         0xB6 => Or(MemReg(HL)),
         0xB7 => Or(Reg8(A)),
+        0xC1 => Pop(BC),
         0xC2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotZero),
         0xC3 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::None),
+        0xC5 => Push(BC),
         0xC6 => AddA(Imm8(bytes[1])),
         0xC9 => Ret,
         // 0xCB was moved to the bottom since it contains its own big match.
         0xCA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Zero),
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
         0xCE => AdcA(Imm8(bytes[1])),
+        0xD1 => Pop(DE),
         0xD2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotCarry),
+        0xD5 => Push(DE),
         0xD6 => Sub(Imm8(bytes[1])),
         0xDA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Carry),
         0xDE => SbcA(Imm8(bytes[1])),
         0xE0 => Ld8(MemImmHigh(bytes[1]), Reg8(A)),
+        0xE1 => Pop(HL),
+        0xE5 => Push(HL),
         0xE6 => And(Imm8(bytes[1])),
         0xE9 => Jp(Reg16(HL), Cond::None),
         0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
         0xEE => Xor(Imm8(bytes[1])),
         0xF0 => Ld8(Reg8(A), MemImmHigh(bytes[1])),
+        0xF1 => Pop(AF),
         0xF3 => Di,
+        0xF5 => Push(AF),
         0xF6 => Or(Imm8(bytes[1])),
         0xFA => Ld8(Reg8(A), MemImm(to_u16(bytes[1], bytes[2]))),
         0xFB => Ei,
