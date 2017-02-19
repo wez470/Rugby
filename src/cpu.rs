@@ -78,9 +78,10 @@ const PREFIX_CB_BASE_CYCLES: [usize; 0x100] = [
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // F
 ];
 
-/// The length of every instruction. (1 byte for the opcode plus options bytes for operands.)
+/// The length of every instruction. (1 byte for the opcode plus optional bytes for operands.)
 ///
-/// `0xCB`-prefixed instructions are handled separately.
+/// Every `0xCB`-prefixed instruction has length 2 (counting the `CB` opcode), so we handle that
+/// simply by putting a 2 in the 0xCB location.
 const INSTRUCTION_LENGTH: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      1,  3,  1,  1,  1,  1,  2,  1,  3,  1,  1,  1,  1,  1,  2,  1, // 0
@@ -94,31 +95,12 @@ const INSTRUCTION_LENGTH: [usize; 0x100] = [
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 8
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // 9
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // A
-     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  0,  1,  1,  1, // B
-     1,  1,  3,  3,  3,  1,  2,  1,  1,  1,  3,  1,  3,  3,  2,  1, // C
+     1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // B
+     1,  1,  3,  3,  3,  1,  2,  1,  1,  1,  3,  2,  3,  3,  2,  1, // C
      1,  1,  3,  0,  3,  1,  2,  1,  1,  1,  3,  0,  3,  0,  2,  1, // D
      2,  1,  2,  0,  0,  1,  2,  1,  2,  1,  3,  0,  0,  0,  2,  1, // E
      2,  1,  2,  1,  0,  1,  2,  1,  2,  1,  3,  1,  0,  0,  2,  1, // F
 ];
-
-/// Every `0xCB`-prefixed instruction has length 2 (counting the `CB` opcode).
-const PREFIX_CB_INSTRUCTION_LENGTH: usize = 2;
-
-fn base_cycles(opcode: u8) -> usize {
-    if opcode == 0xCB {
-        PREFIX_CB_BASE_CYCLES[opcode as usize]
-    } else {
-        BASE_CYCLES[opcode as usize]
-    }
-}
-
-fn instruction_length(opcode: u8) -> usize {
-    if opcode == 0xCB {
-        PREFIX_CB_INSTRUCTION_LENGTH
-    } else {
-        INSTRUCTION_LENGTH[opcode as usize]
-    }
-}
 
 #[derive(Clone, Copy, Debug)]
 pub enum Regs_8 {
@@ -370,8 +352,14 @@ impl Cpu {
 
         self.base_pc = self.reg_pc.get() as usize;
         let opcode = self.rom[self.base_pc];
-        let instruction_len = instruction_length(opcode);
-        self.cycles += base_cycles(opcode);
+        let instruction_len = INSTRUCTION_LENGTH[opcode as usize];
+
+        self.cycles += if opcode == 0xCB {
+            let opcode_after_cb = self.rom[self.base_pc + 1];
+            PREFIX_CB_BASE_CYCLES[opcode_after_cb as usize]
+        } else {
+            BASE_CYCLES[opcode as usize]
+        };
 
         print!("{:04X}:", self.base_pc);
         for &byte in &self.rom[self.base_pc .. (self.base_pc + instruction_len)] {
