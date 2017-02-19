@@ -141,6 +141,14 @@ enum Operand8 {
 
     /// Memory location at the address in the given register.
     MemReg(Regs_16),
+
+    /// Memory location at the address in the HL register. HL is incremented after accessing this
+    /// operand. This is used in `LD A, (HL+)` and `LD (HL+), A`.
+    MemHlPostInc,
+
+    /// Memory location at the address in the HL register. HL is decremented after accessing this
+    /// operand. This is used in `LD A, (HL-)` and `LD (HL-), A`.
+    MemHlPostDec,
 }
 
 /// Represents an operand resolving to a 16-bit value.
@@ -155,7 +163,6 @@ enum Operand16 {
     /// 16-bit memory location at the given immediate address (and the byte above).
     MemImm16(u16),
 }
-
 
 /// Represents the condition checked by a conditional instruction (JP, JR, RET, or CALL).
 #[derive(Debug)]
@@ -530,16 +537,36 @@ impl Cpu {
         self.set_operand_8(dest, val);
     }
 
-    fn get_operand_8(&self, src: Operand8) -> u8 {
+    /// Get the value of the given 8-bit operand.
+    ///
+    /// NOTE: Accessing some operands has side effects, so you should not call this twice on a
+    /// given operand.
+    fn get_operand_8(&mut self, src: Operand8) -> u8 {
         match src {
             Operand8::Imm8(val) => val,
             Operand8::Reg8(reg) => self.get_reg_8(reg),
             Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize],
             Operand8::MemImmHigh(mem_offset) => self.memory.mem[0xFF00 + mem_offset as usize],
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize],
+            Operand8::MemHlPostInc => {
+                let hl = self.get_reg_16(Regs_16::HL);
+                let val = self.memory.mem[hl as usize];
+                self.set_reg_16(Regs_16::HL, hl.wrapping_add(1));
+                val
+            }
+            Operand8::MemHlPostDec => {
+                let hl = self.get_reg_16(Regs_16::HL);
+                let val = self.memory.mem[hl as usize];
+                self.set_reg_16(Regs_16::HL, hl.wrapping_sub(1));
+                val
+            }
         }
     }
 
+    /// Set the value of the given 8-bit operand.
+    ///
+    /// NOTE: Accessing some operands has side effects, so you should not call this twice on a
+    /// given operand.
     fn set_operand_8(&mut self, dest: Operand8, val: u8) {
         match dest {
             Operand8::Imm8(_) => panic!("Attempt to store to an 8-bit immediate value"),
@@ -547,6 +574,16 @@ impl Cpu {
             Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize] = val,
             Operand8::MemImmHigh(mem_offset) => self.memory.mem[0xFF00 + mem_offset as usize] = val,
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize] = val,
+            Operand8::MemHlPostInc => {
+                let hl = self.get_reg_16(Regs_16::HL);
+                self.memory.mem[hl as usize] = val;
+                self.set_reg_16(Regs_16::HL, hl.wrapping_add(1));
+            }
+            Operand8::MemHlPostDec => {
+                let hl = self.get_reg_16(Regs_16::HL);
+                self.memory.mem[hl as usize] = val;
+                self.set_reg_16(Regs_16::HL, hl.wrapping_sub(1));
+            }
         }
     }
 
@@ -790,24 +827,28 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x1E => Ld8(Reg8(E), Imm8(bytes[1])),
         0x20 => Jr(bytes[1] as i8, Cond::NotZero),
         0x21 => Ld16(Reg16(HL), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x22 => Ld8(MemHlPostInc, Reg8(A)),
         0x23 => Inc16(Reg16(HL)),
         0x24 => Inc8(Reg8(H)),
         0x25 => Dec8(Reg8(H)),
         0x26 => Ld8(Reg8(H), Imm8(bytes[1])),
         0x28 => Jr(bytes[1] as i8, Cond::Zero),
         0x29 => AddHl(Reg16(HL)),
+        0x2A => Ld8(Reg8(A), MemHlPostInc),
         0x2B => Dec16(Reg16(HL)),
         0x2C => Inc8(Reg8(L)),
         0x2D => Dec8(Reg8(L)),
         0x2E => Ld8(Reg8(L), Imm8(bytes[1])),
         0x30 => Jr(bytes[1] as i8, Cond::NotCarry),
         0x31 => Ld16(Reg16(SP), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x32 => Ld8(MemHlPostDec, Reg8(A)),
         0x33 => Inc16(Reg16(SP)),
         0x34 => Inc8(MemReg(HL)),
         0x35 => Dec8(MemReg(HL)),
         0x36 => Ld8(MemReg(HL), Imm8(bytes[1])),
         0x38 => Jr(bytes[1] as i8, Cond::Carry),
         0x39 => AddHl(Reg16(SP)),
+        0x3A => Ld8(Reg8(A), MemHlPostDec),
         0x3B => Dec16(Reg16(SP)),
         0x3C => Inc8(Reg8(A)),
         0x3D => Dec8(Reg8(A)),
