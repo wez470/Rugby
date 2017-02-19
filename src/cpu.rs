@@ -136,11 +136,15 @@ enum Operand8 {
     /// Memory location at the given immediate address.
     MemImm(u16),
 
-    /// Memory location at the address `0xFF00 + byte`.
-    MemImmHigh(u8),
-
     /// Memory location at the address in the given register.
     MemReg(Regs_16),
+
+    /// Memory location at the address `0xFF00 + byte`.
+    MemHighImm(u8),
+
+    /// Memory location at the address `0xFF00 + C`. Used only in `LD A, (0xFF00+C)` and
+    /// `LD (0xFF00+C), A`.
+    MemHighC,
 
     /// Memory location at the address in the HL register. HL is incremented after accessing this
     /// operand. This is used in `LD A, (HL+)` and `LD (HL+), A`.
@@ -546,8 +550,12 @@ impl Cpu {
             Operand8::Imm8(val) => val,
             Operand8::Reg8(reg) => self.get_reg_8(reg),
             Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize],
-            Operand8::MemImmHigh(mem_offset) => self.memory.mem[0xFF00 + mem_offset as usize],
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize],
+            Operand8::MemHighImm(mem_offset) => self.memory.mem[0xFF00 | mem_offset as usize],
+            Operand8::MemHighC => {
+                let offset = self.get_reg_8(Regs_8::C);
+                self.memory.mem[0xFF00 | offset as usize]
+            }
             Operand8::MemHlPostInc => {
                 let hl = self.get_reg_16(Regs_16::HL);
                 let val = self.memory.mem[hl as usize];
@@ -572,8 +580,12 @@ impl Cpu {
             Operand8::Imm8(_) => panic!("Attempt to store to an 8-bit immediate value"),
             Operand8::Reg8(reg) => self.set_reg_8(reg, val),
             Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize] = val,
-            Operand8::MemImmHigh(mem_offset) => self.memory.mem[0xFF00 + mem_offset as usize] = val,
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize] = val,
+            Operand8::MemHighImm(mem_offset) => self.memory.mem[0xFF00 | mem_offset as usize] = val,
+            Operand8::MemHighC => {
+                let offset = self.get_reg_8(Regs_8::C);
+                self.memory.mem[0xFF00 | offset as usize] = val;
+            }
             Operand8::MemHlPostInc => {
                 let hl = self.get_reg_16(Regs_16::HL);
                 self.memory.mem[hl as usize] = val;
@@ -988,15 +1000,17 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xD6 => Sub(Imm8(bytes[1])),
         0xDA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Carry),
         0xDE => SbcA(Imm8(bytes[1])),
-        0xE0 => Ld8(MemImmHigh(bytes[1]), Reg8(A)),
+        0xE0 => Ld8(MemHighImm(bytes[1]), Reg8(A)),
         0xE1 => Pop(HL),
+        0xE2 => Ld8(MemHighC, Reg8(A)),
         0xE5 => Push(HL),
         0xE6 => And(Imm8(bytes[1])),
         0xE9 => Jp(Reg16(HL), Cond::None),
         0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
         0xEE => Xor(Imm8(bytes[1])),
-        0xF0 => Ld8(Reg8(A), MemImmHigh(bytes[1])),
+        0xF0 => Ld8(Reg8(A), MemHighImm(bytes[1])),
         0xF1 => Pop(AF),
+        0xF2 => Ld8(Reg8(A), MemHighC),
         0xF3 => Di,
         0xF5 => Push(AF),
         0xF6 => Or(Imm8(bytes[1])),
