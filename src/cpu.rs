@@ -204,29 +204,37 @@ enum Inst {
     /// CP: Compare A with the operand. Like `A - operand` but only for the flag side effects.
     Cp(Operand8),
 
-    /// RLC: Rotate left 1 bit. Does not flow through carry, despite the name. :)
+    /// RLC: 1-bit rotate left circular.
+    ///   * low bit = old high bit
+    ///   * carry = old high bit
     Rlc(Operand8),
 
-    /// RL: Rotate left 1 bit. This one does flow through carry, despite the name. :)
+    /// RL: 1-bit rotate left, through the carry flag.
+    ///   * low bit = old carry
+    ///   * carry = old high bit
     Rl(Operand8),
 
-    /// RRC: Rotate right 1 bit. Does not flow through carry, despite the name. :)
+    /// RRC: 1-bit rotate right circular.
+    ///   * high bit = old low bit
+    ///   * carry = old low bit
     Rrc(Operand8),
 
-    /// RR: Rotate right 1 bit. This one does flow through carry, despite the name. :)
+    /// RR: 1-bit rotate right, through the carry flag.
+    ///   * high bit = old carry
+    ///   * carry = old low bit
     Rr(Operand8),
 
-    /// SLA: Arithmetic shift left by 1 bit.
-    ///   * carry = old high bit
+    /// SLA: 1-bit arithmetic shift left.
     ///   * low bit = 0
+    ///   * carry = old high bit
     Sla(Operand8),
 
-    /// SRA: Arithmetic shift right.
-    ///   * high bit unchanged
+    /// SRA: 1-bit arithmetic shift right.
+    ///   * high bit unchanged (i.e. result has the same sign)
     ///   * carry = old low bit
     Sra(Operand8),
 
-    /// SRL: Logical shift right.
+    /// SRL: 1-bit logical shift right.
     ///   * high bit = 0
     ///   * carry = old low bit
     Srl(Operand8),
@@ -426,8 +434,8 @@ impl Cpu {
 
         true
     }
-    
-    /// Jump to the specified location if the condition is met
+
+    /// Jump to the specified location if the condition is met.
     fn jp(&mut self, loc: u16, cond: Cond) {
         if self.is_cond_met(cond) {
             self.cycles += 4;
