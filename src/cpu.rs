@@ -193,12 +193,8 @@ enum Inst {
     /// EI: Enable interrupts.
     Ei,
 
-    // TODO(wcarlson): Consider splitting this out into 3 jump instructions (JpCond, Jp, JpHl).
-    // The gameboy cpu manual lists them as three distinct instructions.
-    // Alternatively could be two instructions with one of them taking an Operand16. Also should
-    // consider removing None from the Cond enum. Jp is broken in it's current state
     /// JP: Absolute jump.
-    Jp(u16, Cond),
+    Jp(Operand16, Cond),
 
     /// JR: Relative jump.
     Jr(i8, Cond),
@@ -458,10 +454,11 @@ impl Cpu {
         true
     }
 
-    /// Jump to the specified location if the condition is met.
-    fn jp(&mut self, loc: u16, cond: Cond) {
+    /// Jump to the specified address if the condition is met.
+    fn jp(&mut self, addr: Operand16, cond: Cond) {
+        let addr_val = self.get_operand_16(addr);
         if self.check_cond_and_update_cycles(cond) {
-            self.reg_pc.set(loc);
+            self.reg_pc.set(addr_val);
         }
     }
 
@@ -817,11 +814,16 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xAC => Xor(Reg8(H)),
         0xAD => Xor(Reg8(L)),
         0xAF => Xor(Reg8(A)),
-        0xC3 => Jp(to_u16(bytes[1], bytes[2]), Cond::None),
+        0xC2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotZero),
+        0xC3 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::None),
         0xC9 => Ret,
         // 0xCB was moved to the bottom since it contains its own big match.
+        0xCA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Zero),
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
+        0xD2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotCarry),
+        0xDA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Carry),
         0xE0 => Ld8(MemImmHigh(bytes[1]), Reg8(A)),
+        0xE9 => Jp(Reg16(HL), Cond::None),
         0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
         0xF0 => Ld8(Reg8(A), MemImmHigh(bytes[1])),
         0xF3 => Di,
