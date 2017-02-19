@@ -178,102 +178,125 @@ enum Cond {
 
 #[derive(Debug)]
 enum Inst {
-    /// NOP: No operation.
+    /// `NOP`: No operation.
     Nop,
 
-    /// STOP: Halt CPU & LCD display until button pressed.
+    /// `STOP`: Halt CPU & LCD display until button pressed.
     Stop,
 
-    /// HALT: Power down CPU until an interrupt occurs. The Gameboy uses this to save power.
+    /// `HALT`: Power down CPU until an interrupt occurs. The Gameboy uses this to save power.
     Halt,
 
-    /// DI: Disable interrupts.
+    /// `DI`: Disable interrupts.
     Di,
 
-    /// EI: Enable interrupts.
+    /// `EI`: Enable interrupts.
     Ei,
 
-    /// JP: Absolute jump.
+    /// `JP cond, xx`: Absolute jump.
     Jp(Operand16, Cond),
 
-    /// JR: Relative jump.
+    /// `JR cond, x`: Relative jump.
     Jr(i8, Cond),
 
-    /// CALL: Call the function at the given immediate address.
+    /// `CALL addr`: Call the function at the given immediate address.
     Call(u16, Cond),
 
-    /// RET: Return from the current function by jumping to an address popped from the stack.
+    /// `RET`: Return from the current function by jumping to an address popped from the stack.
     Ret,
 
-    /// LD: Loads, stores, and moves for 8-bit values.
+    /// `LD x, x`: 8-bit loads, stores, and moves.
     Ld8(Operand8, Operand8),
 
-    /// LD: Loads, stores, and moves for 16-bit values.
+    /// `LD xx, xx`: 8-bit loads, stores, and moves.
     Ld16(Operand16, Operand16),
 
-    /// INC: 8-bit increment.
+    /// `INC x`: 8-bit increment.
     Inc8(Operand8),
 
-    /// INC: 16-bit increment.
+    /// `INC xx`: 16-bit increment.
     Inc16(Operand16),
 
-    /// DEC: 8-bit decrement.
+    /// `DEC x`: 8-bit decrement.
     Dec8(Operand8),
 
-    /// DEC: 16-bit decrement.
+    /// `DEC xx`: 16-bit decrement.
     Dec16(Operand16),
 
-    /// XOR: Exclusive-or between A and the operand.
+    /// `ADD A, x`: 8-bit addition. Implicit first operand is always register A.
+    AddA(Operand8),
+
+    /// `ADD HL, xx`: 16-bit addition. Implicit first operand is always register HL.
+    AddHl(Operand16),
+
+    /// `ADC A, x`: Addition with carry. Implicit first operand is always register A.
+    AdcA(Operand8),
+
+    /// `SUB x`: Subtraction. Implicit first operand is always register A.
+    Sub(Operand8),
+
+    /// `SBC A, x`: Subtraction with carry. Implicit first operand is always register A.
+    SbcA(Operand8),
+
+    /// `AND x`: Bitwise and. Implicit first operand is always register A.
+    And(Operand8),
+
+    /// `XOR x`: Bitwise exclusive or. Implicit first operand is always register A.
     Xor(Operand8),
 
-    /// CP: Compare A with the operand. Like `A - operand` but only for the flag side effects.
+    /// `OR x`: Bitwise or. Implicit first operand is always register A.
+    Or(Operand8),
+
+    /// `CP x`: Comparison. Implicit first operand is always register A. Operates like subtraction
+    /// but only for the flag side effects.
     Cp(Operand8),
 
-    /// RLC: 1-bit rotate left circular.
+    /// `RLC x`: 1-bit rotate left circular.
     ///   * low bit = old high bit
     ///   * carry = old high bit
     Rlc(Operand8),
 
-    /// RL: 1-bit rotate left, through the carry flag.
+    /// `RL x`: 1-bit rotate left, through the carry flag.
     ///   * low bit = old carry
     ///   * carry = old high bit
     Rl(Operand8),
 
-    /// RRC: 1-bit rotate right circular.
+    /// `RRC x`: 1-bit rotate right circular.
     ///   * high bit = old low bit
     ///   * carry = old low bit
     Rrc(Operand8),
 
-    /// RR: 1-bit rotate right, through the carry flag.
+    /// `RR x`: 1-bit rotate right, through the carry flag.
     ///   * high bit = old carry
     ///   * carry = old low bit
     Rr(Operand8),
 
-    /// SLA: 1-bit arithmetic shift left.
+    /// `SLA x`: 1-bit arithmetic shift left.
     ///   * low bit = 0
     ///   * carry = old high bit
     Sla(Operand8),
 
-    /// SRA: 1-bit arithmetic shift right.
+    /// `SRA x`: 1-bit arithmetic shift right.
     ///   * high bit unchanged (i.e. result has the same sign)
     ///   * carry = old low bit
     Sra(Operand8),
 
-    /// SRL: 1-bit logical shift right.
+    /// `SRL x`: 1-bit logical shift right.
     ///   * high bit = 0
     ///   * carry = old low bit
     Srl(Operand8),
 
-    /// SWAP: Swap high and low nibbles (4 bits).
+    /// `SWAP x`: Swap high and low nibbles (4 bits).
     Swap(Operand8),
 
-    /// BIT: Test the bit at the given index in the given operand. Sets the zero flag accordingly.
+    /// `BIT b, x`: Test the bit at the given index in the given operand. Sets the zero flag
+    /// accordingly.
     Bit(u8, Operand8),
 
-    /// RES: Reset the bit at the given index in the given operand. (Set to zero.)
+    /// `RES b, x`: Reset the bit at the given index in the given operand. (Set to zero.)
     Res(u8, Operand8),
 
-    /// SET: Set the bit at the given index in the given operand. (Set to one.)
+    /// `SET b, x`: Set the bit at the given index in the given operand. (Set to one.)
     Set(u8, Operand8),
 }
 
@@ -733,6 +756,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x05 => Dec8(Reg8(B)),
         0x06 => Ld8(Reg8(B), Imm8(bytes[1])),
         0x08 => Ld16(MemImm16(to_u16(bytes[1], bytes[2])), Reg16(SP)),
+        0x09 => AddHl(Reg16(BC)),
         0x0A => Ld8(Reg8(A), MemReg(BC)),
         0x0B => Dec16(Reg16(BC)),
         0x0C => Inc8(Reg8(C)),
@@ -752,6 +776,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x15 => Dec8(Reg8(D)),
         0x16 => Ld8(Reg8(D), Imm8(bytes[1])),
         0x18 => Jr(bytes[1] as i8, Cond::None),
+        0x19 => AddHl(Reg16(DE)),
         0x1A => Ld8(Reg8(A), MemReg(DE)),
         0x1B => Dec16(Reg16(DE)),
         0x1C => Inc8(Reg8(E)),
@@ -764,6 +789,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x25 => Dec8(Reg8(H)),
         0x26 => Ld8(Reg8(H), Imm8(bytes[1])),
         0x28 => Jr(bytes[1] as i8, Cond::Zero),
+        0x29 => AddHl(Reg16(HL)),
         0x2B => Dec16(Reg16(HL)),
         0x2C => Inc8(Reg8(L)),
         0x2D => Dec8(Reg8(L)),
@@ -775,6 +801,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x35 => Dec8(MemReg(HL)),
         0x36 => Ld8(MemReg(HL), Imm8(bytes[1])),
         0x38 => Jr(bytes[1] as i8, Cond::Carry),
+        0x39 => AddHl(Reg16(SP)),
         0x3B => Dec16(Reg16(SP)),
         0x3C => Inc8(Reg8(A)),
         0x3D => Dec8(Reg8(A)),
@@ -843,6 +870,46 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x7D => Ld8(Reg8(A), Reg8(L)),
         0x7E => Ld8(Reg8(A), MemReg(HL)),
         0x7F => Ld8(Reg8(A), Reg8(A)),
+        0x80 => AddA(Reg8(B)),
+        0x81 => AddA(Reg8(C)),
+        0x82 => AddA(Reg8(D)),
+        0x83 => AddA(Reg8(E)),
+        0x84 => AddA(Reg8(H)),
+        0x85 => AddA(Reg8(L)),
+        0x86 => AddA(MemReg(HL)),
+        0x87 => AddA(Reg8(A)),
+        0x88 => AdcA(Reg8(B)),
+        0x89 => AdcA(Reg8(C)),
+        0x8A => AdcA(Reg8(D)),
+        0x8B => AdcA(Reg8(E)),
+        0x8C => AdcA(Reg8(H)),
+        0x8D => AdcA(Reg8(L)),
+        0x8E => AdcA(MemReg(HL)),
+        0x8F => AdcA(Reg8(A)),
+        0x90 => Sub(Reg8(B)),
+        0x91 => Sub(Reg8(C)),
+        0x92 => Sub(Reg8(D)),
+        0x93 => Sub(Reg8(E)),
+        0x94 => Sub(Reg8(H)),
+        0x95 => Sub(Reg8(L)),
+        0x96 => Sub(MemReg(HL)),
+        0x97 => Sub(Reg8(A)),
+        0x98 => SbcA(Reg8(B)),
+        0x99 => SbcA(Reg8(C)),
+        0x9A => SbcA(Reg8(D)),
+        0x9B => SbcA(Reg8(E)),
+        0x9C => SbcA(Reg8(H)),
+        0x9D => SbcA(Reg8(L)),
+        0x9E => SbcA(MemReg(HL)),
+        0x9F => SbcA(Reg8(A)),
+        0xA0 => And(Reg8(B)),
+        0xA1 => And(Reg8(C)),
+        0xA2 => And(Reg8(D)),
+        0xA3 => And(Reg8(E)),
+        0xA4 => And(Reg8(H)),
+        0xA5 => And(Reg8(L)),
+        0xA6 => And(MemReg(HL)),
+        0xA7 => And(Reg8(A)),
         0xA8 => Xor(Reg8(B)),
         0xA9 => Xor(Reg8(C)),
         0xAA => Xor(Reg8(D)),
@@ -850,19 +917,34 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xAC => Xor(Reg8(H)),
         0xAD => Xor(Reg8(L)),
         0xAF => Xor(Reg8(A)),
+        0xB0 => Or(Reg8(B)),
+        0xB1 => Or(Reg8(C)),
+        0xB2 => Or(Reg8(D)),
+        0xB3 => Or(Reg8(E)),
+        0xB4 => Or(Reg8(H)),
+        0xB5 => Or(Reg8(L)),
+        0xB6 => Or(MemReg(HL)),
+        0xB7 => Or(Reg8(A)),
         0xC2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotZero),
         0xC3 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::None),
+        0xC6 => AddA(Imm8(bytes[1])),
         0xC9 => Ret,
         // 0xCB was moved to the bottom since it contains its own big match.
         0xCA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Zero),
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
+        0xCE => AdcA(Imm8(bytes[1])),
         0xD2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotCarry),
+        0xD6 => Sub(Imm8(bytes[1])),
         0xDA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Carry),
+        0xDE => SbcA(Imm8(bytes[1])),
         0xE0 => Ld8(MemImmHigh(bytes[1]), Reg8(A)),
+        0xE6 => And(Imm8(bytes[1])),
         0xE9 => Jp(Reg16(HL), Cond::None),
         0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
+        0xEE => Xor(Imm8(bytes[1])),
         0xF0 => Ld8(Reg8(A), MemImmHigh(bytes[1])),
         0xF3 => Di,
+        0xF6 => Or(Imm8(bytes[1])),
         0xFA => Ld8(Reg8(A), MemImm(to_u16(bytes[1], bytes[2]))),
         0xFB => Ei,
         0xFE => Cp(Imm8(bytes[1])),
