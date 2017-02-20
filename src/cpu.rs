@@ -290,6 +290,18 @@ enum Inst {
     ///   * carry = old low bit
     Rr(Operand8),
 
+    /// `RLCA`: Shorter encoding of `RLC A`. It also affects the zero flag differently.
+    Rlca,
+
+    /// `RLA`: Shorter encoding of `RL A`. It also affects the zero flag differently.
+    Rla,
+
+    /// `RRCA`: Shorter encoding of `RRC A`. It also affects the zero flag differently.
+    Rrca,
+
+    /// `RRA`: Shorter encoding of `RR A`. It also affects the zero flag differently.
+    Rra,
+
     /// `SLA x`: 1-bit arithmetic shift left.
     ///   * low bit = 0
     ///   * carry = old high bit
@@ -812,6 +824,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x04 => Inc8(Reg8(B)),
         0x05 => Dec8(Reg8(B)),
         0x06 => Ld8(Reg8(B), Imm8(bytes[1])),
+        0x07 => Rlca,
         0x08 => Ld16(MemImm16(to_u16(bytes[1], bytes[2])), Reg16(SP)),
         0x09 => AddHl(Reg16(BC)),
         0x0A => Ld8(Reg8(A), MemReg(BC)),
@@ -819,6 +832,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x0C => Inc8(Reg8(C)),
         0x0D => Dec8(Reg8(C)),
         0x0E => Ld8(Reg8(C), Imm8(bytes[1])),
+        0x0F => Rrca,
         0x10 => {
             // FIXME: For some reason the STOP instruction is followed by 0x00 according to the
             // manual. Perhaps this should result in an invalid instruction if it's not zero. For
@@ -832,6 +846,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x14 => Inc8(Reg8(D)),
         0x15 => Dec8(Reg8(D)),
         0x16 => Ld8(Reg8(D), Imm8(bytes[1])),
+        0x17 => Rla,
         0x18 => Jr(bytes[1] as i8, Cond::None),
         0x19 => AddHl(Reg16(DE)),
         0x1A => Ld8(Reg8(A), MemReg(DE)),
@@ -839,6 +854,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x1C => Inc8(Reg8(E)),
         0x1D => Dec8(Reg8(E)),
         0x1E => Ld8(Reg8(E), Imm8(bytes[1])),
+        0x1F => Rra,
         0x20 => Jr(bytes[1] as i8, Cond::NotZero),
         0x21 => Ld16(Reg16(HL), Imm16(to_u16(bytes[1], bytes[2]))),
         0x22 => Ld8(MemHlPostInc, Reg8(A)),
