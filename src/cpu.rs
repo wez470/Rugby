@@ -487,7 +487,6 @@ impl Cpu {
             0xAC => self.xor(Regs8::H),
             0xAD => self.xor(Regs8::L),
             0xAF => self.xor(Regs8::A),
-            0xCD => self.call(),
             0xC9 => self.ret(),
             0xFE => self.cp(),
             0xCB => {
@@ -545,6 +544,7 @@ impl Cpu {
             Inst::Ei => self.pending_enable_interrupts = true,
             Inst::Jp(loc, cond) => self.jp(loc, cond),
             Inst::Jr(offset, cond) => self.jr(offset, cond),
+            Inst::Call(fn_addr, cond) => self.call(fn_addr, cond),
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
@@ -587,6 +587,16 @@ impl Cpu {
     fn jr(&mut self, offset: i8, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
             self.reg_pc.inc(offset);
+        }
+    }
+
+    /// Call a subroutine if the condition is met.
+    fn call(&mut self, fn_addr: u16, cond: Cond) {
+        if self.check_cond_and_update_cycles(cond) {
+            // The return address is the address of the instruction after the call.
+            let return_addr = self.reg_pc.get();
+            self.push_stack(return_addr);
+            self.reg_pc.set(fn_addr);
         }
     }
 
@@ -676,13 +686,6 @@ impl Cpu {
         }
     }
 
-    /// Load immediate 16-bit data into the given register.
-    fn load_imm16(&mut self, reg: Regs16) {
-        let low = self.rom[self.base_pc + 1] as u16;
-        let high = self.rom[self.base_pc + 2] as u16;
-        self.set_reg_16(reg, (high << 8) | low);
-    }
-
     fn xor(&mut self, reg: Regs8) {
         let n = self.get_reg_8(reg);
         let result = self.reg_af.high ^ n;
@@ -699,13 +702,6 @@ impl Cpu {
         self.set_sub_flag(true);
         self.set_carry_flag(a < n);
         self.set_half_carry_flag(Cpu::get_sub_half_carry(a, n));
-    }
-
-    fn call(&mut self) {
-        // The return address is the address of the instruction after the call.
-        let return_addr = self.reg_pc.get();
-        self.push_stack(return_addr);
-        self.load_imm16(Regs16::PC);
     }
 
     fn ret(&mut self) {
