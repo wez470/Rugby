@@ -480,8 +480,6 @@ impl Cpu {
 
         let mut handled_by_opcode_match = true;
         match opcode {
-            0x18 => self.jr_r8(),
-            0x28 => self.jr_z_signed_8(),
             0xA8 => self.xor(Regs_8::B),
             0xA9 => self.xor(Regs_8::C),
             0xAA => self.xor(Regs_8::D),
@@ -545,7 +543,8 @@ impl Cpu {
             Inst::Nop => {},
             Inst::Di => self.pending_disable_interrupts = true,
             Inst::Ei => self.pending_enable_interrupts = true,
-            Inst::Jp(location, cond) => self.jp(location, cond),
+            Inst::Jp(loc, cond) => self.jp(loc, cond),
+            Inst::Jr(offset, cond) => self.jr(offset, cond),
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
@@ -565,7 +564,7 @@ impl Cpu {
 
     /// If the given condition is met, increment the cycle count accordingly and return true.
     fn check_cond_and_update_cycles(&mut self, cond: Cond) -> bool {
-        let condition_met = self.check_cond(cond);
+        let condition_met = self.is_cond_met(cond);
         if condition_met {
             let opcode = self.rom[self.base_pc];
             self.cycles += CONDITIONAL_CYCLES[opcode as usize];
@@ -574,13 +573,20 @@ impl Cpu {
     }
 
     /// Return true if the given condition is met.
-    fn check_cond(&self, cond: Cond) -> bool {
+    fn is_cond_met(&self, cond: Cond) -> bool {
         match cond {
             Cond::None => true,
             Cond::Zero => self.get_zero_flag(),
             Cond::NotZero => !self.get_zero_flag(),
             Cond::Carry => self.get_carry_flag(),
             Cond::NotCarry => !self.get_carry_flag(),
+        }
+    }
+
+    /// Increment the program counter by the given offset if the condition is met.
+    fn jr(&mut self, offset: i8, cond: Cond) {
+        if self.check_cond_and_update_cycles(cond) {
+            self.reg_pc.inc(offset);
         }
     }
 
@@ -675,19 +681,6 @@ impl Cpu {
         let low = self.rom[self.base_pc + 1] as u16;
         let high = self.rom[self.base_pc + 2] as u16;
         self.set_reg_16(reg, (high << 8) | low);
-    }
-
-    fn jr_r8(&mut self) {
-        let n = self.rom[self.base_pc + 1] as i8;
-        self.reg_pc.inc(n);
-    }
-
-    fn jr_z_signed_8(&mut self) {
-        if self.get_zero_flag() {
-            self.cycles += 4;
-            let val = self.rom[self.base_pc + 1] as i8;
-            self.reg_pc.inc(val);
-        }
     }
 
     fn xor(&mut self, reg: Regs_8) {
