@@ -598,9 +598,9 @@ impl Cpu {
         match src {
             Operand8::Imm8(val) => val,
             Operand8::Reg8(reg) => self.get_reg_8(reg),
-            Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize],
+            Operand8::MemImm(loc) => self.memory.mem[loc as usize],
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize],
-            Operand8::MemHighImm(mem_offset) => self.memory.mem[0xFF00 | mem_offset as usize],
+            Operand8::MemHighImm(offset) => self.memory.mem[0xFF00 | offset as usize],
             Operand8::MemHighC => {
                 let offset = self.get_reg_8(Regs_8::C);
                 self.memory.mem[0xFF00 | offset as usize]
