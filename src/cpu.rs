@@ -103,7 +103,7 @@ const INSTRUCTION_LENGTH: [usize; 0x100] = [
 ];
 
 #[derive(Clone, Copy, Debug)]
-pub enum Regs_8 {
+pub enum Regs8 {
     A,
     F,
     B,
@@ -115,7 +115,7 @@ pub enum Regs_8 {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Regs_16 {
+pub enum Regs16 {
     AF,
     BC,
     DE,
@@ -131,13 +131,13 @@ enum Operand8 {
     Imm8(u8),
 
     /// 8-bit register.
-    Reg8(Regs_8),
+    Reg8(Regs8),
 
     /// Memory location at the given immediate address.
     MemImm(u16),
 
     /// Memory location at the address in the given register.
-    MemReg(Regs_16),
+    MemReg(Regs16),
 
     /// Memory location at the address `0xFF00 + byte`.
     MemHighImm(u8),
@@ -162,7 +162,7 @@ enum Operand16 {
     Imm16(u16),
 
     /// 16-bit register.
-    Reg16(Regs_16),
+    Reg16(Regs16),
 
     /// 16-bit memory location at the given immediate address (and the byte above).
     MemImm16(u16),
@@ -231,10 +231,10 @@ enum Inst {
     Reti,
 
     /// `PUSH xx`: Push the given register onto the stack.
-    Push(Regs_16),
+    Push(Regs16),
 
     /// `POP xx`: Pop the top of the stack into the given register.
-    Pop(Regs_16),
+    Pop(Regs16),
 
     /// `LD x, x`: 8-bit loads, stores, and moves.
     Ld8(Operand8, Operand8),
@@ -480,33 +480,33 @@ impl Cpu {
 
         let mut handled_by_opcode_match = true;
         match opcode {
-            0xA8 => self.xor(Regs_8::B),
-            0xA9 => self.xor(Regs_8::C),
-            0xAA => self.xor(Regs_8::D),
-            0xAB => self.xor(Regs_8::E),
-            0xAC => self.xor(Regs_8::H),
-            0xAD => self.xor(Regs_8::L),
-            0xAF => self.xor(Regs_8::A),
+            0xA8 => self.xor(Regs8::B),
+            0xA9 => self.xor(Regs8::C),
+            0xAA => self.xor(Regs8::D),
+            0xAB => self.xor(Regs8::E),
+            0xAC => self.xor(Regs8::H),
+            0xAD => self.xor(Regs8::L),
+            0xAF => self.xor(Regs8::A),
             0xCD => self.call(),
             0xC9 => self.ret(),
             0xFE => self.cp(),
             0xCB => {
                 let opcode_after_cb = self.rom[self.base_pc + 1];
                 match opcode_after_cb {
-                    0x00 => self.rotate_left_carry(Regs_8::B),
-                    0x01 => self.rotate_left_carry(Regs_8::C),
-                    0x02 => self.rotate_left_carry(Regs_8::D),
-                    0x03 => self.rotate_left_carry(Regs_8::E),
-                    0x04 => self.rotate_left_carry(Regs_8::H),
-                    0x05 => self.rotate_left_carry(Regs_8::L),
-                    0x07 => self.rotate_left_carry(Regs_8::A),
-                    0x08 => self.rotate_right_carry(Regs_8::B),
-                    0x09 => self.rotate_right_carry(Regs_8::C),
-                    0x0A => self.rotate_right_carry(Regs_8::D),
-                    0x0B => self.rotate_right_carry(Regs_8::E),
-                    0x0C => self.rotate_right_carry(Regs_8::H),
-                    0x0D => self.rotate_right_carry(Regs_8::L),
-                    0x0F => self.rotate_right_carry(Regs_8::A),
+                    0x00 => self.rotate_left_carry(Regs8::B),
+                    0x01 => self.rotate_left_carry(Regs8::C),
+                    0x02 => self.rotate_left_carry(Regs8::D),
+                    0x03 => self.rotate_left_carry(Regs8::E),
+                    0x04 => self.rotate_left_carry(Regs8::H),
+                    0x05 => self.rotate_left_carry(Regs8::L),
+                    0x07 => self.rotate_left_carry(Regs8::A),
+                    0x08 => self.rotate_right_carry(Regs8::B),
+                    0x09 => self.rotate_right_carry(Regs8::C),
+                    0x0A => self.rotate_right_carry(Regs8::D),
+                    0x0B => self.rotate_right_carry(Regs8::E),
+                    0x0C => self.rotate_right_carry(Regs8::H),
+                    0x0D => self.rotate_right_carry(Regs8::L),
+                    0x0F => self.rotate_right_carry(Regs8::A),
                     _ => handled_by_opcode_match = false,
                 }
             }
@@ -608,19 +608,19 @@ impl Cpu {
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize],
             Operand8::MemHighImm(offset) => self.memory.mem[0xFF00 | offset as usize],
             Operand8::MemHighC => {
-                let offset = self.get_reg_8(Regs_8::C);
+                let offset = self.get_reg_8(Regs8::C);
                 self.memory.mem[0xFF00 | offset as usize]
             }
             Operand8::MemHlPostInc => {
-                let hl = self.get_reg_16(Regs_16::HL);
+                let hl = self.get_reg_16(Regs16::HL);
                 let val = self.memory.mem[hl as usize];
-                self.set_reg_16(Regs_16::HL, hl.wrapping_add(1));
+                self.set_reg_16(Regs16::HL, hl.wrapping_add(1));
                 val
             }
             Operand8::MemHlPostDec => {
-                let hl = self.get_reg_16(Regs_16::HL);
+                let hl = self.get_reg_16(Regs16::HL);
                 let val = self.memory.mem[hl as usize];
-                self.set_reg_16(Regs_16::HL, hl.wrapping_sub(1));
+                self.set_reg_16(Regs16::HL, hl.wrapping_sub(1));
                 val
             }
         }
@@ -638,18 +638,18 @@ impl Cpu {
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize] = val,
             Operand8::MemHighImm(offset) => self.memory.mem[0xFF00 | offset as usize] = val,
             Operand8::MemHighC => {
-                let offset = self.get_reg_8(Regs_8::C);
+                let offset = self.get_reg_8(Regs8::C);
                 self.memory.mem[0xFF00 | offset as usize] = val;
             }
             Operand8::MemHlPostInc => {
-                let hl = self.get_reg_16(Regs_16::HL);
+                let hl = self.get_reg_16(Regs16::HL);
                 self.memory.mem[hl as usize] = val;
-                self.set_reg_16(Regs_16::HL, hl.wrapping_add(1));
+                self.set_reg_16(Regs16::HL, hl.wrapping_add(1));
             }
             Operand8::MemHlPostDec => {
-                let hl = self.get_reg_16(Regs_16::HL);
+                let hl = self.get_reg_16(Regs16::HL);
                 self.memory.mem[hl as usize] = val;
-                self.set_reg_16(Regs_16::HL, hl.wrapping_sub(1));
+                self.set_reg_16(Regs16::HL, hl.wrapping_sub(1));
             }
         }
     }
@@ -677,13 +677,13 @@ impl Cpu {
     }
 
     /// Load immediate 16-bit data into the given register.
-    fn load_imm16(&mut self, reg: Regs_16) {
+    fn load_imm16(&mut self, reg: Regs16) {
         let low = self.rom[self.base_pc + 1] as u16;
         let high = self.rom[self.base_pc + 2] as u16;
         self.set_reg_16(reg, (high << 8) | low);
     }
 
-    fn xor(&mut self, reg: Regs_8) {
+    fn xor(&mut self, reg: Regs8) {
         let n = self.get_reg_8(reg);
         let result = self.reg_af.high ^ n;
         self.set_zero_flag(result == 0);
@@ -705,12 +705,12 @@ impl Cpu {
         // The return address is the address of the instruction after the call.
         let return_addr = self.reg_pc.get();
         self.push_stack(return_addr);
-        self.load_imm16(Regs_16::PC);
+        self.load_imm16(Regs16::PC);
     }
 
     fn ret(&mut self) {
         let return_addr = self.pop_stack();
-        self.set_reg_16(Regs_16::PC, return_addr);
+        self.set_reg_16(Regs16::PC, return_addr);
     }
 
     fn push_stack(&mut self, val: u16) {
@@ -760,57 +760,57 @@ impl Cpu {
         self.reg_af.is_bit_set(CARRY_FLAG)
     }
 
-    fn set_reg_8(&mut self, reg: Regs_8, val: u8) {
+    fn set_reg_8(&mut self, reg: Regs8, val: u8) {
         match reg {
-            Regs_8::A => self.reg_af.high = val,
-            Regs_8::F => self.reg_af.low = val,
-            Regs_8::B => self.reg_bc.high = val,
-            Regs_8::C => self.reg_bc.low = val,
-            Regs_8::D => self.reg_de.high = val,
-            Regs_8::E => self.reg_de.low = val,
-            Regs_8::H => self.reg_hl.high = val,
-            Regs_8::L => self.reg_hl.low = val,
+            Regs8::A => self.reg_af.high = val,
+            Regs8::F => self.reg_af.low = val,
+            Regs8::B => self.reg_bc.high = val,
+            Regs8::C => self.reg_bc.low = val,
+            Regs8::D => self.reg_de.high = val,
+            Regs8::E => self.reg_de.low = val,
+            Regs8::H => self.reg_hl.high = val,
+            Regs8::L => self.reg_hl.low = val,
         }
     }
 
-    fn get_reg_8(&self, reg: Regs_8) -> u8 {
+    fn get_reg_8(&self, reg: Regs8) -> u8 {
          match reg {
-            Regs_8::A => self.reg_af.high,
-            Regs_8::F => self.reg_af.low,
-            Regs_8::B => self.reg_bc.high,
-            Regs_8::C => self.reg_bc.low,
-            Regs_8::D => self.reg_de.high,
-            Regs_8::E => self.reg_de.low,
-            Regs_8::H => self.reg_hl.high,
-            Regs_8::L => self.reg_hl.low,
+            Regs8::A => self.reg_af.high,
+            Regs8::F => self.reg_af.low,
+            Regs8::B => self.reg_bc.high,
+            Regs8::C => self.reg_bc.low,
+            Regs8::D => self.reg_de.high,
+            Regs8::E => self.reg_de.low,
+            Regs8::H => self.reg_hl.high,
+            Regs8::L => self.reg_hl.low,
         }
     }
 
-    fn set_reg_16(&mut self, reg: Regs_16, val: u16) {
+    fn set_reg_16(&mut self, reg: Regs16, val: u16) {
         match reg {
-            Regs_16::AF => self.reg_af.set(val),
-            Regs_16::BC => self.reg_bc.set(val),
-            Regs_16::DE => self.reg_de.set(val),
-            Regs_16::HL => self.reg_hl.set(val),
-            Regs_16::SP => self.reg_sp.set(val),
-            Regs_16::PC => self.reg_pc.set(val),
+            Regs16::AF => self.reg_af.set(val),
+            Regs16::BC => self.reg_bc.set(val),
+            Regs16::DE => self.reg_de.set(val),
+            Regs16::HL => self.reg_hl.set(val),
+            Regs16::SP => self.reg_sp.set(val),
+            Regs16::PC => self.reg_pc.set(val),
         }
     }
 
-    fn get_reg_16(&self, reg: Regs_16) -> u16 {
+    fn get_reg_16(&self, reg: Regs16) -> u16 {
          match reg {
-            Regs_16::AF => self.reg_af.get(),
-            Regs_16::BC => self.reg_bc.get(),
-            Regs_16::DE => self.reg_de.get(),
-            Regs_16::HL => self.reg_hl.get(),
-            Regs_16::SP => self.reg_sp.get(),
-            Regs_16::PC => self.reg_pc.get(),
+            Regs16::AF => self.reg_af.get(),
+            Regs16::BC => self.reg_bc.get(),
+            Regs16::DE => self.reg_de.get(),
+            Regs16::HL => self.reg_hl.get(),
+            Regs16::SP => self.reg_sp.get(),
+            Regs16::PC => self.reg_pc.get(),
         }
     }
 
     /// Rotate register by one bit. The carry is the highest order bit value
     /// before the operation occurs. Rotation does not flow through carry bit
-    fn rotate_left_carry(&mut self, reg: Regs_8) {
+    fn rotate_left_carry(&mut self, reg: Regs8) {
         let reg_val = self.get_reg_8(reg);
         let rot_val = reg_val.rotate_left(1);
         self.set_reg_8(reg, rot_val);
@@ -822,7 +822,7 @@ impl Cpu {
 
     /// Rotate register by one bit. The carry is the lowest order bit value
     /// before the operation occurs. Rotation does not flow through carry bit
-    fn rotate_right_carry(&mut self, reg: Regs_8) {
+    fn rotate_right_carry(&mut self, reg: Regs8) {
         let reg_val = self.get_reg_8(reg);
         let rot_val = reg_val.rotate_right(1);
         self.set_reg_8(reg, rot_val);
@@ -841,8 +841,8 @@ fn decode(bytes: &[u8]) -> Inst {
     use self::Inst::*;
     use self::Operand8::*;
     use self::Operand16::*;
-    use self::Regs_16::*;
-    use self::Regs_8::*;
+    use self::Regs16::*;
+    use self::Regs8::*;
 
     match bytes[0] {
         0x00 => Nop,
@@ -1465,7 +1465,7 @@ mod tests {
         let (mut actual, mut expected) = setup(vec![0x00]); // nop
         actual.step();
 
-        expected.set_reg_16(Regs_16::PC, 1);
+        expected.set_reg_16(Regs16::PC, 1);
         expected.cycles = 4;
         check_diff(&actual, &expected);
     }
@@ -1476,13 +1476,13 @@ mod tests {
             0x3E, 0x13, // ld a, 0x13
             0x06, 0x42, // ld b, 0x42
         ]);
-        actual.set_reg_8(Regs_8::A, 0);
-        actual.set_reg_8(Regs_8::B, 0);
+        actual.set_reg_8(Regs8::A, 0);
+        actual.set_reg_8(Regs8::B, 0);
         actual.step_n(2);
 
-        expected.set_reg_8(Regs_8::A, 0x13);
-        expected.set_reg_8(Regs_8::B, 0x42);
-        expected.set_reg_16(Regs_16::PC, 4);
+        expected.set_reg_8(Regs8::A, 0x13);
+        expected.set_reg_8(Regs8::B, 0x42);
+        expected.set_reg_16(Regs16::PC, 4);
         expected.cycles = 16;
         check_diff(&actual, &expected);
     }
@@ -1492,11 +1492,11 @@ mod tests {
         let (mut actual, mut expected) = setup(vec![
             0x11, 0x34, 0x12, // ld de, 0x1234
         ]);
-        actual.set_reg_16(Regs_16::DE, 0);
+        actual.set_reg_16(Regs16::DE, 0);
         actual.step();
 
-        expected.set_reg_16(Regs_16::DE, 0x1234);
-        expected.set_reg_16(Regs_16::PC, 3);
+        expected.set_reg_16(Regs16::DE, 0x1234);
+        expected.set_reg_16(Regs16::PC, 3);
         expected.cycles = 12;
         check_diff(&actual, &expected);
     }
@@ -1508,7 +1508,7 @@ mod tests {
         ]);
         actual.step();
 
-        expected.set_reg_16(Regs_16::PC, 0x1234);
+        expected.set_reg_16(Regs16::PC, 0x1234);
         expected.cycles = 16;
         check_diff(&actual, &expected);
     }
@@ -1524,7 +1524,7 @@ mod tests {
         // After DI, interrupts still aren't disabled until the next instruction executes.
         expected.interrupts_enabled = true;
         expected.pending_disable_interrupts = true;
-        expected.set_reg_16(Regs_16::PC, 1);
+        expected.set_reg_16(Regs16::PC, 1);
         expected.cycles = 4;
         check_diff(&actual, &expected);
 
@@ -1534,7 +1534,7 @@ mod tests {
         // Now the instruction after DI has executed, so DI takes effect.
         expected.interrupts_enabled = false;
         expected.pending_disable_interrupts = false;
-        expected.set_reg_16(Regs_16::PC, 2);
+        expected.set_reg_16(Regs16::PC, 2);
         expected.cycles = 8;
         check_diff(&actual, &expected);
     }
@@ -1550,7 +1550,7 @@ mod tests {
         // After EI, interrupts still aren't disabled until the next instruction executes.
         expected.interrupts_enabled = false;
         expected.pending_enable_interrupts = true;
-        expected.set_reg_16(Regs_16::PC, 1);
+        expected.set_reg_16(Regs16::PC, 1);
         expected.cycles = 4;
         check_diff(&actual, &expected);
 
@@ -1560,7 +1560,7 @@ mod tests {
         // Now the instruction after EI has executed, so EI takes effect.
         expected.interrupts_enabled = true;
         expected.pending_enable_interrupts = false;
-        expected.set_reg_16(Regs_16::PC, 2);
+        expected.set_reg_16(Regs16::PC, 2);
         expected.cycles = 8;
         check_diff(&actual, &expected);
     }
