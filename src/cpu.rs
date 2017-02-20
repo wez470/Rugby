@@ -97,9 +97,9 @@ const INSTRUCTION_LENGTH: [usize; 0x100] = [
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // A
      1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1,  1, // B
      1,  1,  3,  3,  3,  1,  2,  1,  1,  1,  3,  2,  3,  3,  2,  1, // C
-     1,  1,  3,  0,  3,  1,  2,  1,  1,  1,  3,  0,  3,  0,  2,  1, // D
-     2,  1,  2,  0,  0,  1,  2,  1,  2,  1,  3,  0,  0,  0,  2,  1, // E
-     2,  1,  2,  1,  0,  1,  2,  1,  2,  1,  3,  1,  0,  0,  2,  1, // F
+     1,  1,  3,  1,  3,  1,  2,  1,  1,  1,  3,  1,  3,  1,  2,  1, // D
+     2,  1,  2,  1,  1,  1,  2,  1,  2,  1,  3,  1,  1,  1,  2,  1, // E
+     2,  1,  2,  1,  1,  1,  2,  1,  2,  1,  3,  1,  1,  1,  2,  1, // F
 ];
 
 #[derive(Clone, Copy, Debug)]
@@ -214,9 +214,21 @@ enum Inst {
     /// conditional.
     Call(u16, Cond),
 
+    /// `RST addr`: Call one of eight "restarts" stored in the first 256 bytes of memory. Works
+    /// just like a function call to the given address. We store only the low byte of the address;
+    /// the high byte is always 0x00.
+    ///
+    /// Valid addresses: 0x00, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, and 0x38.
+    Rst(u8),
+
     /// `RET cond?`: Return from the current function by jumping to an address popped from the
     /// stack. Optionally conditional.
     Ret(Cond),
+
+    /// `RETI`: Return from the current function, like `RET`, but also enable interrupts. Typically
+    /// used to return from interrupt handlers because interrupts are disabled when they are
+    /// triggered.
+    Reti,
 
     /// `PUSH xx`: Push the given register onto the stack.
     Push(Regs_16),
@@ -229,6 +241,9 @@ enum Inst {
 
     /// `LD xx, xx`: 8-bit loads, stores, and moves.
     Ld16(Operand16, Operand16),
+
+    /// `LD HL, SP+x`: Add signed 8-bit immediate to stack pointer and store the result in HL.
+    LdHlSp(i8),
 
     /// `INC x`: 8-bit increment.
     Inc8(Operand8),
@@ -247,6 +262,9 @@ enum Inst {
 
     /// `ADD HL, xx`: 16-bit addition. Implicit first operand is always register HL.
     AddHl(Operand16),
+
+    /// `ADD SP, x`: Add signed 8-bit immediate to stack pointer.
+    AddSp(i8),
 
     /// `ADC A, x`: Addition with carry. Implicit first operand is always register A.
     AdcA(Operand8),
@@ -329,6 +347,26 @@ enum Inst {
 
     /// `SET b, x`: Set the bit at the given index in the given operand. (Set to one.)
     Set(u8, Operand8),
+
+    /// `DAA`: Decimal adjust register A. This is used after adding or subtracting BCD
+    /// (binary-coded decimal) values to obtain the correct result for BCD arithmetic.
+    // TODO(solson): Figure out the details from the manuals and document in detail here. This is a
+    // complicated instruction.
+    Daa,
+
+    /// `CPL`: Complement register A, i.e. flip all bits.
+    Cpl,
+
+    /// `CCF`: Complement the carry flag, i.e. invert its value.
+    Ccf,
+
+    /// `SCF`: Set the carry flag to true.
+    Scf,
+
+    /// An invalid opcode the CPU does not understand, Instruction decoding will generate these for
+    /// bad opcodes and executing them will halt emulation and report an error. On the physical
+    /// Gameboy, they supposedly cause it to "lock up".
+    Invalid(u8),
 }
 
 #[derive(Clone)]
@@ -430,19 +468,15 @@ impl Cpu {
 
         self.reg_pc.inc(instruction_len as i8);
 
+        let inst = decode(&self.rom[self.base_pc..(self.base_pc + instruction_len)]);
+        println!("\t\t(decoded: {:?})", inst);
+
         // TODO(solson): We're in the middle of incrementally porting from the old `match opcode`
         // below to the new `self.execute(inst)` method. While this is happening we're tracking
         // which instructions are handled by each part with the `handled_*` bools.
         //
         // These should be removed when the porting is done.
-        let handled_by_execute;
-        if let Some(inst) = decode(&self.rom[self.base_pc..(self.base_pc + instruction_len)]) {
-            println!("\t\t(decoded: {:?})", inst);
-            handled_by_execute = self.execute(inst);
-        } else {
-            println!("\t\t(could not decode)");
-            handled_by_execute = false;
-        }
+        let handled_by_execute = self.execute(inst);
 
         let mut handled_by_opcode_match = true;
         match opcode {
@@ -809,14 +843,14 @@ impl Cpu {
 ///
 /// Panics if the slice is empty or if it isn't long enough for the instruction specified by its
 /// first byte (the opcode).
-fn decode(bytes: &[u8]) -> Option<Inst> {
+fn decode(bytes: &[u8]) -> Inst {
     use self::Inst::*;
     use self::Operand8::*;
     use self::Operand16::*;
     use self::Regs_16::*;
     use self::Regs_8::*;
 
-    let inst = match bytes[0] {
+    match bytes[0] {
         0x00 => Nop,
         0x01 => Ld16(Reg16(BC), Imm16(to_u16(bytes[1], bytes[2]))),
         0x02 => Ld8(MemReg(BC), Reg8(A)),
@@ -862,6 +896,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x24 => Inc8(Reg8(H)),
         0x25 => Dec8(Reg8(H)),
         0x26 => Ld8(Reg8(H), Imm8(bytes[1])),
+        0x27 => Daa,
         0x28 => Jr(bytes[1] as i8, Cond::Zero),
         0x29 => AddHl(Reg16(HL)),
         0x2A => Ld8(Reg8(A), MemHlPostInc),
@@ -869,6 +904,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x2C => Inc8(Reg8(L)),
         0x2D => Dec8(Reg8(L)),
         0x2E => Ld8(Reg8(L), Imm8(bytes[1])),
+        0x2F => Cpl,
         0x30 => Jr(bytes[1] as i8, Cond::NotCarry),
         0x31 => Ld16(Reg16(SP), Imm16(to_u16(bytes[1], bytes[2]))),
         0x32 => Ld8(MemHlPostDec, Reg8(A)),
@@ -876,6 +912,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x34 => Inc8(MemReg(HL)),
         0x35 => Dec8(MemReg(HL)),
         0x36 => Ld8(MemReg(HL), Imm8(bytes[1])),
+        0x37 => Scf,
         0x38 => Jr(bytes[1] as i8, Cond::Carry),
         0x39 => AddHl(Reg16(SP)),
         0x3A => Ld8(Reg8(A), MemHlPostDec),
@@ -883,6 +920,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0x3C => Inc8(Reg8(A)),
         0x3D => Dec8(Reg8(A)),
         0x3E => Ld8(Reg8(A), Imm8(bytes[1])),
+        0x3F => Ccf,
         0x40 => Ld8(Reg8(B), Reg8(B)),
         0x41 => Ld8(Reg8(B), Reg8(C)),
         0x42 => Ld8(Reg8(B), Reg8(D)),
@@ -993,6 +1031,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xAB => Xor(Reg8(E)),
         0xAC => Xor(Reg8(H)),
         0xAD => Xor(Reg8(L)),
+        0xAE => Xor(MemReg(HL)),
         0xAF => Xor(Reg8(A)),
         0xB0 => Or(Reg8(B)),
         0xB1 => Or(Reg8(C)),
@@ -1017,6 +1056,7 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xC4 => Call(to_u16(bytes[1], bytes[2]), Cond::NotZero),
         0xC5 => Push(BC),
         0xC6 => AddA(Imm8(bytes[1])),
+        0xC7 => Rst(0x00),
         0xC8 => Ret(Cond::Zero),
         0xC9 => Ret(Cond::None),
         0xCA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Zero),
@@ -1024,33 +1064,55 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
         0xCC => Call(to_u16(bytes[1], bytes[2]), Cond::Zero),
         0xCD => Call(to_u16(bytes[1], bytes[2]), Cond::None),
         0xCE => AdcA(Imm8(bytes[1])),
+        0xCF => Rst(0x08),
         0xD0 => Ret(Cond::NotCarry),
         0xD1 => Pop(DE),
         0xD2 => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::NotCarry),
+        0xD3 => Invalid(bytes[0]),
         0xD4 => Call(to_u16(bytes[1], bytes[2]), Cond::NotCarry),
         0xD5 => Push(DE),
         0xD6 => Sub(Imm8(bytes[1])),
+        0xD7 => Rst(0x10),
         0xD8 => Ret(Cond::Carry),
+        0xD9 => Reti,
         0xDA => Jp(Imm16(to_u16(bytes[1], bytes[2])), Cond::Carry),
+        0xDB => Invalid(bytes[0]),
         0xDC => Call(to_u16(bytes[1], bytes[2]), Cond::Carry),
+        0xDD => Invalid(bytes[0]),
         0xDE => SbcA(Imm8(bytes[1])),
+        0xDF => Rst(0x18),
         0xE0 => Ld8(MemHighImm(bytes[1]), Reg8(A)),
         0xE1 => Pop(HL),
         0xE2 => Ld8(MemHighC, Reg8(A)),
+        0xE3 => Invalid(bytes[0]),
+        0xE4 => Invalid(bytes[0]),
         0xE5 => Push(HL),
         0xE6 => And(Imm8(bytes[1])),
+        0xE7 => Rst(0x20),
+        0xE8 => AddSp(bytes[1] as i8),
         0xE9 => Jp(Reg16(HL), Cond::None),
         0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
+        0xEB => Invalid(bytes[0]),
+        0xEC => Invalid(bytes[0]),
+        0xED => Invalid(bytes[0]),
         0xEE => Xor(Imm8(bytes[1])),
+        0xEF => Rst(0x28),
         0xF0 => Ld8(Reg8(A), MemHighImm(bytes[1])),
         0xF1 => Pop(AF),
         0xF2 => Ld8(Reg8(A), MemHighC),
         0xF3 => Di,
+        0xF4 => Invalid(bytes[0]),
         0xF5 => Push(AF),
         0xF6 => Or(Imm8(bytes[1])),
+        0xF7 => Rst(0x30),
+        0xF8 => LdHlSp(bytes[1] as i8),
+        0xF9 => Ld16(Reg16(SP), Reg16(HL)),
         0xFA => Ld8(Reg8(A), MemImm(to_u16(bytes[1], bytes[2]))),
         0xFB => Ei,
+        0xFC => Invalid(bytes[0]),
+        0xFD => Invalid(bytes[0]),
         0xFE => Cp(Imm8(bytes[1])),
+        0xFF => Rst(0x38),
         0xCB => {
             match bytes[1] {
                 0x00 => Rlc(Reg8(B)),
@@ -1312,11 +1374,8 @@ fn decode(bytes: &[u8]) -> Option<Inst> {
                 _ => unreachable!(),
             }
         }
-
-        _ => return None,
-    };
-
-    Some(inst)
+        _ => unreachable!(),
+    }
 }
 
 fn to_u16(low: u8, high: u8) -> u16 {
