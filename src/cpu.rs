@@ -628,9 +628,9 @@ impl Cpu {
         match dest {
             Operand8::Imm8(_) => panic!("Attempt to store to an 8-bit immediate value"),
             Operand8::Reg8(reg) => self.set_reg_8(reg, val),
-            Operand8::MemImm(mem_loc) => self.memory.mem[mem_loc as usize] = val,
+            Operand8::MemImm(loc) => self.memory.mem[loc as usize] = val,
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize] = val,
-            Operand8::MemHighImm(mem_offset) => self.memory.mem[0xFF00 | mem_offset as usize] = val,
+            Operand8::MemHighImm(offset) => self.memory.mem[0xFF00 | offset as usize] = val,
             Operand8::MemHighC => {
                 let offset = self.get_reg_8(Regs_8::C);
                 self.memory.mem[0xFF00 | offset as usize] = val;
