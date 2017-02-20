@@ -548,6 +548,7 @@ impl Cpu {
             Inst::Jp(location, cond) => self.jp(location, cond),
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
+            Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
             _ => return false,
         }
 
