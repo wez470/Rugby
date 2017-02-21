@@ -480,15 +480,6 @@ impl Cpu {
 
         let mut handled_by_opcode_match = true;
         match opcode {
-            0xA8 => self.xor(Regs8::B),
-            0xA9 => self.xor(Regs8::C),
-            0xAA => self.xor(Regs8::D),
-            0xAB => self.xor(Regs8::E),
-            0xAC => self.xor(Regs8::H),
-            0xAD => self.xor(Regs8::L),
-            0xAF => self.xor(Regs8::A),
-            0xC9 => self.ret(),
-            0xFE => self.cp(),
             0xCB => {
                 let opcode_after_cb = self.rom[self.base_pc + 1];
                 match opcode_after_cb {
@@ -546,8 +537,11 @@ impl Cpu {
             Inst::Jr(offset, cond) => self.jr(offset, cond),
             Inst::Call(fn_addr, cond) => self.call(fn_addr, cond),
             Inst::Rst(addr) => self.rst(addr),
+            Inst::Ret(cond) => self.ret(cond),
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
+            Inst::Xor(n) => self.xor(n),
+            Inst::Cp(n) => self.cp(n),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
             _ => return false,
         }
@@ -694,27 +688,29 @@ impl Cpu {
         }
     }
 
-    fn xor(&mut self, reg: Regs8) {
-        let n = self.get_reg_8(reg);
-        let result = self.reg_af.high ^ n;
+    fn xor(&mut self, n: Operand8) {
+        let result = self.reg_af.high ^ self.get_operand_8(n);
+        // self.reg_af.high = result;
         self.set_zero_flag(result == 0);
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
         self.set_carry_flag(false);
     }
 
-    fn cp(&mut self) {
-        let a = self.reg_af.high;
-        let n = self.rom[self.base_pc + 1];
-        self.set_zero_flag(a == n);
+    fn cp(&mut self, n: Operand8) {
+        let left = self.reg_af.high;
+        let right = self.get_operand_8(n);
+        self.set_zero_flag(left == right);
         self.set_sub_flag(true);
-        self.set_carry_flag(a < n);
-        self.set_half_carry_flag(Cpu::get_sub_half_carry(a, n));
+        self.set_carry_flag(left < right);
+        self.set_half_carry_flag(Cpu::get_sub_half_carry(left, right));
     }
 
-    fn ret(&mut self) {
-        let return_addr = self.pop_stack();
-        self.set_reg_16(Regs16::PC, return_addr);
+    fn ret(&mut self, cond: Cond) {
+        if self.check_cond_and_update_cycles(cond) {
+            let return_addr = self.pop_stack();
+            self.set_reg_16(Regs16::PC, return_addr);
+        }
     }
 
     fn push_stack(&mut self, val: u16) {
@@ -732,12 +728,12 @@ impl Cpu {
         to_u16(low, high)
     }
 
-    fn get_add_half_carry(first: u8, second: u8) -> bool {
-       ((first & 0xf) + (second & 0xf)) & 0x10 == 0x10
+    fn get_add_half_carry(left: u8, right: u8) -> bool {
+       ((left & 0xf) + (right & 0xf)) & 0x10 == 0x10
     }
 
-    fn get_sub_half_carry(first: u8, second: u8) -> bool {
-       (first & 0xf) < (second & 0xf)
+    fn get_sub_half_carry(left: u8, right: u8) -> bool {
+       (left & 0xf) < (right & 0xf)
     }
 
     fn set_zero_flag(&mut self, set: bool) {
