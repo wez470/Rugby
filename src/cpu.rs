@@ -545,6 +545,7 @@ impl Cpu {
             Inst::Jp(loc, cond) => self.jp(loc, cond),
             Inst::Jr(offset, cond) => self.jr(offset, cond),
             Inst::Call(fn_addr, cond) => self.call(fn_addr, cond),
+            Inst::Rst(addr) => self.rst(addr),
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
@@ -598,6 +599,13 @@ impl Cpu {
             self.push_stack(return_addr);
             self.reg_pc.set(fn_addr);
         }
+    }
+
+    /// TODO(wcarlson): Write this comment
+    fn rst(&mut self, addr: u8) {
+        let return_addr = self.reg_pc.get();
+        self.push_stack(return_addr);
+        self.reg_pc.set(addr as u16);
     }
 
     /// Load 8 bits from `src` and store them into `dest`.
