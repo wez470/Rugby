@@ -105,7 +105,6 @@ const INSTRUCTION_LENGTH: [usize; 0x100] = [
 #[derive(Clone, Copy, Debug)]
 pub enum Regs8 {
     A,
-    F,
     B,
     C,
     D,
@@ -768,7 +767,6 @@ impl Cpu {
     fn set_reg_8(&mut self, reg: Regs8, val: u8) {
         match reg {
             Regs8::A => self.reg_af.high = val,
-            Regs8::F => self.reg_af.low = val,
             Regs8::B => self.reg_bc.high = val,
             Regs8::C => self.reg_bc.low = val,
             Regs8::D => self.reg_de.high = val,
@@ -781,7 +779,6 @@ impl Cpu {
     fn get_reg_8(&self, reg: Regs8) -> u8 {
          match reg {
             Regs8::A => self.reg_af.high,
-            Regs8::F => self.reg_af.low,
             Regs8::B => self.reg_bc.high,
             Regs8::C => self.reg_bc.low,
             Regs8::D => self.reg_de.high,
