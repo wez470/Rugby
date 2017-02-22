@@ -468,6 +468,12 @@ impl Cpu {
         self.reg_sp.set(0xFFFE);
     }
 
+    pub fn step_n(&mut self, steps: usize) {
+        for _ in 0..steps {
+            self.step();
+        }
+    }
+
     pub fn step(&mut self) {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
@@ -505,12 +511,6 @@ impl Cpu {
         }
     }
 
-    pub fn step_n(&mut self, steps: usize) {
-        for _ in 0..steps {
-            self.step();
-        }
-    }
-
     fn execute(&mut self, inst: Inst) {
         match inst {
             Inst::Nop => {},
@@ -540,27 +540,6 @@ impl Cpu {
         }
     }
 
-    /// If the given condition is met, increment the cycle count accordingly and return true.
-    fn check_cond_and_update_cycles(&mut self, cond: Cond) -> bool {
-        let condition_met = self.is_cond_met(cond);
-        if condition_met {
-            let opcode = self.rom[self.base_pc];
-            self.cycles += CONDITIONAL_CYCLES[opcode as usize];
-        }
-        condition_met
-    }
-
-    /// Return true if the given condition is met.
-    fn is_cond_met(&self, cond: Cond) -> bool {
-        match cond {
-            Cond::None => true,
-            Cond::Zero => self.get_zero_flag(),
-            Cond::NotZero => !self.get_zero_flag(),
-            Cond::Carry => self.get_carry_flag(),
-            Cond::NotCarry => !self.get_carry_flag(),
-        }
-    }
-
     /// Increment the program counter by the given offset if the condition is met.
     fn jr(&mut self, offset: i8, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
@@ -585,10 +564,131 @@ impl Cpu {
         self.reg_pc.set(addr as u16);
     }
 
+    fn ret(&mut self, cond: Cond) {
+        if self.check_cond_and_update_cycles(cond) {
+            let return_addr = self.pop_stack();
+            self.set_reg_16(Regs16::PC, return_addr);
+        }
+    }
+
     /// Load 8 bits from `src` and store them into `dest`.
     fn ld_8(&mut self, dest: Operand8, src: Operand8) {
         let val = self.get_operand_8(src);
         self.set_operand_8(dest, val);
+    }
+
+    /// Load 16 bits from `src` and store them into `dest`.
+    fn ld_16(&mut self, dest: Operand16, src: Operand16) {
+        let val = self.get_operand_16(src);
+        self.set_operand_16(dest, val);
+    }
+
+    fn xor(&mut self, n: Operand8) {
+        let result = self.reg_af.high ^ self.get_operand_8(n);
+        // self.reg_af.high = result;
+        self.set_zero_flag(result == 0);
+        self.set_sub_flag(false);
+        self.set_half_carry_flag(false);
+        self.set_carry_flag(false);
+    }
+
+    fn cp(&mut self, n: Operand8) {
+        let left = self.reg_af.high;
+        let right = self.get_operand_8(n);
+        self.set_zero_flag(left == right);
+        self.set_sub_flag(true);
+        self.set_carry_flag(left < right);
+        self.set_half_carry_flag(Cpu::get_sub_half_carry(left, right));
+    }
+
+    /// See documentation for `Inst::Rlc`.
+    fn rlc(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val.rotate_left(1);
+        self.set_operand_8(n, new_val);
+        self.set_zero_flag(new_val == 0);
+        self.set_half_carry_flag(false);
+        self.set_sub_flag(false);
+        self.set_carry_flag(old_val & 0x80 != 0);
+    }
+
+    /// See documentation for `Inst::Rrc`.
+    fn rrc(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val.rotate_right(1);
+        self.set_operand_8(n, new_val);
+        self.set_zero_flag(new_val == 0);
+        self.set_half_carry_flag(false);
+        self.set_sub_flag(false);
+        self.set_carry_flag(old_val & 0x01 != 0);
+    }
+
+    /// If the given condition is met, increment the cycle count accordingly and return true.
+    fn check_cond_and_update_cycles(&mut self, cond: Cond) -> bool {
+        let condition_met = self.is_cond_met(cond);
+        if condition_met {
+            let opcode = self.rom[self.base_pc];
+            self.cycles += CONDITIONAL_CYCLES[opcode as usize];
+        }
+        condition_met
+    }
+
+    /// Return true if the given condition is met.
+    fn is_cond_met(&self, cond: Cond) -> bool {
+        match cond {
+            Cond::None => true,
+            Cond::Zero => self.get_zero_flag(),
+            Cond::NotZero => !self.get_zero_flag(),
+            Cond::Carry => self.get_carry_flag(),
+            Cond::NotCarry => !self.get_carry_flag(),
+        }
+    }
+
+    fn push_stack(&mut self, val: u16) {
+        self.reg_sp.inc(-2);
+        let addr = self.reg_sp.get() as usize;
+        self.memory.mem[addr] = val as u8; // low
+        self.memory.mem[addr + 1] = (val >> 8) as u8; // high
+    }
+
+    fn pop_stack(&mut self) -> u16 {
+        let addr = self.reg_sp.get() as usize;
+        self.reg_sp.inc(2);
+        let low = self.memory.mem[addr];
+        let high = self.memory.mem[addr + 1];
+        to_u16(low, high)
+    }
+
+    fn get_add_half_carry(left: u8, right: u8) -> bool {
+       ((left & 0xf) + (right & 0xf)) & 0x10 == 0x10
+    }
+
+    fn get_sub_half_carry(left: u8, right: u8) -> bool {
+       (left & 0xf) < (right & 0xf)
+    }
+
+    fn set_zero_flag(&mut self, set: bool) {
+        self.reg_af.set_bit(ZERO_FLAG, set);
+    }
+
+    fn get_zero_flag(&self) -> bool {
+        self.reg_af.is_bit_set(ZERO_FLAG)
+    }
+
+    fn set_sub_flag(&mut self, set: bool) {
+        self.reg_af.set_bit(SUB_FLAG, set);
+    }
+
+    fn set_half_carry_flag(&mut self, set: bool) {
+        self.reg_af.set_bit(HALF_CARRY_FLAG, set);
+    }
+
+    fn set_carry_flag(&mut self, set: bool) {
+        self.reg_af.set_bit(CARRY_FLAG, set);
+    }
+
+    fn get_carry_flag(&self) -> bool {
+        self.reg_af.is_bit_set(CARRY_FLAG)
     }
 
     /// Get the value of the given 8-bit operand.
@@ -649,12 +749,6 @@ impl Cpu {
         }
     }
 
-    /// Load 16 bits from `src` and store them into `dest`.
-    fn ld_16(&mut self, dest: Operand16, src: Operand16) {
-        let val = self.get_operand_16(src);
-        self.set_operand_16(dest, val);
-    }
-
     fn get_operand_16(&self, src: Operand16) -> u16 {
         match src {
             Operand16::Imm16(val) => val,
@@ -669,78 +763,6 @@ impl Cpu {
             Operand16::Reg16(reg) => self.set_reg_16(reg, val),
             Operand16::MemImm16(_) => unimplemented!(),
         }
-    }
-
-    fn xor(&mut self, n: Operand8) {
-        let result = self.reg_af.high ^ self.get_operand_8(n);
-        // self.reg_af.high = result;
-        self.set_zero_flag(result == 0);
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(false);
-        self.set_carry_flag(false);
-    }
-
-    fn cp(&mut self, n: Operand8) {
-        let left = self.reg_af.high;
-        let right = self.get_operand_8(n);
-        self.set_zero_flag(left == right);
-        self.set_sub_flag(true);
-        self.set_carry_flag(left < right);
-        self.set_half_carry_flag(Cpu::get_sub_half_carry(left, right));
-    }
-
-    fn ret(&mut self, cond: Cond) {
-        if self.check_cond_and_update_cycles(cond) {
-            let return_addr = self.pop_stack();
-            self.set_reg_16(Regs16::PC, return_addr);
-        }
-    }
-
-    fn push_stack(&mut self, val: u16) {
-        self.reg_sp.inc(-2);
-        let addr = self.reg_sp.get() as usize;
-        self.memory.mem[addr] = val as u8; // low
-        self.memory.mem[addr + 1] = (val >> 8) as u8; // high
-    }
-
-    fn pop_stack(&mut self) -> u16 {
-        let addr = self.reg_sp.get() as usize;
-        self.reg_sp.inc(2);
-        let low = self.memory.mem[addr];
-        let high = self.memory.mem[addr + 1];
-        to_u16(low, high)
-    }
-
-    fn get_add_half_carry(left: u8, right: u8) -> bool {
-       ((left & 0xf) + (right & 0xf)) & 0x10 == 0x10
-    }
-
-    fn get_sub_half_carry(left: u8, right: u8) -> bool {
-       (left & 0xf) < (right & 0xf)
-    }
-
-    fn set_zero_flag(&mut self, set: bool) {
-        self.reg_af.set_bit(ZERO_FLAG, set);
-    }
-
-    fn get_zero_flag(&self) -> bool {
-        self.reg_af.is_bit_set(ZERO_FLAG)
-    }
-
-    fn set_sub_flag(&mut self, set: bool) {
-        self.reg_af.set_bit(SUB_FLAG, set);
-    }
-
-    fn set_half_carry_flag(&mut self, set: bool) {
-        self.reg_af.set_bit(HALF_CARRY_FLAG, set);
-    }
-
-    fn set_carry_flag(&mut self, set: bool) {
-        self.reg_af.set_bit(CARRY_FLAG, set);
-    }
-
-    fn get_carry_flag(&self) -> bool {
-        self.reg_af.is_bit_set(CARRY_FLAG)
     }
 
     fn set_reg_8(&mut self, reg: Regs8, val: u8) {
@@ -789,28 +811,6 @@ impl Cpu {
             Regs16::SP => self.reg_sp.get(),
             Regs16::PC => self.reg_pc.get(),
         }
-    }
-
-    /// See documentation for `Inst::Rlc`.
-    fn rlc(&mut self, n: Operand8) {
-        let old_val = self.get_operand_8(n);
-        let new_val = old_val.rotate_left(1);
-        self.set_operand_8(n, new_val);
-        self.set_zero_flag(new_val == 0);
-        self.set_half_carry_flag(false);
-        self.set_sub_flag(false);
-        self.set_carry_flag(old_val & 0x80 != 0);
-    }
-
-    /// See documentation for `Inst::Rrc`.
-    fn rrc(&mut self, n: Operand8) {
-        let old_val = self.get_operand_8(n);
-        let new_val = old_val.rotate_right(1);
-        self.set_operand_8(n, new_val);
-        self.set_zero_flag(new_val == 0);
-        self.set_half_carry_flag(false);
-        self.set_sub_flag(false);
-        self.set_carry_flag(old_val & 0x01 != 0);
     }
 }
 
