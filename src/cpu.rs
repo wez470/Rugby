@@ -125,7 +125,7 @@ pub enum Regs16 {
 }
 
 /// Represents an operand resolving to an 8-bit value.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 enum Operand8 {
     /// 8-bit immediate value.
     Imm8(u8),
@@ -156,7 +156,7 @@ enum Operand8 {
 }
 
 /// Represents an operand resolving to a 16-bit value.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 enum Operand16 {
     /// 16-bit immediate value.
     Imm16(u16),
@@ -507,20 +507,6 @@ impl Cpu {
             0xCB => {
                 let opcode_after_cb = self.rom[self.base_pc + 1];
                 match opcode_after_cb {
-                    0x00 => self.rotate_left_carry(Regs8::B),
-                    0x01 => self.rotate_left_carry(Regs8::C),
-                    0x02 => self.rotate_left_carry(Regs8::D),
-                    0x03 => self.rotate_left_carry(Regs8::E),
-                    0x04 => self.rotate_left_carry(Regs8::H),
-                    0x05 => self.rotate_left_carry(Regs8::L),
-                    0x07 => self.rotate_left_carry(Regs8::A),
-                    0x08 => self.rotate_right_carry(Regs8::B),
-                    0x09 => self.rotate_right_carry(Regs8::C),
-                    0x0A => self.rotate_right_carry(Regs8::D),
-                    0x0B => self.rotate_right_carry(Regs8::E),
-                    0x0C => self.rotate_right_carry(Regs8::H),
-                    0x0D => self.rotate_right_carry(Regs8::L),
-                    0x0F => self.rotate_right_carry(Regs8::A),
                     _ => handled_by_opcode_match = false,
                 }
             }
@@ -566,6 +552,8 @@ impl Cpu {
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
             Inst::Xor(n) => self.xor(n),
             Inst::Cp(n) => self.cp(n),
+            Inst::Rlc(n) => self.rlc(n),
+            Inst::Rrc(n) => self.rrc(n),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
             _ => return false,
         }
@@ -832,28 +820,26 @@ impl Cpu {
         }
     }
 
-    /// Rotate register by one bit. The carry is the highest order bit value
-    /// before the operation occurs. Rotation does not flow through carry bit
-    fn rotate_left_carry(&mut self, reg: Regs8) {
-        let reg_val = self.get_reg_8(reg);
-        let rot_val = reg_val.rotate_left(1);
-        self.set_reg_8(reg, rot_val);
-        self.set_zero_flag(rot_val == 0);
+    /// See documentation for `Inst::Rlc`.
+    fn rlc(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val.rotate_left(1);
+        self.set_operand_8(n, new_val);
+        self.set_zero_flag(new_val == 0);
         self.set_half_carry_flag(false);
         self.set_sub_flag(false);
-        self.set_carry_flag(reg_val & 0x80 != 0);
+        self.set_carry_flag(old_val & 0x80 != 0);
     }
 
-    /// Rotate register by one bit. The carry is the lowest order bit value
-    /// before the operation occurs. Rotation does not flow through carry bit
-    fn rotate_right_carry(&mut self, reg: Regs8) {
-        let reg_val = self.get_reg_8(reg);
-        let rot_val = reg_val.rotate_right(1);
-        self.set_reg_8(reg, rot_val);
-        self.set_zero_flag(rot_val == 0);
+    /// See documentation for `Inst::Rrc`.
+    fn rrc(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val.rotate_right(1);
+        self.set_operand_8(n, new_val);
+        self.set_zero_flag(new_val == 0);
         self.set_half_carry_flag(false);
         self.set_sub_flag(false);
-        self.set_carry_flag(reg_val & 0x01 != 0);
+        self.set_carry_flag(old_val & 0x01 != 0);
     }
 }
 
