@@ -477,6 +477,7 @@ impl Cpu {
         self.base_pc = self.reg_pc.get() as usize;
         let opcode = self.rom[self.base_pc];
         let instruction_len = INSTRUCTION_LENGTH[opcode as usize];
+        self.reg_pc.inc(instruction_len as i8);
 
         self.cycles += if opcode == 0xCB {
             let opcode_after_cb = self.rom[self.base_pc + 1];
@@ -490,35 +491,10 @@ impl Cpu {
             print!(" {:02X}", byte);
         }
 
-        self.reg_pc.inc(instruction_len as i8);
-
         let inst = decode(&self.rom[self.base_pc..(self.base_pc + instruction_len)]);
         println!("\t\t(decoded: {:?})", inst);
 
-        // TODO(solson): We're in the middle of incrementally porting from the old `match opcode`
-        // below to the new `self.execute(inst)` method. While this is happening we're tracking
-        // which instructions are handled by each part with the `handled_*` bools.
-        //
-        // These should be removed when the porting is done.
-        let handled_by_execute = self.execute(inst);
-
-        let mut handled_by_opcode_match = true;
-        match opcode {
-            0xCB => {
-                let opcode_after_cb = self.rom[self.base_pc + 1];
-                match opcode_after_cb {
-                    _ => handled_by_opcode_match = false,
-                }
-            }
-            _ => handled_by_opcode_match = false,
-        };
-
-        match (handled_by_execute, handled_by_opcode_match) {
-            (true, true) => panic!("instruction was handled twice"),
-            (true, false) => {}, // Good case: only handled by new code.
-            (false, true) => println!("  handled by old match"),
-            (false, false) => println!("  unimplemented"),
-        }
+        self.execute(inst);
 
         if pending_enable_interrupts {
             self.interrupts_enabled = true;
@@ -535,10 +511,7 @@ impl Cpu {
         }
     }
 
-    // TODO(solson): We should remove the "was handled" return value once all instructions are
-    // handled.
-    /// Execute the given instruction. Return true if the instruction was handled.
-    fn execute(&mut self, inst: Inst) -> bool {
+    fn execute(&mut self, inst: Inst) {
         match inst {
             Inst::Nop => {},
             Inst::Di => self.pending_disable_interrupts = true,
@@ -555,10 +528,8 @@ impl Cpu {
             Inst::Rlc(n) => self.rlc(n),
             Inst::Rrc(n) => self.rrc(n),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
-            _ => return false,
+            _ => println!("  unimplemented"),
         }
-
-        true
     }
 
     /// Jump to the specified address if the condition is met.
