@@ -288,24 +288,48 @@ enum Inst {
     /// but only for the flag side effects.
     Cp(Operand8),
 
-    /// `RLC x`: 1-bit rotate left circular.
-    ///   * low bit = old high bit
-    ///   * carry = old high bit
+    /// `RLC x`: 1-bit rotate left circular. Bits move according to the diagram, where 0 is the low
+    /// bit, 7 is the high bit, and `C` is the carry flag.
+    ///
+    /// ```text
+    ///         +--------------+
+    /// +---+   |  +--------+  |
+    /// | C |<--+--| 7 <- 0 |<-+
+    /// +---+      +--------+
+    /// ```
     Rlc(Operand8),
 
-    /// `RL x`: 1-bit rotate left, through the carry flag.
-    ///   * low bit = old carry
-    ///   * carry = old high bit
+    /// `RL x`: 1-bit rotate left, through the carry flag. Bits move according to the diagram,
+    /// where 0 is the low bit, 7 is the high bit, and `C` is the carry flag.
+    ///
+    /// ```text
+    ///   +---------------------+
+    ///   | +---+   +--------+  |
+    ///   +-| C |<--| 7 <- 0 |<-+
+    ///     +---+   +--------+
+    /// ```
     Rl(Operand8),
 
-    /// `RRC x`: 1-bit rotate right circular.
-    ///   * high bit = old low bit
-    ///   * carry = old low bit
+    /// `RRC x`: 1-bit rotate right circular. Bits move according to the diagram, where 0 is the low
+    /// bit, 7 is the high bit, and `C` is the carry flag.
+    ///
+    /// ```text
+    /// +--------------+
+    /// |  +--------+  |   +---+
+    /// +->| 7 -> 0 |--+-->| C |
+    ///    +--------+      +---+
+    /// ```
     Rrc(Operand8),
 
-    /// `RR x`: 1-bit rotate right, through the carry flag.
-    ///   * high bit = old carry
-    ///   * carry = old low bit
+    /// `RR x`: 1-bit rotate right, through the carry flag. Bits move according to the diagram,
+    /// where 0 is the low bit, 7 is the high bit, and `C` is the carry flag.
+    ///
+    /// ```text
+    ///   +---------------------+
+    ///   |  +--------+   +---+ |
+    ///   +->| 7 -> 0 |-->| C |-+
+    ///      +--------+   +---+
+    /// ```
     Rr(Operand8),
 
     /// `RLCA`: Shorter encoding of `RLC A`. It also affects the zero flag differently.
