@@ -522,6 +522,8 @@ impl Cpu {
             Inst::Ret(cond) => self.ret(cond),
             Inst::Ld8(dest, src) => self.ld_8(dest, src),
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
+            Inst::Inc8(n) => self.inc_8(n),
+            Inst::Dec8(n) => self.dec_8(n),
             Inst::Xor(n) => self.xor(n),
             Inst::Cp(n) => self.cp(n),
             Inst::Rlc(n) => self.rlc(n),
@@ -580,6 +582,24 @@ impl Cpu {
     fn ld_16(&mut self, dest: Operand16, src: Operand16) {
         let val = self.get_operand_16(src);
         self.set_operand_16(dest, val);
+    }
+
+    fn inc_8(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val.wrapping_add(1);
+        self.set_operand_8(n, new_val);
+        self.set_zero_flag(new_val == 0);
+        self.set_sub_flag(false);
+        self.set_half_carry_flag(get_add_half_carry(old_val, 1));
+    }
+
+    fn dec_8(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val.wrapping_sub(1);
+        self.set_operand_8(n, new_val);
+        self.set_zero_flag(new_val == 0);
+        self.set_sub_flag(true);
+        self.set_half_carry_flag(get_sub_half_carry(old_val, 1));
     }
 
     fn xor(&mut self, n: Operand8) {
