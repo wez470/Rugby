@@ -596,8 +596,8 @@ impl Cpu {
         let right = self.get_operand_8(n);
         self.set_zero_flag(left == right);
         self.set_sub_flag(true);
-        self.set_carry_flag(left < right);
         self.set_half_carry_flag(Cpu::get_sub_half_carry(left, right));
+        self.set_carry_flag(left < right);
     }
 
     /// See documentation for `Inst::Rlc`.
@@ -606,8 +606,8 @@ impl Cpu {
         let new_val = old_val.rotate_left(1);
         self.set_operand_8(n, new_val);
         self.set_zero_flag(new_val == 0);
-        self.set_half_carry_flag(false);
         self.set_sub_flag(false);
+        self.set_half_carry_flag(false);
         self.set_carry_flag(old_val & 0x80 != 0);
     }
 
@@ -617,8 +617,8 @@ impl Cpu {
         let new_val = old_val.rotate_right(1);
         self.set_operand_8(n, new_val);
         self.set_zero_flag(new_val == 0);
-        self.set_half_carry_flag(false);
         self.set_sub_flag(false);
+        self.set_half_carry_flag(false);
         self.set_carry_flag(old_val & 0x01 != 0);
     }
 
