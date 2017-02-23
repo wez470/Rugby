@@ -526,7 +526,9 @@ impl Cpu {
             Inst::Dec8(n) => self.dec_8(n),
             Inst::Inc16(n) => self.inc_16(n),
             Inst::Dec16(n) => self.dec_16(n),
+            Inst::And(n) => self.and(n),
             Inst::Xor(n) => self.xor(n),
+            Inst::Or(n) => self.or(n),
             Inst::Cp(n) => self.cp(n),
             Inst::Rlc(n) => self.rlc(n),
             Inst::Rrc(n) => self.rrc(n),
@@ -614,8 +616,26 @@ impl Cpu {
         self.set_operand_16(n, val);
     }
 
+    fn and(&mut self, n: Operand8) {
+        let result = self.reg_af.high & self.get_operand_8(n);
+        self.reg_af.high = result;
+        self.set_zero_flag(result == 0);
+        self.set_sub_flag(false);
+        self.set_half_carry_flag(true);
+        self.set_carry_flag(false);
+    }
+
     fn xor(&mut self, n: Operand8) {
         let result = self.reg_af.high ^ self.get_operand_8(n);
+        self.reg_af.high = result;
+        self.set_zero_flag(result == 0);
+        self.set_sub_flag(false);
+        self.set_half_carry_flag(true);
+        self.set_carry_flag(false);
+    }
+
+    fn or(&mut self, n: Operand8) {
+        let result = self.reg_af.high | self.get_operand_8(n);
         self.reg_af.high = result;
         self.set_zero_flag(result == 0);
         self.set_sub_flag(false);
