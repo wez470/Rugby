@@ -247,11 +247,11 @@ enum Inst {
     /// `INC x`: 8-bit increment.
     Inc8(Operand8),
 
-    /// `INC xx`: 16-bit increment.
-    Inc16(Operand16),
-
     /// `DEC x`: 8-bit decrement.
     Dec8(Operand8),
+
+    /// `INC xx`: 16-bit increment.
+    Inc16(Operand16),
 
     /// `DEC xx`: 16-bit decrement.
     Dec16(Operand16),
@@ -524,6 +524,8 @@ impl Cpu {
             Inst::Ld16(dest, src) => self.ld_16(dest, src),
             Inst::Inc8(n) => self.inc_8(n),
             Inst::Dec8(n) => self.dec_8(n),
+            Inst::Inc16(n) => self.inc_16(n),
+            Inst::Dec16(n) => self.dec_16(n),
             Inst::Xor(n) => self.xor(n),
             Inst::Cp(n) => self.cp(n),
             Inst::Rlc(n) => self.rlc(n),
@@ -600,6 +602,16 @@ impl Cpu {
         self.set_zero_flag(new_val == 0);
         self.set_sub_flag(true);
         self.set_half_carry_flag(get_sub_half_carry(old_val, 1));
+    }
+
+    fn inc_16(&mut self, n: Operand16) {
+        let val = self.get_operand_16(n).wrapping_add(1);
+        self.set_operand_16(n, val);
+    }
+
+    fn dec_16(&mut self, n: Operand16) {
+        let val = self.get_operand_16(n).wrapping_sub(1);
+        self.set_operand_16(n, val);
     }
 
     fn xor(&mut self, n: Operand8) {
