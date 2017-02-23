@@ -532,6 +532,8 @@ impl Cpu {
             Inst::Cp(n) => self.cp(n),
             Inst::Rlc(n) => self.rlc(n),
             Inst::Rrc(n) => self.rrc(n),
+            Inst::Swap(n) => self.swap(n),
+            Inst::Cpl => self.cpl(),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
             _ => println!("  unimplemented"),
         }
@@ -672,6 +674,22 @@ impl Cpu {
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
         self.set_carry_flag(old_val & 0x01 != 0);
+    }
+
+    fn swap(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val.rotate_right(4);
+        self.set_operand_8(n, new_val);
+        self.set_zero_flag(new_val == 0);
+        self.set_sub_flag(false);
+        self.set_half_carry_flag(false);
+        self.set_carry_flag(false);
+    }
+
+    fn cpl(&mut self) {
+        self.reg_af.high = !self.reg_af.high;
+        self.set_sub_flag(true);
+        self.set_half_carry_flag(true);
     }
 
     /// If the given condition is met, increment the cycle count accordingly and return true.
