@@ -584,7 +584,7 @@ impl Cpu {
 
     fn xor(&mut self, n: Operand8) {
         let result = self.reg_af.high ^ self.get_operand_8(n);
-        // self.reg_af.high = result;
+        self.reg_af.high = result;
         self.set_zero_flag(result == 0);
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
