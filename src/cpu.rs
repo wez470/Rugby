@@ -596,7 +596,7 @@ impl Cpu {
         let right = self.get_operand_8(n);
         self.set_zero_flag(left == right);
         self.set_sub_flag(true);
-        self.set_half_carry_flag(Cpu::get_sub_half_carry(left, right));
+        self.set_half_carry_flag(get_sub_half_carry(left, right));
         self.set_carry_flag(left < right);
     }
 
@@ -656,14 +656,6 @@ impl Cpu {
         let low = self.memory.mem[addr];
         let high = self.memory.mem[addr + 1];
         to_u16(low, high)
-    }
-
-    fn get_add_half_carry(left: u8, right: u8) -> bool {
-       ((left & 0xf) + (right & 0xf)) & 0x10 == 0x10
-    }
-
-    fn get_sub_half_carry(left: u8, right: u8) -> bool {
-       (left & 0xf) < (right & 0xf)
     }
 
     fn set_zero_flag(&mut self, set: bool) {
@@ -1350,8 +1342,21 @@ fn decode(bytes: &[u8]) -> Inst {
     }
 }
 
+/// Create a `u16` from its high and low bytes.
 fn to_u16(low: u8, high: u8) -> u16 {
     ((high as u16) << 8) | low as u16
+}
+
+/// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry
+/// from bit 3 into bit 4.
+fn get_add_half_carry(left: u8, right: u8) -> bool {
+   ((left & 0xf) + (right & 0xf)) & 0x10 != 0
+}
+
+/// Returns true if `left - right` should set the half-carry flag, i.e. it requires a borrow
+/// from bit 4 into bit 3.
+fn get_sub_half_carry(left: u8, right: u8) -> bool {
+   (left & 0xf) < (right & 0xf)
 }
 
 #[cfg(test)]
