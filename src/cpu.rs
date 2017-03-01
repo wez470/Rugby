@@ -534,6 +534,8 @@ impl Cpu {
             Inst::Rrc(n) => self.rrc(n),
             Inst::Swap(n) => self.swap(n),
             Inst::Cpl => self.cpl(),
+            Inst::Ccf => self.ccf(),
+            Inst::Scf => self.scf(),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
             _ => println!("  unimplemented"),
         }
@@ -690,6 +692,19 @@ impl Cpu {
         self.reg_af.high = !self.reg_af.high;
         self.set_sub_flag(true);
         self.set_half_carry_flag(true);
+    }
+
+    fn ccf(&mut self) {
+        let carry = !self.get_carry_flag();
+        self.set_sub_flag(false);
+        self.set_half_carry_flag(false);
+        self.set_carry_flag(carry);
+    }
+
+    fn scf(&mut self) {
+        self.set_sub_flag(false);
+        self.set_half_carry_flag(false);
+        self.set_carry_flag(true);
     }
 
     /// If the given condition is met, increment the cycle count accordingly and return true.
