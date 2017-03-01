@@ -524,6 +524,8 @@ impl Cpu {
             Inst::Call(fn_addr, cond) => self.call(fn_addr, cond),
             Inst::Rst(addr) => self.call_restart(addr),
             Inst::Ret(cond) => self.ret(cond),
+            Inst::Push(reg) => self.push(reg),
+            Inst::Pop(reg) => self.pop(reg),
             Inst::Ld8(dest, src) => self.move_8(dest, src),
             Inst::Ld16(dest, src) => self.move_16(dest, src),
             Inst::Inc8(n) => self.inc_8(n),
@@ -591,6 +593,18 @@ impl Cpu {
             let return_addr = self.pop_stack();
             self.set_reg_16(Regs16::PC, return_addr);
         }
+    }
+
+    /// The `Inst::Push` instruction.
+    fn push(&mut self, reg: Regs16) {
+        let val = self.get_reg_16(reg);
+        self.push_stack(val);
+    }
+
+    /// The `Inst::Pop` instruction.
+    fn pop(&mut self, reg: Regs16) {
+        let val = self.pop_stack();
+        self.set_reg_16(reg, val);
     }
 
     /// The 8-bit `Inst::Ld` instruction.
