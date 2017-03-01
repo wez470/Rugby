@@ -539,6 +539,9 @@ impl Cpu {
             Inst::Rlc(n) => self.rotate_left_circular(n),
             Inst::Rrc(n) => self.rotate_right_circular(n),
             Inst::Swap(n) => self.swap(n),
+            Inst::Bit(bit, n) => self.test_bit(bit, n),
+            Inst::Res(bit, n) => self.reset_bit(bit, n),
+            Inst::Set(bit, n) => self.set_bit(bit, n),
             Inst::Cpl => self.complement(),
             Inst::Ccf => self.complement_carry_flag(),
             Inst::Scf => self.set_carry_flag(),
@@ -726,6 +729,26 @@ impl Cpu {
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, false);
+    }
+
+    /// The `Inst::Bit` instruction.
+    fn test_bit(&mut self, bit: u8, n: Operand8) {
+        let is_zero = self.get_operand_8(n) & (1 << bit) == 0;
+        self.set_flag(Flag::Zero, is_zero);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, true);
+    }
+
+    /// The `Inst::Res` instruction.
+    fn reset_bit(&mut self, bit: u8, n: Operand8) {
+        let val = self.get_operand_8(n) & !(1 << bit);
+        self.set_operand_8(n, val);
+    }
+
+    /// The `Inst::Set` instruction.
+    fn set_bit(&mut self, bit: u8, n: Operand8) {
+        let val = self.get_operand_8(n) | (1 << bit);
+        self.set_operand_8(n, val);
     }
 
     /// The `Inst::Cpl` instruction.
