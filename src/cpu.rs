@@ -515,13 +515,13 @@ impl Cpu {
             Inst::Nop => {},
             Inst::Di => self.pending_disable_interrupts = true,
             Inst::Ei => self.pending_enable_interrupts = true,
-            Inst::Jp(loc, cond) => self.jp(loc, cond),
-            Inst::Jr(offset, cond) => self.jr(offset, cond),
+            Inst::Jp(loc, cond) => self.jump(loc, cond),
+            Inst::Jr(offset, cond) => self.jump_relative(offset, cond),
             Inst::Call(fn_addr, cond) => self.call(fn_addr, cond),
-            Inst::Rst(addr) => self.rst(addr),
+            Inst::Rst(addr) => self.call_restart(addr),
             Inst::Ret(cond) => self.ret(cond),
-            Inst::Ld8(dest, src) => self.ld_8(dest, src),
-            Inst::Ld16(dest, src) => self.ld_16(dest, src),
+            Inst::Ld8(dest, src) => self.move_8(dest, src),
+            Inst::Ld16(dest, src) => self.move_16(dest, src),
             Inst::Inc8(n) => self.inc_8(n),
             Inst::Dec8(n) => self.dec_8(n),
             Inst::Inc16(n) => self.inc_16(n),
@@ -529,33 +529,39 @@ impl Cpu {
             Inst::And(n) => self.and(n),
             Inst::Xor(n) => self.xor(n),
             Inst::Or(n) => self.or(n),
-            Inst::Cp(n) => self.cp(n),
-            Inst::Rlc(n) => self.rlc(n),
-            Inst::Rrc(n) => self.rrc(n),
+            Inst::Cp(n) => self.compare(n),
+            Inst::Rlc(n) => self.rotate_left_circular(n),
+            Inst::Rrc(n) => self.rotate_right_circular(n),
             Inst::Swap(n) => self.swap(n),
-            Inst::Cpl => self.cpl(),
-            Inst::Ccf => self.ccf(),
-            Inst::Scf => self.scf(),
+            Inst::Cpl => self.complement(),
+            Inst::Ccf => self.complement_carry_flag(),
+            Inst::Scf => self.set_carry_inst(),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
             _ => println!("  unimplemented"),
         }
     }
 
+    /// The `Inst::Jp` instruction.
+    ///
     /// Jump to the specified address if the condition is met.
-    fn jp(&mut self, addr: Operand16, cond: Cond) {
+    fn jump(&mut self, addr: Operand16, cond: Cond) {
         let addr_val = self.get_operand_16(addr);
         if self.check_cond_and_update_cycles(cond) {
             self.reg_pc.set(addr_val);
         }
     }
 
+    /// The `Inst::Jr` instruction.
+    ///
     /// Increment the program counter by the given offset if the condition is met.
-    fn jr(&mut self, offset: i8, cond: Cond) {
+    fn jump_relative(&mut self, offset: i8, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
             self.reg_pc.inc(offset);
         }
     }
 
+    /// The `Inst::Call` instruction.
+    ///
     /// Call a subroutine if the condition is met.
     fn call(&mut self, fn_addr: u16, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
@@ -566,13 +572,16 @@ impl Cpu {
         }
     }
 
-    /// TODO(wcarlson): Write this comment
-    fn rst(&mut self, addr: u8) {
+    /// The `Inst::Rst` instruction.
+    ///
+    /// Call the "restart" function at the given address.
+    fn call_restart(&mut self, addr: u8) {
         let return_addr = self.reg_pc.get();
         self.push_stack(return_addr);
         self.reg_pc.set(addr as u16);
     }
 
+    /// The `Inst::Ret` instruction.
     fn ret(&mut self, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
             let return_addr = self.pop_stack();
@@ -580,18 +589,23 @@ impl Cpu {
         }
     }
 
-    /// Load 8 bits from `src` and store them into `dest`.
-    fn ld_8(&mut self, dest: Operand8, src: Operand8) {
+    /// The 8-bit `Inst::Ld` instruction.
+    ///
+    /// Move 8 bits from `src` and store them into `dest`.
+    fn move_8(&mut self, dest: Operand8, src: Operand8) {
         let val = self.get_operand_8(src);
         self.set_operand_8(dest, val);
     }
 
-    /// Load 16 bits from `src` and store them into `dest`.
-    fn ld_16(&mut self, dest: Operand16, src: Operand16) {
+    /// The 16-bit `Inst::Ld` instruction.
+    ///
+    /// Move 16 bits from `src` and store them into `dest`.
+    fn move_16(&mut self, dest: Operand16, src: Operand16) {
         let val = self.get_operand_16(src);
         self.set_operand_16(dest, val);
     }
 
+    /// The 8-bit `Inst::Inc` instruction.
     fn inc_8(&mut self, n: Operand8) {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.wrapping_add(1);
@@ -601,6 +615,7 @@ impl Cpu {
         self.set_half_carry_flag(get_add_half_carry(old_val, 1));
     }
 
+    /// The 8-bit `Inst::Dec` instruction.
     fn dec_8(&mut self, n: Operand8) {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.wrapping_sub(1);
@@ -610,16 +625,19 @@ impl Cpu {
         self.set_half_carry_flag(get_sub_half_carry(old_val, 1));
     }
 
+    /// The 16-bit `Inst::Inc` instruction.
     fn inc_16(&mut self, n: Operand16) {
         let val = self.get_operand_16(n).wrapping_add(1);
         self.set_operand_16(n, val);
     }
 
+    /// The 16-bit `Inst::Dec` instruction.
     fn dec_16(&mut self, n: Operand16) {
         let val = self.get_operand_16(n).wrapping_sub(1);
         self.set_operand_16(n, val);
     }
 
+    /// The `Inst::And` instruction.
     fn and(&mut self, n: Operand8) {
         let result = self.reg_af.high & self.get_operand_8(n);
         self.reg_af.high = result;
@@ -629,6 +647,7 @@ impl Cpu {
         self.set_carry_flag(false);
     }
 
+    /// The `Inst::Xor` instruction.
     fn xor(&mut self, n: Operand8) {
         let result = self.reg_af.high ^ self.get_operand_8(n);
         self.reg_af.high = result;
@@ -638,6 +657,7 @@ impl Cpu {
         self.set_carry_flag(false);
     }
 
+    /// The `Inst::Or` instruction.
     fn or(&mut self, n: Operand8) {
         let result = self.reg_af.high | self.get_operand_8(n);
         self.reg_af.high = result;
@@ -647,7 +667,8 @@ impl Cpu {
         self.set_carry_flag(false);
     }
 
-    fn cp(&mut self, n: Operand8) {
+    /// The `Inst::Cp` instruction.
+    fn compare(&mut self, n: Operand8) {
         let left = self.reg_af.high;
         let right = self.get_operand_8(n);
         self.set_zero_flag(left == right);
@@ -656,8 +677,8 @@ impl Cpu {
         self.set_carry_flag(left < right);
     }
 
-    /// See documentation for `Inst::Rlc`.
-    fn rlc(&mut self, n: Operand8) {
+    /// The `Inst::Rlc` instruction.
+    fn rotate_left_circular(&mut self, n: Operand8) {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_left(1);
         self.set_operand_8(n, new_val);
@@ -667,8 +688,8 @@ impl Cpu {
         self.set_carry_flag(old_val & 0x80 != 0);
     }
 
-    /// See documentation for `Inst::Rrc`.
-    fn rrc(&mut self, n: Operand8) {
+    /// The `Inst::Rrc` instruction.
+    fn rotate_right_circular(&mut self, n: Operand8) {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_right(1);
         self.set_operand_8(n, new_val);
@@ -678,6 +699,7 @@ impl Cpu {
         self.set_carry_flag(old_val & 0x01 != 0);
     }
 
+    /// The `Inst::Swap` instruction.
     fn swap(&mut self, n: Operand8) {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_right(4);
@@ -688,20 +710,25 @@ impl Cpu {
         self.set_carry_flag(false);
     }
 
-    fn cpl(&mut self) {
+    /// The `Inst::Cpl` instruction.
+    fn complement(&mut self) {
         self.reg_af.high = !self.reg_af.high;
         self.set_sub_flag(true);
         self.set_half_carry_flag(true);
     }
 
-    fn ccf(&mut self) {
+    /// The `Inst::Ccf` instruction.
+    fn complement_carry_flag(&mut self) {
         let carry = !self.get_carry_flag();
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
         self.set_carry_flag(carry);
     }
 
-    fn scf(&mut self) {
+    /// The `Inst::Scf` instruction.
+    ///
+    /// NOTE: Named to avoid collision with the `set_carry_flag` helper function.
+    fn set_carry_inst(&mut self) {
         self.set_sub_flag(false);
         self.set_half_carry_flag(false);
         self.set_carry_flag(true);
