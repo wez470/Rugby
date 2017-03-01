@@ -1,11 +1,6 @@
 use reg_16::Reg16;
 use memory::Memory;
 
-const ZERO_FLAG: u8 = 7;
-const SUB_FLAG: u8 = 6;
-const HALF_CARRY_FLAG: u8 = 5;
-const CARRY_FLAG: u8 = 4;
-
 // The below tables are based on the tables at
 // http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html.
 
@@ -121,6 +116,15 @@ pub enum Regs16 {
     HL,
     SP,
     PC,
+}
+
+#[derive(Clone, Copy, Debug)]
+#[repr(u8)]
+enum Flag {
+    Zero = 7,
+    Sub = 6,
+    HalfCarry = 5,
+    Carry = 4,
 }
 
 /// Represents an operand resolving to an 8-bit value.
@@ -535,7 +539,7 @@ impl Cpu {
             Inst::Swap(n) => self.swap(n),
             Inst::Cpl => self.complement(),
             Inst::Ccf => self.complement_carry_flag(),
-            Inst::Scf => self.set_carry_inst(),
+            Inst::Scf => self.set_carry_flag(),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
             _ => println!("  unimplemented"),
         }
@@ -610,9 +614,9 @@ impl Cpu {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.wrapping_add(1);
         self.set_operand_8(n, new_val);
-        self.set_zero_flag(new_val == 0);
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(get_add_half_carry(old_val, 1));
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, get_add_half_carry(old_val, 1));
     }
 
     /// The 8-bit `Inst::Dec` instruction.
@@ -620,9 +624,9 @@ impl Cpu {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.wrapping_sub(1);
         self.set_operand_8(n, new_val);
-        self.set_zero_flag(new_val == 0);
-        self.set_sub_flag(true);
-        self.set_half_carry_flag(get_sub_half_carry(old_val, 1));
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, true);
+        self.set_flag(Flag::HalfCarry, get_sub_half_carry(old_val, 1));
     }
 
     /// The 16-bit `Inst::Inc` instruction.
@@ -641,40 +645,40 @@ impl Cpu {
     fn and(&mut self, n: Operand8) {
         let result = self.reg_af.high & self.get_operand_8(n);
         self.reg_af.high = result;
-        self.set_zero_flag(result == 0);
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(true);
-        self.set_carry_flag(false);
+        self.set_flag(Flag::Zero, result == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, true);
+        self.set_flag(Flag::Carry, false);
     }
 
     /// The `Inst::Xor` instruction.
     fn xor(&mut self, n: Operand8) {
         let result = self.reg_af.high ^ self.get_operand_8(n);
         self.reg_af.high = result;
-        self.set_zero_flag(result == 0);
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(true);
-        self.set_carry_flag(false);
+        self.set_flag(Flag::Zero, result == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, true);
+        self.set_flag(Flag::Carry, false);
     }
 
     /// The `Inst::Or` instruction.
     fn or(&mut self, n: Operand8) {
         let result = self.reg_af.high | self.get_operand_8(n);
         self.reg_af.high = result;
-        self.set_zero_flag(result == 0);
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(false);
-        self.set_carry_flag(false);
+        self.set_flag(Flag::Zero, result == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, false);
     }
 
     /// The `Inst::Cp` instruction.
     fn compare(&mut self, n: Operand8) {
         let left = self.reg_af.high;
         let right = self.get_operand_8(n);
-        self.set_zero_flag(left == right);
-        self.set_sub_flag(true);
-        self.set_half_carry_flag(get_sub_half_carry(left, right));
-        self.set_carry_flag(left < right);
+        self.set_flag(Flag::Zero, left == right);
+        self.set_flag(Flag::Sub, true);
+        self.set_flag(Flag::HalfCarry, get_sub_half_carry(left, right));
+        self.set_flag(Flag::Carry, left < right);
     }
 
     /// The `Inst::Rlc` instruction.
@@ -682,10 +686,10 @@ impl Cpu {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_left(1);
         self.set_operand_8(n, new_val);
-        self.set_zero_flag(new_val == 0);
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(false);
-        self.set_carry_flag(old_val & 0x80 != 0);
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, old_val & 0x80 != 0);
     }
 
     /// The `Inst::Rrc` instruction.
@@ -693,10 +697,10 @@ impl Cpu {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_right(1);
         self.set_operand_8(n, new_val);
-        self.set_zero_flag(new_val == 0);
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(false);
-        self.set_carry_flag(old_val & 0x01 != 0);
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, old_val & 0x01 != 0);
     }
 
     /// The `Inst::Swap` instruction.
@@ -704,34 +708,32 @@ impl Cpu {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_right(4);
         self.set_operand_8(n, new_val);
-        self.set_zero_flag(new_val == 0);
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(false);
-        self.set_carry_flag(false);
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, false);
     }
 
     /// The `Inst::Cpl` instruction.
     fn complement(&mut self) {
         self.reg_af.high = !self.reg_af.high;
-        self.set_sub_flag(true);
-        self.set_half_carry_flag(true);
+        self.set_flag(Flag::Sub, true);
+        self.set_flag(Flag::HalfCarry, true);
     }
 
     /// The `Inst::Ccf` instruction.
     fn complement_carry_flag(&mut self) {
-        let carry = !self.get_carry_flag();
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(false);
-        self.set_carry_flag(carry);
+        let carry = !self.get_flag(Flag::Carry);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, carry);
     }
 
     /// The `Inst::Scf` instruction.
-    ///
-    /// NOTE: Named to avoid collision with the `set_carry_flag` helper function.
-    fn set_carry_inst(&mut self) {
-        self.set_sub_flag(false);
-        self.set_half_carry_flag(false);
-        self.set_carry_flag(true);
+    fn set_carry_flag(&mut self) {
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, true);
     }
 
     /// If the given condition is met, increment the cycle count accordingly and return true.
@@ -748,10 +750,10 @@ impl Cpu {
     fn is_cond_met(&self, cond: Cond) -> bool {
         match cond {
             Cond::None => true,
-            Cond::Zero => self.get_zero_flag(),
-            Cond::NotZero => !self.get_zero_flag(),
-            Cond::Carry => self.get_carry_flag(),
-            Cond::NotCarry => !self.get_carry_flag(),
+            Cond::Zero => self.get_flag(Flag::Zero),
+            Cond::NotZero => !self.get_flag(Flag::Zero),
+            Cond::Carry => self.get_flag(Flag::Carry),
+            Cond::NotCarry => !self.get_flag(Flag::Carry),
         }
     }
 
@@ -770,28 +772,12 @@ impl Cpu {
         to_u16(low, high)
     }
 
-    fn set_zero_flag(&mut self, set: bool) {
-        self.reg_af.set_bit(ZERO_FLAG, set);
+    fn set_flag(&mut self, flag: Flag, val: bool) {
+        self.reg_af.set_bit(flag as u8, val);
     }
 
-    fn get_zero_flag(&self) -> bool {
-        self.reg_af.is_bit_set(ZERO_FLAG)
-    }
-
-    fn set_sub_flag(&mut self, set: bool) {
-        self.reg_af.set_bit(SUB_FLAG, set);
-    }
-
-    fn set_half_carry_flag(&mut self, set: bool) {
-        self.reg_af.set_bit(HALF_CARRY_FLAG, set);
-    }
-
-    fn set_carry_flag(&mut self, set: bool) {
-        self.reg_af.set_bit(CARRY_FLAG, set);
-    }
-
-    fn get_carry_flag(&self) -> bool {
-        self.reg_af.is_bit_set(CARRY_FLAG)
+    fn get_flag(&self, flag: Flag) -> bool {
+        self.reg_af.is_bit_set(flag as u8)
     }
 
     /// Get the value of the given 8-bit operand.
