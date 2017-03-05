@@ -652,9 +652,15 @@ impl Cpu {
         self.set_reg_16(Regs16::HL, val);
         self.set_flag(Flag::Zero, false);
         self.set_flag(Flag::Sub, false);
-        // TODO(wcarlson): Set Carry and Half Carry properly
-        // self.set_flag(Flag::HalfCarry,)
-        // self.set_flag(Flag::Carry,)
+        // TODO(wcarlson): Potential bugs in this section. Unsure if these implementations are
+        // correct
+        if offset >= 0 {
+            self.set_flag(Flag::HalfCarry, get_add_half_carry((sp & 0xFF) as u8, offset as u8));
+            self.set_flag(Flag::Carry, (sp & 0xFF) as u16 + offset as u16 > 0xFF);
+        } else {
+            self.set_flag(Flag::HalfCarry, get_sub_half_carry((val & 0xFF) as u8, (sp & 0xFF) as u8));
+            self.set_flag(Flag::Carry, (val & 0xFF) <= (sp & 0xFF)); // Very uncertain about this
+        }
     }
 
     /// The 8-bit `Inst::Inc` instruction.
