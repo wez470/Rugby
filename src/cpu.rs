@@ -650,6 +650,11 @@ impl Cpu {
         let sp = self.get_reg_16(Regs16::SP);
         let val = (sp as i32 + offset as i32) as u16;
         self.set_reg_16(Regs16::HL, val);
+        self.set_flag(Flag::Zero, false);
+        self.set_flag(Flag::Sub, false);
+        // TODO(wcarlson): Set Carry and Half Carry properly
+        // self.set_flag(Flag::HalfCarry,)
+        // self.set_flag(Flag::Carry,)
     }
 
     /// The 8-bit `Inst::Inc` instruction.
