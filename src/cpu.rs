@@ -531,7 +531,7 @@ impl Cpu {
             Inst::Pop(reg) => self.pop(reg),
             Inst::Ld8(dest, src) => self.move_8(dest, src),
             Inst::Ld16(dest, src) => self.move_16(dest, src),
-            Inst::LdHlSp(offset) => self.load_sp_into_hl(offset),
+            Inst::LdHlSp(offset) => self.load_stack_addr_into_hl(offset),
             Inst::Inc8(n) => self.inc_8(n),
             Inst::Dec8(n) => self.dec_8(n),
             Inst::Inc16(n) => self.inc_16(n),
@@ -646,9 +646,7 @@ impl Cpu {
     }
 
     /// The `Inst:LdHlSp` instruction.
-    ///
-    /// TODO(wcarlson): possibly figure out a better name for this function
-    fn load_sp_into_hl(&mut self, offset: i8) {
+    fn load_stack_addr_into_hl(&mut self, offset: i8) {
         let sp = self.get_reg_16(Regs16::SP);
         let val = (sp as i32 + offset as i32) as u16;
         self.set_reg_16(Regs16::HL, val);
