@@ -1511,7 +1511,7 @@ fn to_u16(low: u8, high: u8) -> u16 {
 /// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry
 /// from bit 3 into bit 4.
 fn get_add_half_carry(left: u8, right: u8) -> bool {
-   ((left & 0xf) + (right & 0xf)) & 0x10 != 0
+   (left & 0xf) + (right & 0xf) > 0xf
 }
 
 /// Returns true if `left - right` should set the half-carry flag, i.e. it requires a borrow
