@@ -646,6 +646,8 @@ impl Cpu {
     }
 
     /// The `Inst:LdHlSp` instruction.
+    ///
+    /// Loads the stack pointer plus an 8-bit signed value into register HL.
     fn load_stack_addr_into_hl(&mut self, offset: i8) {
         let sp = self.get_reg_16(Regs16::SP);
         let val = (sp as i32 + offset as i32) as u16;
@@ -659,7 +661,7 @@ impl Cpu {
             self.set_flag(Flag::Carry, (sp & 0xFF) as u16 + offset as u16 > 0xFF);
         } else {
             self.set_flag(Flag::HalfCarry, get_sub_half_carry((val & 0xFF) as u8, (sp & 0xFF) as u8));
-            self.set_flag(Flag::Carry, (val & 0xFF) <= (sp & 0xFF)); // Very uncertain about this
+            self.set_flag(Flag::Carry, (val & 0xFF) <= (sp & 0xFF)); // Uncertain about this
         }
     }
 
