@@ -98,7 +98,7 @@ const INSTRUCTION_LENGTH: [usize; 0x100] = [
 ];
 
 #[derive(Clone, Copy, Debug)]
-pub enum Reg8 {
+pub enum Regs8 {
     A,
     B,
     C,
@@ -134,7 +134,7 @@ enum Operand8 {
     Imm8(u8),
 
     /// 8-bit register.
-    Reg8(Reg8),
+    Reg8(Regs8),
 
     /// Memory location at the given immediate address.
     MemImm(u16),
@@ -699,10 +699,10 @@ impl Cpu {
 
     /// The `Inst::Sub` instruction
     fn sub(&mut self, n: Operand8) {
-        let a = self.get_reg_8(Reg8::A);
+        let a = self.get_reg_8(Regs8::A);
         let n_val = self.get_operand_8(n);
         let new_a = a.wrapping_sub(n_val);
-        self.set_reg_8(Reg8::A, new_a);
+        self.set_reg_8(Regs8::A, new_a);
         self.set_flag(Flag::Zero, new_a == 0);
         self.set_flag(Flag::Sub, true);
         self.set_flag(Flag::HalfCarry, get_sub_half_carry(a, n_val));
@@ -880,7 +880,7 @@ impl Cpu {
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize],
             Operand8::MemHighImm(offset) => self.memory.mem[0xFF00 | offset as usize],
             Operand8::MemHighC => {
-                let offset = self.get_reg_8(Reg8::C);
+                let offset = self.get_reg_8(Regs8::C);
                 self.memory.mem[0xFF00 | offset as usize]
             }
             Operand8::MemHlPostInc => {
@@ -910,7 +910,7 @@ impl Cpu {
             Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize] = val,
             Operand8::MemHighImm(offset) => self.memory.mem[0xFF00 | offset as usize] = val,
             Operand8::MemHighC => {
-                let offset = self.get_reg_8(Reg8::C);
+                let offset = self.get_reg_8(Regs8::C);
                 self.memory.mem[0xFF00 | offset as usize] = val;
             }
             Operand8::MemHlPostInc => {
@@ -942,27 +942,27 @@ impl Cpu {
         }
     }
 
-    fn set_reg_8(&mut self, reg: Reg8, val: u8) {
+    fn set_reg_8(&mut self, reg: Regs8, val: u8) {
         match reg {
-            Reg8::A => self.reg_af.high = val,
-            Reg8::B => self.reg_bc.high = val,
-            Reg8::C => self.reg_bc.low = val,
-            Reg8::D => self.reg_de.high = val,
-            Reg8::E => self.reg_de.low = val,
-            Reg8::H => self.reg_hl.high = val,
-            Reg8::L => self.reg_hl.low = val,
+            Regs8::A => self.reg_af.high = val,
+            Regs8::B => self.reg_bc.high = val,
+            Regs8::C => self.reg_bc.low = val,
+            Regs8::D => self.reg_de.high = val,
+            Regs8::E => self.reg_de.low = val,
+            Regs8::H => self.reg_hl.high = val,
+            Regs8::L => self.reg_hl.low = val,
         }
     }
 
-    fn get_reg_8(&self, reg: Reg8) -> u8 {
+    fn get_reg_8(&self, reg: Regs8) -> u8 {
          match reg {
-            Reg8::A => self.reg_af.high,
-            Reg8::B => self.reg_bc.high,
-            Reg8::C => self.reg_bc.low,
-            Reg8::D => self.reg_de.high,
-            Reg8::E => self.reg_de.low,
-            Reg8::H => self.reg_hl.high,
-            Reg8::L => self.reg_hl.low,
+            Regs8::A => self.reg_af.high,
+            Regs8::B => self.reg_bc.high,
+            Regs8::C => self.reg_bc.low,
+            Regs8::D => self.reg_de.high,
+            Regs8::E => self.reg_de.low,
+            Regs8::H => self.reg_hl.high,
+            Regs8::L => self.reg_hl.low,
         }
     }
 
@@ -998,7 +998,7 @@ fn decode(bytes: &[u8]) -> Inst {
     use self::Operand8::*;
     use self::Operand16::*;
     use self::Regs16::*;
-    use self::Reg8::*;
+    use self::Regs8::*;
 
     match bytes[0] {
         0x00 => Nop,
@@ -1645,12 +1645,12 @@ mod tests {
             0x3E, 0x13, // ld a, 0x13
             0x06, 0x42, // ld b, 0x42
         ]);
-        actual.set_reg_8(Reg8::A, 0);
-        actual.set_reg_8(Reg8::B, 0);
+        actual.set_reg_8(Regs8::A, 0);
+        actual.set_reg_8(Regs8::B, 0);
         actual.step_n(2);
 
-        expected.set_reg_8(Reg8::A, 0x13);
-        expected.set_reg_8(Reg8::B, 0x42);
+        expected.set_reg_8(Regs8::A, 0x13);
+        expected.set_reg_8(Regs8::B, 0x42);
         expected.set_reg_16(Regs16::PC, 4);
         expected.cycles = 16;
         check_diff(&actual, &expected);
