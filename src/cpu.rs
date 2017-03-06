@@ -540,7 +540,7 @@ impl Cpu {
             Inst::AddHl(_) => println!(" Unimplemented"),
             Inst::AddSp(_) => println!(" Unimplemented"),
             Inst::AdcA(_) => println!(" Unimplemented"),
-            Inst::Sub(_) => println!(" Unimplemented"),
+            Inst::Sub(n) => self.sub(n),
             Inst::SbcA(_) => println!(" Unimplemented"),
             Inst::And(n) => self.and(n),
             Inst::Xor(n) => self.xor(n),
@@ -695,6 +695,18 @@ impl Cpu {
     fn dec_16(&mut self, n: Operand16) {
         let val = self.get_operand_16(n).wrapping_sub(1);
         self.set_operand_16(n, val);
+    }
+
+    /// The `Inst::Sub` instruction
+    fn sub(&mut self, n: Operand8) {
+        let a = self.get_reg_8(Regs8::A);
+        let n_val = self.get_operand_8(n);
+        let new_a = a.wrapping_sub(n_val);
+        self.set_reg_8(Regs8::A, new_a);
+        self.set_flag(Flag::Zero, new_a == 0);
+        self.set_flag(Flag::Sub, true);
+        self.set_flag(Flag::HalfCarry, get_sub_half_carry(a, n_val));
+        self.set_flag(Flag::Carry, new_a > a);
     }
 
     /// The `Inst::And` instruction.
