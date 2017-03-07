@@ -547,9 +547,9 @@ impl Cpu {
             Inst::Or(n) => self.or(n),
             Inst::Cp(n) => self.compare(n),
             Inst::Rlc(n) => self.rotate_left_circular(n),
-            Inst::Rl(_) => println!(" Unimplemented"),
+            Inst::Rl(n) => self.rotate_left(n),
             Inst::Rrc(n) => self.rotate_right_circular(n),
-            Inst::Rr(_) => println!(" Unimplemented"),
+            Inst::Rr(n) => self.rotate_right(n),
             Inst::Rlca => println!(" Unimplemented"),
             Inst::Rla => println!(" Unimplemented"),
             Inst::Rrca => println!(" Unimplemented"),
@@ -760,10 +760,34 @@ impl Cpu {
         self.set_flag(Flag::Carry, old_val & 0x80 != 0);
     }
 
+    /// The `Inst::Rl` instruction.
+    fn rotate_left(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let old_carry = self.get_flag(Flag::Carry) as u8;
+        let new_val = (old_val << 1) | old_carry;
+        self.set_operand_8(n, new_val);
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, old_val & 0x80 != 0);
+    }
+
     /// The `Inst::Rrc` instruction.
     fn rotate_right_circular(&mut self, n: Operand8) {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_right(1);
+        self.set_operand_8(n, new_val);
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, old_val & 0x01 != 0);
+    }
+
+    /// The `Inst::Rr` instruction.
+    pub fn rotate_right(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let old_carry = self.get_flag(Flag::Carry) as u8;
+        let new_val = (old_carry << 7) | (old_val >> 1);
         self.set_operand_8(n, new_val);
         self.set_flag(Flag::Zero, new_val == 0);
         self.set_flag(Flag::Sub, false);
