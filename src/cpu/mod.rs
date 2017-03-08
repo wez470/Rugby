@@ -175,7 +175,7 @@ impl Cpu {
             Inst::Inc16(n) => self.inc_16(n),
             Inst::Dec16(n) => self.dec_16(n),
             Inst::AddA(n) => self.add_accum(n),
-            Inst::AddHl(_) => println!(" Unimplemented"),
+            Inst::AddHl(n) => self.add_hl(n),
             Inst::AddSp(_) => println!(" Unimplemented"),
             Inst::AdcA(_) => println!(" Unimplemented"),
             Inst::Sub(n) => self.sub_accum(n),
@@ -356,6 +356,17 @@ impl Cpu {
         self.set_flag(Flag::Zero, new_accum == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, get_add_half_carry(accum, n_val));
+        self.set_flag(Flag::Carry, carry);
+    }
+
+    /// The `Inst::AddHl` instruction
+    fn add_hl(&mut self, n: Operand16) {
+        let old_hl = self.get_reg_16(Reg16::HL);
+        let n_val = self.get_operand_16(n);
+        let (new_hl, carry) = old_hl.overflowing_add(n_val);
+        self.set_reg_16(Reg16::HL, new_hl);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, get_add_half_carry_high(old_hl, n_val));
         self.set_flag(Flag::Carry, carry);
     }
 
@@ -719,6 +730,12 @@ fn get_add_half_carry(left: u8, right: u8) -> bool {
 /// from bit 4 into bit 3.
 fn get_sub_half_carry(left: u8, right: u8) -> bool {
    (left & 0xf) < (right & 0xf)
+}
+
+/// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry
+/// from bit 11 into bit 12.
+fn get_add_half_carry_high(left: u16, right: u16) -> bool {
+   (left & 0xfff) + (right & 0xfff) > 0xfff
 }
 
 #[cfg(test)]
