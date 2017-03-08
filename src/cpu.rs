@@ -554,7 +554,7 @@ impl Cpu {
             Inst::Rla => println!(" Unimplemented"),
             Inst::Rrca => println!(" Unimplemented"),
             Inst::Rra => println!(" Unimplemented"),
-            Inst::Sla(_) => println!(" Unimplemented"),
+            Inst::Sla(n) => self.shift_left_arith(n),
             Inst::Sra(_) => println!(" Unimplemented"),
             Inst::Srl(_) => println!(" Unimplemented"),
             Inst::Swap(n) => self.swap(n),
@@ -793,6 +793,17 @@ impl Cpu {
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, old_val & 0x01 != 0);
+    }
+
+    /// The `Inst::Sla` instruction.
+    fn shift_left_arith(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val << 1;
+        self.set_operand_8(n, new_val);
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, old_val & 0x80 != 0);
     }
 
     /// The `Inst::Swap` instruction.
