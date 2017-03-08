@@ -370,7 +370,7 @@ impl Inst {
     ///
     /// Panics if the slice is empty or if it isn't long enough for the instruction specified by its
     /// first byte (the opcode).
-    pub fn decode(bytes: &[u8]) -> Inst {
+    pub fn from_bytes(bytes: &[u8]) -> Inst {
         use self::Inst::*;
         use self::Operand8::*;
         use self::Operand16::*;

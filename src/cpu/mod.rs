@@ -138,7 +138,7 @@ impl Cpu {
             print!(" {:02X}", byte);
         }
 
-        let inst = Inst::decode(&self.rom[self.base_pc..(self.base_pc + instruction_len)]);
+        let inst = Inst::from_bytes(&self.rom[self.base_pc..(self.base_pc + instruction_len)]);
         println!("\t\t(decoded: {:?})", inst);
 
         self.execute(inst);
