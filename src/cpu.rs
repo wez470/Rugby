@@ -1,4 +1,4 @@
-use reg_16::Reg16;
+use reg_16::Register;
 use memory::Memory;
 
 // The below tables are based on the tables at
@@ -165,7 +165,7 @@ enum Operand16 {
     Imm16(u16),
 
     /// 16-bit register.
-    Reg16(Regs16),
+    Register(Regs16),
 
     /// 16-bit memory location at the given immediate address (and the byte above).
     MemImm16(u16),
@@ -399,22 +399,22 @@ enum Inst {
 #[derive(Clone)]
 pub struct Cpu {
     /// Register containing the flags register and register 'A'
-    reg_af: Reg16,
+    reg_af: Register,
 
     /// Register containing registers 'B' and 'C'
-    reg_bc: Reg16,
+    reg_bc: Register,
 
     /// Register containing registers 'D' and 'E'
-    reg_de: Reg16,
+    reg_de: Register,
 
     /// Register containing registers 'H' and 'L'
-    reg_hl: Reg16,
+    reg_hl: Register,
 
     /// Register that contains the stack pointer
-    reg_sp: Reg16,
+    reg_sp: Register,
 
     /// Register that contains the program counter
-    reg_pc: Reg16,
+    reg_pc: Register,
 
     /// RAM
     memory: Memory,
@@ -443,12 +443,12 @@ pub struct Cpu {
 impl Cpu {
     pub fn new(rom: Box<[u8]>, mem: Memory) -> Cpu {
         let mut cpu = Cpu {
-            reg_af: Reg16::default(),
-            reg_bc: Reg16::default(),
-            reg_de: Reg16::default(),
-            reg_hl: Reg16::default(),
-            reg_sp: Reg16::default(),
-            reg_pc: Reg16::default(),
+            reg_af: Register::default(),
+            reg_bc: Register::default(),
+            reg_de: Register::default(),
+            reg_hl: Register::default(),
+            reg_sp: Register::default(),
+            reg_pc: Register::default(),
             memory: mem,
             rom: rom,
             base_pc: 0,
@@ -999,7 +999,7 @@ impl Cpu {
     fn get_operand_16(&self, src: Operand16) -> u16 {
         match src {
             Operand16::Imm16(val) => val,
-            Operand16::Reg16(reg) => self.get_reg_16(reg),
+            Operand16::Register(reg) => self.get_reg_16(reg),
             Operand16::MemImm16(_) => panic!("no gameboy CPU instruction actually uses this"),
         }
     }
@@ -1007,7 +1007,7 @@ impl Cpu {
     fn set_operand_16(&mut self, dest: Operand16, val: u16) {
         match dest {
             Operand16::Imm16(_) => panic!("Attempt to store to a 16-bit immediate value"),
-            Operand16::Reg16(reg) => self.set_reg_16(reg, val),
+            Operand16::Register(reg) => self.set_reg_16(reg, val),
             Operand16::MemImm16(_) => unimplemented!(),
         }
     }
@@ -1072,17 +1072,17 @@ fn decode(bytes: &[u8]) -> Inst {
 
     match bytes[0] {
         0x00 => Nop,
-        0x01 => Ld16(Reg16(BC), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x01 => Ld16(Register(BC), Imm16(to_u16(bytes[1], bytes[2]))),
         0x02 => Ld8(MemReg(BC), Reg8(A)),
-        0x03 => Inc16(Reg16(BC)),
+        0x03 => Inc16(Register(BC)),
         0x04 => Inc8(Reg8(B)),
         0x05 => Dec8(Reg8(B)),
         0x06 => Ld8(Reg8(B), Imm8(bytes[1])),
         0x07 => Rlca,
-        0x08 => Ld16(MemImm16(to_u16(bytes[1], bytes[2])), Reg16(SP)),
-        0x09 => AddHl(Reg16(BC)),
+        0x08 => Ld16(MemImm16(to_u16(bytes[1], bytes[2])), Register(SP)),
+        0x09 => AddHl(Register(BC)),
         0x0A => Ld8(Reg8(A), MemReg(BC)),
-        0x0B => Dec16(Reg16(BC)),
+        0x0B => Dec16(Register(BC)),
         0x0C => Inc8(Reg8(C)),
         0x0D => Dec8(Reg8(C)),
         0x0E => Ld8(Reg8(C), Imm8(bytes[1])),
@@ -1094,49 +1094,49 @@ fn decode(bytes: &[u8]) -> Inst {
             assert_eq!(bytes[1], 0);
             Stop
         }
-        0x11 => Ld16(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x11 => Ld16(Register(DE), Imm16(to_u16(bytes[1], bytes[2]))),
         0x12 => Ld8(MemReg(DE), Reg8(A)),
-        0x13 => Inc16(Reg16(DE)),
+        0x13 => Inc16(Register(DE)),
         0x14 => Inc8(Reg8(D)),
         0x15 => Dec8(Reg8(D)),
         0x16 => Ld8(Reg8(D), Imm8(bytes[1])),
         0x17 => Rla,
         0x18 => Jr(bytes[1] as i8, Cond::None),
-        0x19 => AddHl(Reg16(DE)),
+        0x19 => AddHl(Register(DE)),
         0x1A => Ld8(Reg8(A), MemReg(DE)),
-        0x1B => Dec16(Reg16(DE)),
+        0x1B => Dec16(Register(DE)),
         0x1C => Inc8(Reg8(E)),
         0x1D => Dec8(Reg8(E)),
         0x1E => Ld8(Reg8(E), Imm8(bytes[1])),
         0x1F => Rra,
         0x20 => Jr(bytes[1] as i8, Cond::NotZero),
-        0x21 => Ld16(Reg16(HL), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x21 => Ld16(Register(HL), Imm16(to_u16(bytes[1], bytes[2]))),
         0x22 => Ld8(MemHlPostInc, Reg8(A)),
-        0x23 => Inc16(Reg16(HL)),
+        0x23 => Inc16(Register(HL)),
         0x24 => Inc8(Reg8(H)),
         0x25 => Dec8(Reg8(H)),
         0x26 => Ld8(Reg8(H), Imm8(bytes[1])),
         0x27 => Daa,
         0x28 => Jr(bytes[1] as i8, Cond::Zero),
-        0x29 => AddHl(Reg16(HL)),
+        0x29 => AddHl(Register(HL)),
         0x2A => Ld8(Reg8(A), MemHlPostInc),
-        0x2B => Dec16(Reg16(HL)),
+        0x2B => Dec16(Register(HL)),
         0x2C => Inc8(Reg8(L)),
         0x2D => Dec8(Reg8(L)),
         0x2E => Ld8(Reg8(L), Imm8(bytes[1])),
         0x2F => Cpl,
         0x30 => Jr(bytes[1] as i8, Cond::NotCarry),
-        0x31 => Ld16(Reg16(SP), Imm16(to_u16(bytes[1], bytes[2]))),
+        0x31 => Ld16(Register(SP), Imm16(to_u16(bytes[1], bytes[2]))),
         0x32 => Ld8(MemHlPostDec, Reg8(A)),
-        0x33 => Inc16(Reg16(SP)),
+        0x33 => Inc16(Register(SP)),
         0x34 => Inc8(MemReg(HL)),
         0x35 => Dec8(MemReg(HL)),
         0x36 => Ld8(MemReg(HL), Imm8(bytes[1])),
         0x37 => Scf,
         0x38 => Jr(bytes[1] as i8, Cond::Carry),
-        0x39 => AddHl(Reg16(SP)),
+        0x39 => AddHl(Register(SP)),
         0x3A => Ld8(Reg8(A), MemHlPostDec),
-        0x3B => Dec16(Reg16(SP)),
+        0x3B => Dec16(Register(SP)),
         0x3C => Inc8(Reg8(A)),
         0x3D => Dec8(Reg8(A)),
         0x3E => Ld8(Reg8(A), Imm8(bytes[1])),
@@ -1310,7 +1310,7 @@ fn decode(bytes: &[u8]) -> Inst {
         0xE6 => And(Imm8(bytes[1])),
         0xE7 => Rst(0x20),
         0xE8 => AddSp(bytes[1] as i8),
-        0xE9 => Jp(Reg16(HL), Cond::None),
+        0xE9 => Jp(Register(HL), Cond::None),
         0xEA => Ld8(MemImm(to_u16(bytes[1], bytes[2])), Reg8(A)),
         0xEB => Invalid(bytes[0]),
         0xEC => Invalid(bytes[0]),
@@ -1326,7 +1326,7 @@ fn decode(bytes: &[u8]) -> Inst {
         0xF6 => Or(Imm8(bytes[1])),
         0xF7 => Rst(0x30),
         0xF8 => LdHlSp(bytes[1] as i8),
-        0xF9 => Ld16(Reg16(SP), Reg16(HL)),
+        0xF9 => Ld16(Register(SP), Register(HL)),
         0xFA => Ld8(Reg8(A), MemImm(to_u16(bytes[1], bytes[2]))),
         0xFB => Ei,
         0xFC => Invalid(bytes[0]),

@@ -1,10 +1,10 @@
 #[derive(Clone, Default)]
-pub struct Reg16 {
+pub struct Register {
     pub high: u8,
     pub low: u8
 }
 
-impl Reg16 {
+impl Register {
     pub fn set(&mut self, val: u16) {
         self.low = (val & 0xFF) as u8;
         self.high = ((val >> 8) & 0xFF) as u8;
@@ -36,7 +36,7 @@ impl Reg16 {
 
 #[test]
 fn test_set_16_bit_reg() {
-    let mut reg = Reg16::default();
+    let mut reg = Register::default();
     reg.set(60000);
     assert_eq!(reg.low, 96);
     assert_eq!(reg.high, 234);
@@ -44,7 +44,7 @@ fn test_set_16_bit_reg() {
 
 #[test]
 fn test_get_16_bit_reg() {
-    let mut reg = Reg16::default();
+    let mut reg = Register::default();
     reg.low = 96;
     reg.high = 234;
     assert_eq!(reg.get(), 60000);
@@ -52,7 +52,7 @@ fn test_get_16_bit_reg() {
 
 #[test]
 fn test_inc() {
-    let mut reg = Reg16::default();
+    let mut reg = Register::default();
     reg.set(0);
     reg.inc(1);
     assert_eq!(reg.get(), 1);
