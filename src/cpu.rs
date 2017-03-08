@@ -540,12 +540,12 @@ impl Cpu {
             Inst::AddHl(_) => println!(" Unimplemented"),
             Inst::AddSp(_) => println!(" Unimplemented"),
             Inst::AdcA(_) => println!(" Unimplemented"),
-            Inst::Sub(n) => self.sub(n),
+            Inst::Sub(n) => self.sub_accum(n),
             Inst::SbcA(_) => println!(" Unimplemented"),
-            Inst::And(n) => self.and(n),
-            Inst::Xor(n) => self.xor(n),
-            Inst::Or(n) => self.or(n),
-            Inst::Cp(n) => self.compare(n),
+            Inst::And(n) => self.and_accum(n),
+            Inst::Xor(n) => self.xor_accum(n),
+            Inst::Or(n) => self.or_accum(n),
+            Inst::Cp(n) => self.compare_accum(n),
             Inst::Rlc(n) => self.rotate_left_circular(n),
             Inst::Rl(n) => self.rotate_left(n),
             Inst::Rrc(n) => self.rotate_right_circular(n),
@@ -562,7 +562,7 @@ impl Cpu {
             Inst::Res(bit, n) => self.reset_bit(bit, n),
             Inst::Set(bit, n) => self.set_bit(bit, n),
             Inst::Daa => println!(" Unimplemented"),
-            Inst::Cpl => self.complement(),
+            Inst::Cpl => self.complement_accum(),
             Inst::Ccf => self.complement_carry_flag(),
             Inst::Scf => self.set_carry_flag(),
             Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
@@ -698,19 +698,19 @@ impl Cpu {
     }
 
     /// The `Inst::Sub` instruction
-    fn sub(&mut self, n: Operand8) {
-        let a = self.get_reg_8(Regs8::A);
+    fn sub_accum(&mut self, n: Operand8) {
+        let accum = self.get_reg_8(Regs8::A);
         let n_val = self.get_operand_8(n);
-        let new_a = a.wrapping_sub(n_val);
-        self.set_reg_8(Regs8::A, new_a);
-        self.set_flag(Flag::Zero, new_a == 0);
+        let new_accum = accum.wrapping_sub(n_val);
+        self.set_reg_8(Regs8::A, new_accum);
+        self.set_flag(Flag::Zero, new_accum == 0);
         self.set_flag(Flag::Sub, true);
-        self.set_flag(Flag::HalfCarry, get_sub_half_carry(a, n_val));
-        self.set_flag(Flag::Carry, new_a > a);
+        self.set_flag(Flag::HalfCarry, get_sub_half_carry(accum, n_val));
+        self.set_flag(Flag::Carry, new_accum > accum);
     }
 
     /// The `Inst::And` instruction.
-    fn and(&mut self, n: Operand8) {
+    fn and_accum(&mut self, n: Operand8) {
         let result = self.reg_af.high & self.get_operand_8(n);
         self.reg_af.high = result;
         self.set_flag(Flag::Zero, result == 0);
@@ -720,7 +720,7 @@ impl Cpu {
     }
 
     /// The `Inst::Xor` instruction.
-    fn xor(&mut self, n: Operand8) {
+    fn xor_accum(&mut self, n: Operand8) {
         let result = self.reg_af.high ^ self.get_operand_8(n);
         self.reg_af.high = result;
         self.set_flag(Flag::Zero, result == 0);
@@ -730,7 +730,7 @@ impl Cpu {
     }
 
     /// The `Inst::Or` instruction.
-    fn or(&mut self, n: Operand8) {
+    fn or_accum(&mut self, n: Operand8) {
         let result = self.reg_af.high | self.get_operand_8(n);
         self.reg_af.high = result;
         self.set_flag(Flag::Zero, result == 0);
@@ -740,7 +740,7 @@ impl Cpu {
     }
 
     /// The `Inst::Cp` instruction.
-    fn compare(&mut self, n: Operand8) {
+    fn compare_accum(&mut self, n: Operand8) {
         let left = self.reg_af.high;
         let right = self.get_operand_8(n);
         self.set_flag(Flag::Zero, left == right);
@@ -827,7 +827,7 @@ impl Cpu {
     }
 
     /// The `Inst::Cpl` instruction.
-    fn complement(&mut self) {
+    fn complement_accum(&mut self) {
         self.reg_af.high = !self.reg_af.high;
         self.set_flag(Flag::Sub, true);
         self.set_flag(Flag::HalfCarry, true);
