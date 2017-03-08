@@ -536,7 +536,7 @@ impl Cpu {
             Inst::Dec8(n) => self.dec_8(n),
             Inst::Inc16(n) => self.inc_16(n),
             Inst::Dec16(n) => self.dec_16(n),
-            Inst::AddA(_) => println!(" Unimplemented"),
+            Inst::AddA(n) => self.add_accum(n),
             Inst::AddHl(_) => println!(" Unimplemented"),
             Inst::AddSp(_) => println!(" Unimplemented"),
             Inst::AdcA(_) => println!(" Unimplemented"),
@@ -697,16 +697,28 @@ impl Cpu {
         self.set_operand_16(n, val);
     }
 
+    /// The `Inst::AddA` instruction
+    fn add_accum(&mut self, n: Operand8) {
+        let accum = self.get_reg_8(Regs8::A);
+        let n_val = self.get_operand_8(n);
+        let (new_accum, carry) = accum.overflowing_add(n_val);
+        self.set_reg_8(Regs8::A, new_accum);
+        self.set_flag(Flag::Zero, new_accum == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, get_add_half_carry(accum, n_val));
+        self.set_flag(Flag::Carry, carry);
+    }
+
     /// The `Inst::Sub` instruction
     fn sub_accum(&mut self, n: Operand8) {
         let accum = self.get_reg_8(Regs8::A);
         let n_val = self.get_operand_8(n);
-        let new_accum = accum.wrapping_sub(n_val);
+        let (new_accum, carry) = accum.overflowing_sub(n_val);
         self.set_reg_8(Regs8::A, new_accum);
         self.set_flag(Flag::Zero, new_accum == 0);
         self.set_flag(Flag::Sub, true);
         self.set_flag(Flag::HalfCarry, get_sub_half_carry(accum, n_val));
-        self.set_flag(Flag::Carry, new_accum > accum);
+        self.set_flag(Flag::Carry, carry);
     }
 
     /// The `Inst::And` instruction.
