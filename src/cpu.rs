@@ -555,7 +555,7 @@ impl Cpu {
             Inst::Rrca => println!(" Unimplemented"),
             Inst::Rra => println!(" Unimplemented"),
             Inst::Sla(n) => self.shift_left_arith(n),
-            Inst::Sra(_) => println!(" Unimplemented"),
+            Inst::Sra(n) => self.shift_right_arith(n),
             Inst::Srl(_) => println!(" Unimplemented"),
             Inst::Swap(n) => self.swap(n),
             Inst::Bit(bit, n) => self.test_bit(bit, n),
@@ -804,6 +804,18 @@ impl Cpu {
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, old_val & 0x80 != 0);
+    }
+
+    /// The `Inst::Sra` instruction.
+    fn shift_right_arith(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let high_bit = old_val & 0x80;
+        let new_val = (old_val >> 1) | high_bit;
+        self.set_operand_8(n, new_val);
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, old_val & 0x01 != 0);
     }
 
     /// The `Inst::Swap` instruction.
