@@ -784,7 +784,7 @@ impl Cpu {
     }
 
     /// The `Inst::Rr` instruction.
-    pub fn rotate_right(&mut self, n: Operand8) {
+    fn rotate_right(&mut self, n: Operand8) {
         let old_val = self.get_operand_8(n);
         let old_carry = self.get_flag(Flag::Carry) as u8;
         let new_val = (old_carry << 7) | (old_val >> 1);
