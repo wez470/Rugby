@@ -109,7 +109,7 @@ pub enum Regs8 {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Regs16 {
+pub enum Reg16 {
     AF,
     BC,
     DE,
@@ -140,7 +140,7 @@ enum Operand8 {
     MemImm(u16),
 
     /// Memory location at the address in the given register.
-    MemReg(Regs16),
+    MemReg(Reg16),
 
     /// Memory location at the address `0xFF00 + byte`.
     MemHighImm(u8),
@@ -165,7 +165,7 @@ enum Operand16 {
     Imm16(u16),
 
     /// 16-bit register.
-    Register(Regs16),
+    Register(Reg16),
 
     /// 16-bit memory location at the given immediate address (and the byte above).
     MemImm16(u16),
@@ -234,10 +234,10 @@ enum Inst {
     Reti,
 
     /// `PUSH xx`: Push the given register onto the stack.
-    Push(Regs16),
+    Push(Reg16),
 
     /// `POP xx`: Pop the top of the stack into the given register.
-    Pop(Regs16),
+    Pop(Reg16),
 
     /// `LD x, x`: 8-bit loads, stores, and moves.
     Ld8(Operand8, Operand8),
@@ -613,18 +613,18 @@ impl Cpu {
     fn ret(&mut self, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
             let return_addr = self.pop_stack();
-            self.set_reg_16(Regs16::PC, return_addr);
+            self.set_reg_16(Reg16::PC, return_addr);
         }
     }
 
     /// The `Inst::Push` instruction.
-    fn push(&mut self, reg: Regs16) {
+    fn push(&mut self, reg: Reg16) {
         let val = self.get_reg_16(reg);
         self.push_stack(val);
     }
 
     /// The `Inst::Pop` instruction.
-    fn pop(&mut self, reg: Regs16) {
+    fn pop(&mut self, reg: Reg16) {
         let val = self.pop_stack();
         self.set_reg_16(reg, val);
     }
@@ -649,9 +649,9 @@ impl Cpu {
     ///
     /// Loads the stack pointer plus an 8-bit signed value into register HL.
     fn load_stack_addr_into_hl(&mut self, offset: i8) {
-        let sp = self.get_reg_16(Regs16::SP);
+        let sp = self.get_reg_16(Reg16::SP);
         let val = (sp as i32 + offset as i32) as u16;
-        self.set_reg_16(Regs16::HL, val);
+        self.set_reg_16(Reg16::HL, val);
         self.set_flag(Flag::Zero, false);
         self.set_flag(Flag::Sub, false);
         // TODO(wcarlson): Potential bugs in this section. Unsure if these implementations are
@@ -954,15 +954,15 @@ impl Cpu {
                 self.memory.mem[0xFF00 | offset as usize]
             }
             Operand8::MemHlPostInc => {
-                let hl = self.get_reg_16(Regs16::HL);
+                let hl = self.get_reg_16(Reg16::HL);
                 let val = self.memory.mem[hl as usize];
-                self.set_reg_16(Regs16::HL, hl.wrapping_add(1));
+                self.set_reg_16(Reg16::HL, hl.wrapping_add(1));
                 val
             }
             Operand8::MemHlPostDec => {
-                let hl = self.get_reg_16(Regs16::HL);
+                let hl = self.get_reg_16(Reg16::HL);
                 let val = self.memory.mem[hl as usize];
-                self.set_reg_16(Regs16::HL, hl.wrapping_sub(1));
+                self.set_reg_16(Reg16::HL, hl.wrapping_sub(1));
                 val
             }
         }
@@ -984,14 +984,14 @@ impl Cpu {
                 self.memory.mem[0xFF00 | offset as usize] = val;
             }
             Operand8::MemHlPostInc => {
-                let hl = self.get_reg_16(Regs16::HL);
+                let hl = self.get_reg_16(Reg16::HL);
                 self.memory.mem[hl as usize] = val;
-                self.set_reg_16(Regs16::HL, hl.wrapping_add(1));
+                self.set_reg_16(Reg16::HL, hl.wrapping_add(1));
             }
             Operand8::MemHlPostDec => {
-                let hl = self.get_reg_16(Regs16::HL);
+                let hl = self.get_reg_16(Reg16::HL);
                 self.memory.mem[hl as usize] = val;
-                self.set_reg_16(Regs16::HL, hl.wrapping_sub(1));
+                self.set_reg_16(Reg16::HL, hl.wrapping_sub(1));
             }
         }
     }
@@ -1036,25 +1036,25 @@ impl Cpu {
         }
     }
 
-    fn set_reg_16(&mut self, reg: Regs16, val: u16) {
+    fn set_reg_16(&mut self, reg: Reg16, val: u16) {
         match reg {
-            Regs16::AF => self.reg_af.set(val),
-            Regs16::BC => self.reg_bc.set(val),
-            Regs16::DE => self.reg_de.set(val),
-            Regs16::HL => self.reg_hl.set(val),
-            Regs16::SP => self.reg_sp.set(val),
-            Regs16::PC => self.reg_pc.set(val),
+            Reg16::AF => self.reg_af.set(val),
+            Reg16::BC => self.reg_bc.set(val),
+            Reg16::DE => self.reg_de.set(val),
+            Reg16::HL => self.reg_hl.set(val),
+            Reg16::SP => self.reg_sp.set(val),
+            Reg16::PC => self.reg_pc.set(val),
         }
     }
 
-    fn get_reg_16(&self, reg: Regs16) -> u16 {
+    fn get_reg_16(&self, reg: Reg16) -> u16 {
          match reg {
-            Regs16::AF => self.reg_af.get(),
-            Regs16::BC => self.reg_bc.get(),
-            Regs16::DE => self.reg_de.get(),
-            Regs16::HL => self.reg_hl.get(),
-            Regs16::SP => self.reg_sp.get(),
-            Regs16::PC => self.reg_pc.get(),
+            Reg16::AF => self.reg_af.get(),
+            Reg16::BC => self.reg_bc.get(),
+            Reg16::DE => self.reg_de.get(),
+            Reg16::HL => self.reg_hl.get(),
+            Reg16::SP => self.reg_sp.get(),
+            Reg16::PC => self.reg_pc.get(),
         }
     }
 }
@@ -1067,7 +1067,7 @@ fn decode(bytes: &[u8]) -> Inst {
     use self::Inst::*;
     use self::Operand8::*;
     use self::Operand16::*;
-    use self::Regs16::*;
+    use self::Reg16::*;
     use self::Regs8::*;
 
     match bytes[0] {
@@ -1704,7 +1704,7 @@ mod tests {
         let (mut actual, mut expected) = setup(vec![0x00]); // nop
         actual.step();
 
-        expected.set_reg_16(Regs16::PC, 1);
+        expected.set_reg_16(Reg16::PC, 1);
         expected.cycles = 4;
         check_diff(&actual, &expected);
     }
@@ -1721,7 +1721,7 @@ mod tests {
 
         expected.set_reg_8(Regs8::A, 0x13);
         expected.set_reg_8(Regs8::B, 0x42);
-        expected.set_reg_16(Regs16::PC, 4);
+        expected.set_reg_16(Reg16::PC, 4);
         expected.cycles = 16;
         check_diff(&actual, &expected);
     }
@@ -1731,11 +1731,11 @@ mod tests {
         let (mut actual, mut expected) = setup(vec![
             0x11, 0x34, 0x12, // ld de, 0x1234
         ]);
-        actual.set_reg_16(Regs16::DE, 0);
+        actual.set_reg_16(Reg16::DE, 0);
         actual.step();
 
-        expected.set_reg_16(Regs16::DE, 0x1234);
-        expected.set_reg_16(Regs16::PC, 3);
+        expected.set_reg_16(Reg16::DE, 0x1234);
+        expected.set_reg_16(Reg16::PC, 3);
         expected.cycles = 12;
         check_diff(&actual, &expected);
     }
@@ -1747,7 +1747,7 @@ mod tests {
         ]);
         actual.step();
 
-        expected.set_reg_16(Regs16::PC, 0x1234);
+        expected.set_reg_16(Reg16::PC, 0x1234);
         expected.cycles = 16;
         check_diff(&actual, &expected);
     }
@@ -1763,7 +1763,7 @@ mod tests {
         // After DI, interrupts still aren't disabled until the next instruction executes.
         expected.interrupts_enabled = true;
         expected.pending_disable_interrupts = true;
-        expected.set_reg_16(Regs16::PC, 1);
+        expected.set_reg_16(Reg16::PC, 1);
         expected.cycles = 4;
         check_diff(&actual, &expected);
 
@@ -1773,7 +1773,7 @@ mod tests {
         // Now the instruction after DI has executed, so DI takes effect.
         expected.interrupts_enabled = false;
         expected.pending_disable_interrupts = false;
-        expected.set_reg_16(Regs16::PC, 2);
+        expected.set_reg_16(Reg16::PC, 2);
         expected.cycles = 8;
         check_diff(&actual, &expected);
     }
@@ -1789,7 +1789,7 @@ mod tests {
         // After EI, interrupts still aren't disabled until the next instruction executes.
         expected.interrupts_enabled = false;
         expected.pending_enable_interrupts = true;
-        expected.set_reg_16(Regs16::PC, 1);
+        expected.set_reg_16(Reg16::PC, 1);
         expected.cycles = 4;
         check_diff(&actual, &expected);
 
@@ -1799,7 +1799,7 @@ mod tests {
         // Now the instruction after EI has executed, so EI takes effect.
         expected.interrupts_enabled = true;
         expected.pending_enable_interrupts = false;
-        expected.set_reg_16(Regs16::PC, 2);
+        expected.set_reg_16(Reg16::PC, 2);
         expected.cycles = 8;
         check_diff(&actual, &expected);
     }
