@@ -556,7 +556,7 @@ impl Cpu {
             Inst::Rra => println!(" Unimplemented"),
             Inst::Sla(n) => self.shift_left_arith(n),
             Inst::Sra(n) => self.shift_right_arith(n),
-            Inst::Srl(_) => println!(" Unimplemented"),
+            Inst::Srl(n) => self.shift_right_logical(n),
             Inst::Swap(n) => self.swap(n),
             Inst::Bit(bit, n) => self.test_bit(bit, n),
             Inst::Res(bit, n) => self.reset_bit(bit, n),
@@ -811,6 +811,17 @@ impl Cpu {
         let old_val = self.get_operand_8(n);
         let high_bit = old_val & 0x80;
         let new_val = (old_val >> 1) | high_bit;
+        self.set_operand_8(n, new_val);
+        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Sub, false);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, old_val & 0x01 != 0);
+    }
+
+    /// The `Inst::Srl` instruction.
+    fn shift_right_logical(&mut self, n: Operand8) {
+        let old_val = self.get_operand_8(n);
+        let new_val = old_val >> 1;
         self.set_operand_8(n, new_val);
         self.set_flag(Flag::Zero, new_val == 0);
         self.set_flag(Flag::Sub, false);
