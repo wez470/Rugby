@@ -734,6 +734,9 @@ fn get_sub_half_carry(left: u8, right: u8) -> bool {
 
 /// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry
 /// from bit 11 into bit 12.
+///
+/// This is for 16-bit adds, where the half-carry is set based on the halfway point of the high
+/// byte.
 fn get_add_half_carry_high(left: u16, right: u16) -> bool {
    (left & 0xfff) + (right & 0xfff) > 0xfff
 }
