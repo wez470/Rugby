@@ -188,10 +188,22 @@ impl Cpu {
             Inst::Rl(n) => self.rotate_left(n),
             Inst::Rrc(n) => self.rotate_right_circular(n),
             Inst::Rr(n) => self.rotate_right(n),
-            Inst::Rlca => println!(" Unimplemented"),
-            Inst::Rla => println!(" Unimplemented"),
-            Inst::Rrca => println!(" Unimplemented"),
-            Inst::Rra => println!(" Unimplemented"),
+            Inst::Rlca => {
+                self.rotate_left_circular(Operand8::Reg8(Reg8::A));
+                self.set_flag(Flag::Zero, false);
+            }
+            Inst::Rla => {
+                self.rotate_left(Operand8::Reg8(Reg8::A));
+                self.set_flag(Flag::Zero, false);
+            }
+            Inst::Rrca => {
+                self.rotate_right_circular(Operand8::Reg8(Reg8::A));
+                self.set_flag(Flag::Zero, false);
+            }
+            Inst::Rra => {
+                self.rotate_right(Operand8::Reg8(Reg8::A));
+                self.set_flag(Flag::Zero, false);
+            }
             Inst::Sla(n) => self.shift_left_arith(n),
             Inst::Sra(n) => self.shift_right_arith(n),
             Inst::Srl(n) => self.shift_right_logical(n),
