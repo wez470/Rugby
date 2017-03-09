@@ -714,7 +714,7 @@ impl Cpu {
     }
 
     fn get_reg_8(&self, reg: Reg8) -> u8 {
-         match reg {
+        match reg {
             Reg8::A => self.reg_af.high,
             Reg8::B => self.reg_bc.high,
             Reg8::C => self.reg_bc.low,
@@ -737,7 +737,7 @@ impl Cpu {
     }
 
     fn get_reg_16(&self, reg: Reg16) -> u16 {
-         match reg {
+        match reg {
             Reg16::AF => self.reg_af.get(),
             Reg16::BC => self.reg_bc.get(),
             Reg16::DE => self.reg_de.get(),
