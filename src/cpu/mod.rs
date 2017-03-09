@@ -177,7 +177,7 @@ impl Cpu {
             Inst::AddA(n) => self.add_accum(n),
             Inst::AddHl(n) => self.add_hl(n),
             Inst::AddSp(_) => println!(" Unimplemented"),
-            Inst::AdcA(_) => println!(" Unimplemented"),
+            Inst::AdcA(n) => self.add_accum_with_carry(n),
             Inst::Sub(n) => self.sub_accum(n),
             Inst::SbcA(n) => self.sub_accum_with_carry(n),
             Inst::And(n) => self.and_accum(n),
@@ -368,6 +368,20 @@ impl Cpu {
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, get_add_half_carry_high(old_hl, n_val));
         self.set_flag(Flag::Carry, carry);
+    }
+
+    /// The `Inst::AdcA` instruction
+    fn add_accum_with_carry(&mut self, n: Operand8) {
+        let accum = self.get_reg_8(Reg8::A);
+        let n_val = self.get_operand_8(n);
+        let carry_val = self.get_flag(Flag::Carry) as u8;
+        let (midway_accum, midway_carry) = accum.overflowing_add(n_val);
+        let (final_accum, final_carry) = midway_accum.overflowing_add(carry_val);
+        self.set_flag(Flag::Zero, final_accum == 0);
+        self.set_flag(Flag::Sub, false);
+        let half_carry = get_add_half_carry(accum, n_val) || get_add_half_carry(midway_accum, carry_val);
+        self.set_flag(Flag::HalfCarry, half_carry);
+        self.set_flag(Flag::Carry, midway_carry || final_carry);
     }
 
     /// The `Inst::Sub` instruction
