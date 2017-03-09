@@ -295,7 +295,7 @@ impl Cpu {
         self.set_operand_16(dest, val);
     }
 
-    /// The `Inst:LdHlSp` instruction.
+    /// The `Inst::LdHlSp` instruction.
     ///
     /// Loads the stack pointer plus an 8-bit signed value into register HL.
     fn load_stack_addr_into_hl(&mut self, offset: i8) {
