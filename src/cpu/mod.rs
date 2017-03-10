@@ -164,7 +164,10 @@ impl Cpu {
             Inst::Call(fn_addr, cond) => self.call(fn_addr, cond),
             Inst::Rst(addr) => self.call_restart(addr),
             Inst::Ret(cond) => self.ret(cond),
-            Inst::Reti => println!(" Unimplemented"),
+            Inst::Reti => {
+               self.interrupts_enabled = true;
+               self.ret(Cond::None);
+            }
             Inst::Push(reg) => self.push(reg),
             Inst::Pop(reg) => self.pop(reg),
             Inst::Ld8(dest, src) => self.move_8(dest, src),
