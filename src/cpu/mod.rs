@@ -169,14 +169,14 @@ impl Cpu {
             Inst::Pop(reg) => self.pop(reg),
             Inst::Ld8(dest, src) => self.move_8(dest, src),
             Inst::Ld16(dest, src) => self.move_16(dest, src),
-            Inst::LdHlSp(offset) => self.load_stack_addr_into_hl(offset),
+            Inst::LdHlSp(offset) => self.load_stack_addr_into_reg(offset, Reg16::HL),
             Inst::Inc8(n) => self.inc_8(n),
             Inst::Dec8(n) => self.dec_8(n),
             Inst::Inc16(n) => self.inc_16(n),
             Inst::Dec16(n) => self.dec_16(n),
             Inst::AddA(n) => self.add_accum(n),
             Inst::AddHl(n) => self.add_hl(n),
-            Inst::AddSp(_) => println!(" Unimplemented"),
+            Inst::AddSp(offset) => self.load_stack_addr_into_reg(offset, Reg16::SP),
             Inst::AdcA(n) => self.add_accum_with_carry(n),
             Inst::Sub(n) => self.sub_accum(n),
             Inst::SbcA(n) => self.sub_accum_with_carry(n),
@@ -295,13 +295,13 @@ impl Cpu {
         self.set_operand_16(dest, val);
     }
 
-    /// The `Inst::LdHlSp` instruction.
+    /// The `Inst::LdHlSp` and `Inst::AddSp` instructions.
     ///
-    /// Loads the stack pointer plus an 8-bit signed value into register HL.
-    fn load_stack_addr_into_hl(&mut self, offset: i8) {
+    /// Loads the stack pointer plus an 8-bit signed value into the specified register.
+    fn load_stack_addr_into_reg(&mut self, offset: i8, dest: Reg16) {
         let sp = self.get_reg_16(Reg16::SP);
         let val = (sp as i32 + offset as i32) as u16;
-        self.set_reg_16(Reg16::HL, val);
+        self.set_reg_16(dest, val);
         self.set_flag(Flag::Zero, false);
         self.set_flag(Flag::Sub, false);
         // TODO(wcarlson): Potential bugs in this section. Unsure if these implementations are
