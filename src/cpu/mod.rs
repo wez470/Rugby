@@ -857,7 +857,9 @@ impl Cpu {
 
         match addr {
             // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3FFF => self.rom[addr as usize] = val,
+            0x0000...0x3FFF => {
+                panic!("unimplemented: writes to this range control memory bank controllers")
+            }
 
             // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
             0x4000...0x7FFF => {
