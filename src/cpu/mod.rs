@@ -925,6 +925,11 @@ impl Cpu {
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register,
 
+            0x40 => {
+                // FIXME: This is just a hack to get farther in Pokemon Red.
+                0
+            }
+
             0x44 => {
                 // FIXME: Hilarious hacks.
                 let title = &self.rom[0x0134..0x0144];
@@ -932,6 +937,8 @@ impl Cpu {
                     148
                 } else if title.starts_with(b"POKEMON RED") {
                     145
+                } else if title.starts_with(b"CPU_INSTRS") {
+                    144
                 } else {
                     unimplemented!()
                 }
