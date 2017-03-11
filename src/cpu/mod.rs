@@ -780,11 +780,9 @@ impl Cpu {
     }
 
     fn read_mem(&self, addr: u16) -> u8 {
-        let val = match addr {
+        match addr {
             // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3FFF => {
-                panic!("unimplemented: ROM bank 00")
-            }
+            0x0000...0x3FFF => self.rom[addr as usize],
 
             // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
             0x4000...0x7FFF => {
@@ -842,10 +840,7 @@ impl Cpu {
 
             // This match is exhaustive but rustc doesn't check that for integer matches.
             _ => unreachable!(),
-        };
-
-        println!("  {:04X} ==> {:02X}", addr, val);
-        val
+        }
     }
 
     fn write_mem(&mut self, addr: u16, val: u8) {
@@ -853,9 +848,7 @@ impl Cpu {
 
         match addr {
             // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3FFF => {
-                panic!("unimplemented: writes to this range control memory bank controllers")
-            }
+            0x0000...0x3FFF => self.rom[addr as usize] = val,
 
             // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
             0x4000...0x7FFF => {
