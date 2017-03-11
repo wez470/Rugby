@@ -830,11 +830,10 @@ impl Cpu {
             }
 
             // Not Usable
-            0xFEA0...0xFEFF => {
-                // TODO: Figure out what should happen if a game attempts a read here. (Ignore?
-                // Crash? Etc.)
-                panic!("unimplemented: unusable RAM")
-            }
+            //
+            // This part of the address space is not connected to any hardware, but some games do
+            // reads here. The result is 0xFF, the default value for the Gameboy data bus.
+            0xFEA0...0xFEFF => 0xFF,
 
             // I/O Ports
             0xFF00...0xFF7F => self.read_io_port(addr as u8),
@@ -897,11 +896,10 @@ impl Cpu {
             }
 
             // Not Usable
-            0xFEA0...0xFEFF => {
-                // TODO: Figure out what should happen if a game attempts a write here. (Ignore?
-                // Crash? Etc.)
-                panic!("unimplemented: unusable RAM")
-            }
+            //
+            // This part of the address space is not connected to any hardware, but some games do
+            // writes here (I'm looking at you, Tetris). They are to be silently ignored.
+            0xFEA0...0xFEFF => {}
 
             // I/O Ports
             0xFF00...0xFF7F => self.write_io_port(addr as u8, val),
