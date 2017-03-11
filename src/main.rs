@@ -1,6 +1,5 @@
 extern crate clap;
 
-use memory::Memory;
 use cpu::Cpu;
 use std::fs::File;
 use std::io::Read;
@@ -8,7 +7,6 @@ use clap::{Arg, App, AppSettings};
 use std::process::exit;
 use std::fmt::Display;
 
-mod memory;
 mod cpu;
 mod reg_16;
 
@@ -31,7 +29,7 @@ fn main() {
 
     let instruction_count = matches.value_of("INSTRUCTIONS").unwrap().parse().unwrap();
 
-    let mut cpu = Cpu::new(rom, Memory::new());
+    let mut cpu = Cpu::new(rom);
     cpu.step_n(instruction_count);
 }
 

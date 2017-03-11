@@ -1,8 +1,10 @@
-use memory::Memory;
 use reg_16::Register;
 use self::inst::{Cond, Inst, Operand8, Operand16};
 
 mod inst;
+
+// TODO: Refactor later to extract memory-related stuff out of the cpu module.
+const WORK_RAM_SIZE: usize = 8 * 1024; // 8 KB
 
 #[derive(Clone, Copy, Debug)]
 pub enum Reg8 {
@@ -58,8 +60,9 @@ pub struct Cpu {
     /// The 16-bit `PC` register, which contains the program counter.
     reg_pc: Register,
 
-    /// RAM.
-    memory: Memory,
+    /// Work RAM internal to the Gameboy, as opposed to external cartridge RAM. Limited to 8 KB in
+    /// the original Gameboy.
+    work_ram: Box<[u8]>,
 
     /// ROM (game cartridge).
     rom: Box<[u8]>,
@@ -83,7 +86,7 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new(rom: Box<[u8]>, mem: Memory) -> Cpu {
+    pub fn new(rom: Box<[u8]>) -> Cpu {
         let mut cpu = Cpu {
             reg_af: Register::default(),
             reg_bc: Register::default(),
@@ -91,7 +94,7 @@ impl Cpu {
             reg_hl: Register::default(),
             reg_sp: Register::default(),
             reg_pc: Register::default(),
-            memory: mem,
+            work_ram: Box::new([0; WORK_RAM_SIZE]),
             rom: rom,
             base_pc: 0,
             cycles: 0,
@@ -779,14 +782,14 @@ impl Cpu {
                 panic!("unimplemented: cartridge RAM")
             }
 
-            // 4KB Work RAM Bank 0 (WRAM)
-            0xc000...0xcfff => {
-                panic!("unimplemented: work RAM")
-            }
-
-            // 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
-            0xd000...0xdfff => {
-                panic!("unimplemented: work RAM")
+            // C000-CFFF: 4KB Work RAM Bank 0 (WRAM)
+            // D000-DFFF: 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
+            //
+            // NOTE: Since we don't support CGB mode yet, there is no switching and we handle this
+            // like a contiguous 8KB block.
+            0xc000...0xdfff => {
+                let i = (addr - 0xc000) as usize;
+                self.work_ram[i]
             }
 
             // Same as C000-DDFF (ECHO) (typically not used)
@@ -853,14 +856,14 @@ impl Cpu {
                 panic!("unimplemented: cartridge RAM")
             }
 
-            // 4KB Work RAM Bank 0 (WRAM)
-            0xc000...0xcfff => {
-                panic!("unimplemented: work RAM")
-            }
-
-            // 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
-            0xd000...0xdfff => {
-                panic!("unimplemented: work RAM")
+            // C000-CFFF: 4KB Work RAM Bank 0 (WRAM)
+            // D000-DFFF: 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
+            //
+            // NOTE: Since we don't support CGB mode yet, there is no switching and we handle this
+            // like a contiguous 8KB block.
+            0xc000...0xdfff => {
+                let i = (addr - 0xc000) as usize;
+                self.work_ram[i] = val;
             }
 
             // Same as C000-DDFF (ECHO) (typically not used)
@@ -925,12 +928,11 @@ fn get_add_half_carry_high(left: u16, right: u16) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use memory::Memory;
     use std::fmt::{Debug, UpperHex};
     use std::mem;
 
     fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
-        let mut cpu = Cpu::new(rom.into_boxed_slice(), Memory::new());
+        let mut cpu = Cpu::new(rom.into_boxed_slice());
         cpu.reg_pc.set(0);
         (cpu.clone(), cpu)
     }
@@ -962,10 +964,10 @@ mod tests {
             &expected.pending_enable_interrupts
         );
 
-        let actual_mem = actual.memory.mem.iter();
-        let expected_mem = expected.memory.mem.iter();
-        for (i, (actual_cell, expected_cell)) in actual_mem.zip(expected_mem).enumerate() {
-            let name = format!("memory location 0x{:02X}", i);
+        let actual_work_ram = actual.work_ram.iter();
+        let expected_work_ram = expected.work_ram.iter();
+        for (i, (actual_cell, expected_cell)) in actual_work_ram.zip(expected_work_ram).enumerate() {
+            let name = format!("work_ramory location 0x{:02X}", i);
             same &= diff_hex(&name, actual_cell, expected_cell);
         }
 
