@@ -162,8 +162,8 @@ impl Cpu {
     fn execute(&mut self, inst: Inst) {
         match inst {
             Inst::Nop => {},
-            Inst::Stop => println!(" Unimplemented"),
-            Inst::Halt => println!(" Unimplemented"),
+            Inst::Stop => panic!("unimplemented: STOP"),
+            Inst::Halt => panic!("unimplemented: HALT"),
             Inst::Di => self.pending_disable_interrupts = true,
             Inst::Ei => self.pending_enable_interrupts = true,
             Inst::Jp(loc, cond) => self.jump(loc, cond),
@@ -221,7 +221,7 @@ impl Cpu {
             Inst::Bit(bit, n) => self.test_bit(bit, n),
             Inst::Res(bit, n) => self.reset_bit(bit, n),
             Inst::Set(bit, n) => self.set_bit(bit, n),
-            Inst::Daa => println!(" Unimplemented"),
+            Inst::Daa => panic!("unimplemented: DAA"),
             Inst::Cpl => self.complement_accum(),
             Inst::Ccf => self.complement_carry_flag(),
             Inst::Scf => self.set_carry_flag(),
