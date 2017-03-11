@@ -914,8 +914,16 @@ impl Cpu {
 
     fn write_io_port(&mut self, port: u8, val: u8) {
         match port {
+            0x01 | 0x02 => println!("  unimplemented: write to serial I/O port"),
+
+            0x06 | 0x07 => println!("  unimplemented: write to timer I/O port"),
+
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
+
+            0x40 | 0x42 | 0x43 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
+                println!("  unimplemented: write to LCD I/O port");
+            }
 
             _ => panic!("unimplemented: write to I/O port 0x{:02X}", port),
         }
