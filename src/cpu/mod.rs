@@ -5,6 +5,7 @@ mod inst;
 
 // TODO: Refactor later to extract memory-related stuff out of the cpu module.
 const WORK_RAM_SIZE: usize = 8 * 1024; // 8 KB
+const HIGH_RAM_SIZE: usize = 127; // For the address range 0xFF80-0xFFFE (inclusive).
 
 #[derive(Clone, Copy, Debug)]
 pub enum Reg8 {
@@ -64,6 +65,9 @@ pub struct Cpu {
     /// the original Gameboy.
     work_ram: Box<[u8]>,
 
+    /// High RAM internal to the Gameboy. This is a small range of 127 bytes at 0xFF80-0xFFFE.
+    high_ram: Box<[u8]>,
+
     /// ROM (game cartridge).
     rom: Box<[u8]>,
 
@@ -101,6 +105,7 @@ impl Cpu {
             reg_sp: Register::default(),
             reg_pc: Register::default(),
             work_ram: Box::new([0; WORK_RAM_SIZE]),
+            high_ram: Box::new([0; HIGH_RAM_SIZE]),
             rom: rom,
             base_pc: 0,
             cycles: 0,
@@ -822,7 +827,8 @@ impl Cpu {
 
             // High RAM (HRAM)
             0xFF80...0xFFFE => {
-                panic!("unimplemented: high RAM")
+                let i = (addr - 0xFF80) as usize;
+                self.high_ram[i]
             }
 
             // Interrupt Enable Register
@@ -892,7 +898,8 @@ impl Cpu {
 
             // High RAM (HRAM)
             0xFF80...0xFFFE => {
-                panic!("unimplemented: high RAM")
+                let i = (addr - 0xFF80) as usize;
+                self.high_ram[i] = val;
             }
 
             // Interrupt Enable Register
