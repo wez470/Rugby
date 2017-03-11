@@ -148,12 +148,16 @@ impl Cpu {
         self.reg_pc.inc(instruction_len as i8);
 
         // Read the rest of the bytes of this instruction.
-        print!("{:04X}:", base_pc);
         let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
         inst_bytes[0] = self.current_opcode;
         for i in 1..instruction_len {
             inst_bytes[i] = self.read_mem(base_pc + i as u16);
-            print!(" {:02X}", inst_bytes[i]);
+        }
+
+        // Log the current instruction address and bytes for debugging.
+        print!("{:04X}:", base_pc);
+        for b in &inst_bytes[..instruction_len] {
+            print!(" {:02X}", b);
         }
 
         // Update clock cycle count based on the current instruction.
