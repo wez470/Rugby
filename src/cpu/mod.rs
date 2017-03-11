@@ -763,22 +763,22 @@ impl Cpu {
     fn read_mem(&self, addr: u16) -> u8 {
         let val = match addr {
             // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3fff => {
+            0x0000...0x3FFF => {
                 panic!("unimplemented: ROM bank 00")
             }
 
             // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
-            0x4000...0x7fff => {
+            0x4000...0x7FFF => {
                 panic!("unimplemented: ROM bank 01..NN")
             }
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
-            0x8000...0x9fff => {
+            0x8000...0x9FFF => {
                 panic!("unimplemented: video RAM")
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
-            0xa000...0xbfff => {
+            0xA000...0xBFFF => {
                 panic!("unimplemented: cartridge RAM")
             }
 
@@ -787,40 +787,40 @@ impl Cpu {
             //
             // NOTE: Since we don't support CGB mode yet, there is no switching and we handle this
             // like a contiguous 8KB block.
-            0xc000...0xdfff => {
-                let i = (addr - 0xc000) as usize;
+            0xC000...0xDFFF => {
+                let i = (addr - 0xC000) as usize;
                 self.work_ram[i]
             }
 
             // Same as C000-DDFF (ECHO) (typically not used)
-            0xe000...0xfdff => {
+            0xE000...0xFDFF => {
                 panic!("unimplemented: work RAM echo")
             }
 
             // Sprite Attribute Table (OAM)
-            0xfe00...0xfe9f => {
+            0xFE00...0xFE9F => {
                 panic!("unimplemented: sprite memory (OAM)")
             }
 
             // Not Usable
-            0xfea0...0xfeff => {
+            0xFEA0...0xFEFF => {
                 // TODO: Figure out what should happen if a game attempts a read here. (Ignore?
                 // Crash? Etc.)
                 panic!("unimplemented: unusable RAM")
             }
 
             // I/O Ports
-            0xff00...0xff7f => {
+            0xFF00...0xFF7F => {
                 panic!("unimplemented: I/O ports")
             }
 
             // High RAM (HRAM)
-            0xff80...0xfffe => {
+            0xFF80...0xFFFE => {
                 panic!("unimplemented: high RAM")
             }
 
             // Interrupt Enable Register
-            0xffff => {
+            0xFFFF => {
                 panic!("unimplemented: interrupt enable register")
             }
 
@@ -837,22 +837,22 @@ impl Cpu {
 
         match addr {
             // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3fff => {
+            0x0000...0x3FFF => {
                 panic!("unimplemented: writes to this range control memory bank controllers")
             }
 
             // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
-            0x4000...0x7fff => {
+            0x4000...0x7FFF => {
                 panic!("unimplemented: writes to this range control memory bank controllers")
             }
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
-            0x8000...0x9fff => {
+            0x8000...0x9FFF => {
                 panic!("unimplemented: video RAM")
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
-            0xa000...0xbfff => {
+            0xA000...0xBFFF => {
                 panic!("unimplemented: cartridge RAM")
             }
 
@@ -861,40 +861,40 @@ impl Cpu {
             //
             // NOTE: Since we don't support CGB mode yet, there is no switching and we handle this
             // like a contiguous 8KB block.
-            0xc000...0xdfff => {
-                let i = (addr - 0xc000) as usize;
+            0xC000...0xDFFF => {
+                let i = (addr - 0xC000) as usize;
                 self.work_ram[i] = val;
             }
 
             // Same as C000-DDFF (ECHO) (typically not used)
-            0xe000...0xfdff => {
+            0xE000...0xFDFF => {
                 panic!("unimplemented: work RAM echo")
             }
 
             // Sprite Attribute Table (OAM)
-            0xfe00...0xfe9f => {
+            0xFE00...0xFE9F => {
                 panic!("unimplemented: sprite memory (OAM)")
             }
 
             // Not Usable
-            0xfea0...0xfeff => {
+            0xFEA0...0xFEFF => {
                 // TODO: Figure out what should happen if a game attempts a write here. (Ignore?
                 // Crash? Etc.)
                 panic!("unimplemented: unusable RAM")
             }
 
             // I/O Ports
-            0xff00...0xff7f => {
+            0xFF00...0xFF7F => {
                 panic!("unimplemented: I/O ports")
             }
 
             // High RAM (HRAM)
-            0xff80...0xfffe => {
+            0xFF80...0xFFFE => {
                 panic!("unimplemented: high RAM")
             }
 
             // Interrupt Enable Register
-            0xffff => {
+            0xFFFF => {
                 panic!("unimplemented: interrupt enable register")
             }
 
@@ -907,13 +907,13 @@ impl Cpu {
 /// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry
 /// from bit 3 into bit 4.
 fn get_add_half_carry(left: u8, right: u8) -> bool {
-    (left & 0xf) + (right & 0xf) > 0xf
+    (left & 0xF) + (right & 0xF) > 0xF
 }
 
 /// Returns true if `left - right` should set the half-carry flag, i.e. it requires a borrow
 /// from bit 4 into bit 3.
 fn get_sub_half_carry(left: u8, right: u8) -> bool {
-    (left & 0xf) < (right & 0xf)
+    (left & 0xF) < (right & 0xF)
 }
 
 /// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry
@@ -922,7 +922,7 @@ fn get_sub_half_carry(left: u8, right: u8) -> bool {
 /// This is for 16-bit adds, where the half-carry is set based on the halfway point of the high
 /// byte.
 fn get_add_half_carry_high(left: u16, right: u16) -> bool {
-    (left & 0xfff) + (right & 0xfff) > 0xfff
+    (left & 0xFFF) + (right & 0xFFF) > 0xFFF
 }
 
 #[cfg(test)]
