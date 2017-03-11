@@ -25,6 +25,7 @@ pub enum Reg16 {
     PC,
 }
 
+/// Represents bit indexes of flags in the flags register.
 #[derive(Clone, Copy, Debug)]
 #[repr(u8)]
 enum Flag {
@@ -36,28 +37,31 @@ enum Flag {
 
 #[derive(Clone)]
 pub struct Cpu {
-    /// Register containing the flags register and register 'A'
+    /// The 16-bit `AF` register, composed of two 8-bit registers:
+    ///   * `A`, also known as the accumulator.
+    ///   * `F`, the flags register.
     reg_af: Register,
 
-    /// Register containing registers 'B' and 'C'
+    /// The 16-bit `BC` register, composed of the two general-purpose 8-bit registers `B` and `C`.
     reg_bc: Register,
 
+    /// The 16-bit `DE` register, composed of the two general-purpose 8-bit registers `D` and `E`.
     /// Register containing registers 'D' and 'E'
     reg_de: Register,
 
-    /// Register containing registers 'H' and 'L'
+    /// The 16-bit `HL` register, composed of the two general-purpose 8-bit registers `H` and `L`.
     reg_hl: Register,
 
-    /// Register that contains the stack pointer
+    /// The 16-bit `SP` register, which contains the stack pointer.
     reg_sp: Register,
 
-    /// Register that contains the program counter
+    /// The 16-bit `PC` register, which contains the program counter.
     reg_pc: Register,
 
-    /// RAM
+    /// RAM.
     memory: Memory,
 
-    /// ROM (game cartridge)
+    /// ROM (game cartridge).
     rom: Box<[u8]>,
 
     /// The location of the start of the currently-executing instruction.
