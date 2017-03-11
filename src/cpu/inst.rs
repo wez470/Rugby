@@ -96,6 +96,9 @@ pub const INSTRUCTION_LENGTH: [usize; 0x100] = [
      2,  1,  2,  1,  1,  1,  2,  1,  2,  1,  3,  1,  1,  1,  2,  1, // F
 ];
 
+/// The largest value in the `INSTRUCTION_LENGTH` table.
+pub const MAX_INSTRUCTION_LENGTH: usize = 3;
+
 /// Represents an operand resolving to an 8-bit value.
 #[derive(Clone, Copy, Debug)]
 pub enum Operand8 {

@@ -71,8 +71,8 @@ pub struct Cpu {
     /// ROM (game cartridge).
     rom: Box<[u8]>,
 
-    /// The location of the start of the currently-executing instruction.
-    base_pc: usize,
+    /// The opcode of the currently-executing instruction.
+    current_opcode: u8,
 
     /// A running total of the number of cycles taken in execution so far.
     cycles: usize,
@@ -107,7 +107,7 @@ impl Cpu {
             work_ram: Box::new([0; WORK_RAM_SIZE]),
             high_ram: Box::new([0; HIGH_RAM_SIZE]),
             rom: rom,
-            base_pc: 0,
+            current_opcode: 0,
             cycles: 0,
             interrupts_enabled: false,
             pending_disable_interrupts: false,
@@ -141,24 +141,31 @@ impl Cpu {
         self.pending_enable_interrupts = false;
         self.pending_disable_interrupts = false;
 
-        self.base_pc = self.reg_pc.get() as usize;
-        let opcode = self.rom[self.base_pc];
-        let instruction_len = inst::INSTRUCTION_LENGTH[opcode as usize];
+        // Get the opcode for the current instruction and find the total instruction length.
+        let base_pc = self.reg_pc.get();
+        self.current_opcode = self.read_mem(base_pc);
+        let instruction_len = inst::INSTRUCTION_LENGTH[self.current_opcode as usize];
         self.reg_pc.inc(instruction_len as i8);
 
-        self.cycles += if opcode == 0xCB {
-            let opcode_after_cb = self.rom[self.base_pc + 1];
-            inst::PREFIX_CB_BASE_CYCLES[opcode_after_cb as usize]
-        } else {
-            inst::BASE_CYCLES[opcode as usize]
-        };
-
-        print!("{:04X}:", self.base_pc);
-        for &byte in &self.rom[self.base_pc .. (self.base_pc + instruction_len)] {
-            print!(" {:02X}", byte);
+        // Read the rest of the bytes of this instruction.
+        print!("{:04X}:", base_pc);
+        let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
+        inst_bytes[0] = self.current_opcode;
+        for i in 1..instruction_len {
+            inst_bytes[i] = self.read_mem(base_pc + i as u16);
+            print!(" {:02X}", inst_bytes[i]);
         }
 
-        let inst = Inst::from_bytes(&self.rom[self.base_pc..(self.base_pc + instruction_len)]);
+        // Update clock cycle count based on the current instruction.
+        self.cycles += if self.current_opcode == 0xCB {
+            let opcode_after_cb = inst_bytes[1];
+            inst::PREFIX_CB_BASE_CYCLES[opcode_after_cb as usize]
+        } else {
+            inst::BASE_CYCLES[self.current_opcode as usize]
+        };
+
+        // Decode the instruction.
+        let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
         println!("\t\t(decoded: {:?})", inst);
 
         self.execute(inst);
@@ -610,8 +617,7 @@ impl Cpu {
     fn check_cond_and_update_cycles(&mut self, cond: Cond) -> bool {
         let condition_met = self.is_cond_met(cond);
         if condition_met {
-            let opcode = self.rom[self.base_pc];
-            self.cycles += inst::CONDITIONAL_CYCLES[opcode as usize];
+            self.cycles += inst::CONDITIONAL_CYCLES[self.current_opcode as usize];
         }
         condition_met
     }
