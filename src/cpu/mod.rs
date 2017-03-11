@@ -165,8 +165,8 @@ impl Cpu {
             Inst::Rst(addr) => self.call_restart(addr),
             Inst::Ret(cond) => self.ret(cond),
             Inst::Reti => {
-               self.interrupts_enabled = true;
-               self.ret(Cond::None);
+                self.interrupts_enabled = true;
+                self.ret(Cond::None);
             }
             Inst::Push(reg) => self.push(reg),
             Inst::Pop(reg) => self.pop(reg),
@@ -754,13 +754,13 @@ impl Cpu {
 /// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry
 /// from bit 3 into bit 4.
 fn get_add_half_carry(left: u8, right: u8) -> bool {
-   (left & 0xf) + (right & 0xf) > 0xf
+    (left & 0xf) + (right & 0xf) > 0xf
 }
 
 /// Returns true if `left - right` should set the half-carry flag, i.e. it requires a borrow
 /// from bit 4 into bit 3.
 fn get_sub_half_carry(left: u8, right: u8) -> bool {
-   (left & 0xf) < (right & 0xf)
+    (left & 0xf) < (right & 0xf)
 }
 
 /// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry
@@ -769,7 +769,7 @@ fn get_sub_half_carry(left: u8, right: u8) -> bool {
 /// This is for 16-bit adds, where the half-carry is set based on the halfway point of the high
 /// byte.
 fn get_add_half_carry_high(left: u16, right: u16) -> bool {
-   (left & 0xfff) + (right & 0xfff) > 0xfff
+    (left & 0xfff) + (right & 0xfff) > 0xfff
 }
 
 #[cfg(test)]
