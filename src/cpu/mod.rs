@@ -6,6 +6,7 @@ mod inst;
 // TODO: Refactor later to extract memory-related stuff out of the cpu module.
 const WORK_RAM_SIZE: usize = 8 * 1024; // 8 KB
 const HIGH_RAM_SIZE: usize = 127; // For the address range 0xFF80-0xFFFE (inclusive).
+const VIDEO_RAM_SIZE: usize = 8 * 1024; // 8 KB
 
 #[derive(Clone, Copy, Debug)]
 pub enum Reg8 {
@@ -68,6 +69,9 @@ pub struct Cpu {
     /// High RAM internal to the Gameboy. This is a small range of 127 bytes at 0xFF80-0xFFFE.
     high_ram: Box<[u8]>,
 
+    /// Video RAM internal to the Gameboy.
+    video_ram: Box<[u8]>,
+
     /// ROM (game cartridge).
     rom: Box<[u8]>,
 
@@ -106,6 +110,7 @@ impl Cpu {
             reg_pc: Register::default(),
             work_ram: Box::new([0; WORK_RAM_SIZE]),
             high_ram: Box::new([0; HIGH_RAM_SIZE]),
+            video_ram: Box::new([0; VIDEO_RAM_SIZE]),
             rom: rom,
             current_opcode: 0,
             cycles: 0,
@@ -795,7 +800,8 @@ impl Cpu {
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
-                panic!("unimplemented: video RAM")
+                let i = (addr - 0x8000) as usize;
+                self.video_ram[i]
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
@@ -861,7 +867,8 @@ impl Cpu {
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
-                panic!("unimplemented: video RAM")
+                let i = (addr - 0x8000) as usize;
+                self.video_ram[i] = val;
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
