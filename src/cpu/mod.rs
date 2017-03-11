@@ -83,6 +83,12 @@ pub struct Cpu {
     /// True if the previous instruction was EI, which enables interrupts after the next
     /// instruction.
     pending_enable_interrupts: bool,
+
+    /// The `IF` Interrupt Flags register accessed via I/O port 0xFF0F.
+    interrupt_flags_register: u8,
+
+    /// The `IE` Interrupt Enable register accessed via I/O port 0xFFFF.
+    interrupt_enable_register: u8,
 }
 
 impl Cpu {
@@ -101,6 +107,8 @@ impl Cpu {
             interrupts_enabled: false,
             pending_disable_interrupts: false,
             pending_enable_interrupts: false,
+            interrupt_flags_register: 0,
+            interrupt_enable_register: 0,
         };
         cpu.reset();
         cpu
@@ -810,9 +818,7 @@ impl Cpu {
             }
 
             // I/O Ports
-            0xFF00...0xFF7F => {
-                panic!("unimplemented: I/O ports")
-            }
+            0xFF00...0xFF7F => self.read_io_port(addr as u8),
 
             // High RAM (HRAM)
             0xFF80...0xFFFE => {
@@ -820,9 +826,7 @@ impl Cpu {
             }
 
             // Interrupt Enable Register
-            0xFFFF => {
-                panic!("unimplemented: interrupt enable register")
-            }
+            0xFFFF => self.interrupt_enable_register,
 
             // This match is exhaustive but rustc doesn't check that for integer matches.
             _ => unreachable!(),
@@ -884,9 +888,7 @@ impl Cpu {
             }
 
             // I/O Ports
-            0xFF00...0xFF7F => {
-                panic!("unimplemented: I/O ports")
-            }
+            0xFF00...0xFF7F => self.write_io_port(addr as u8, val),
 
             // High RAM (HRAM)
             0xFF80...0xFFFE => {
@@ -894,12 +896,28 @@ impl Cpu {
             }
 
             // Interrupt Enable Register
-            0xFFFF => {
-                panic!("unimplemented: interrupt enable register")
-            }
+            0xFFFF => self.interrupt_enable_register = val,
 
             // This match is exhaustive but rustc doesn't check that for integer matches.
             _ => unreachable!(),
+        }
+    }
+
+    fn read_io_port(&self, port: u8) -> u8 {
+        match port {
+            // IF - Interrupt Flag register
+            0x0F => self.interrupt_flags_register,
+
+            _ => panic!("unimplemented: read from I/O port 0x{:02X}", port),
+        }
+    }
+
+    fn write_io_port(&mut self, port: u8, val: u8) {
+        match port {
+            // IF - Interrupt Flag register
+            0x0F => self.interrupt_flags_register = val,
+
+            _ => panic!("unimplemented: write to I/O port 0x{:02X}", port),
         }
     }
 }
