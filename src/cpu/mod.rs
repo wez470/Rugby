@@ -609,16 +609,16 @@ impl Cpu {
 
     fn push_stack(&mut self, val: u16) {
         self.reg_sp.inc(-2);
-        let addr = self.reg_sp.get() as usize;
-        self.memory.mem[addr] = val as u8; // low
-        self.memory.mem[addr + 1] = (val >> 8) as u8; // high
+        let addr = self.reg_sp.get();
+        self.write_mem(addr, val as u8); // low
+        self.write_mem(addr + 1, (val >> 8) as u8); // high
     }
 
     fn pop_stack(&mut self) -> u16 {
-        let addr = self.reg_sp.get() as usize;
+        let addr = self.reg_sp.get();
         self.reg_sp.inc(2);
-        let low = self.memory.mem[addr];
-        let high = self.memory.mem[addr + 1];
+        let low = self.read_mem(addr);
+        let high = self.read_mem(addr + 1);
         ((high as u16) << 8) | low as u16
     }
 
@@ -638,22 +638,22 @@ impl Cpu {
         match src {
             Operand8::Imm8(val) => val,
             Operand8::Reg8(reg) => self.get_reg_8(reg),
-            Operand8::MemImm(loc) => self.memory.mem[loc as usize],
-            Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize],
-            Operand8::MemHighImm(offset) => self.memory.mem[0xFF00 | offset as usize],
+            Operand8::MemImm(loc) => self.read_mem(loc),
+            Operand8::MemReg(reg) => self.read_mem(self.get_reg_16(reg)),
+            Operand8::MemHighImm(offset) => self.read_mem(0xFF00 | offset as u16),
             Operand8::MemHighC => {
                 let offset = self.get_reg_8(Reg8::C);
-                self.memory.mem[0xFF00 | offset as usize]
+                self.read_mem(0xFF00 | offset as u16)
             }
             Operand8::MemHlPostInc => {
                 let hl = self.get_reg_16(Reg16::HL);
-                let val = self.memory.mem[hl as usize];
+                let val = self.read_mem(hl);
                 self.set_reg_16(Reg16::HL, hl.wrapping_add(1));
                 val
             }
             Operand8::MemHlPostDec => {
                 let hl = self.get_reg_16(Reg16::HL);
-                let val = self.memory.mem[hl as usize];
+                let val = self.read_mem(hl);
                 self.set_reg_16(Reg16::HL, hl.wrapping_sub(1));
                 val
             }
@@ -668,21 +668,24 @@ impl Cpu {
         match dest {
             Operand8::Imm8(_) => panic!("Attempt to store to an 8-bit immediate value"),
             Operand8::Reg8(reg) => self.set_reg_8(reg, val),
-            Operand8::MemImm(loc) => self.memory.mem[loc as usize] = val,
-            Operand8::MemReg(reg) => self.memory.mem[self.get_reg_16(reg) as usize] = val,
-            Operand8::MemHighImm(offset) => self.memory.mem[0xFF00 | offset as usize] = val,
+            Operand8::MemImm(loc) => self.write_mem(loc, val),
+            Operand8::MemReg(reg) => {
+                let addr = self.get_reg_16(reg);
+                self.write_mem(addr, val);
+            }
+            Operand8::MemHighImm(offset) => self.write_mem(0xFF00 | offset as u16, val),
             Operand8::MemHighC => {
                 let offset = self.get_reg_8(Reg8::C);
-                self.memory.mem[0xFF00 | offset as usize] = val;
+                self.write_mem(0xFF00 | offset as u16, val);
             }
             Operand8::MemHlPostInc => {
                 let hl = self.get_reg_16(Reg16::HL);
-                self.memory.mem[hl as usize] = val;
+                self.write_mem(hl, val);
                 self.set_reg_16(Reg16::HL, hl.wrapping_add(1));
             }
             Operand8::MemHlPostDec => {
                 let hl = self.get_reg_16(Reg16::HL);
-                self.memory.mem[hl as usize] = val;
+                self.write_mem(hl, val);
                 self.set_reg_16(Reg16::HL, hl.wrapping_sub(1));
             }
         }
@@ -747,6 +750,149 @@ impl Cpu {
             Reg16::HL => self.reg_hl.get(),
             Reg16::SP => self.reg_sp.get(),
             Reg16::PC => self.reg_pc.get(),
+        }
+    }
+
+    fn read_mem(&self, addr: u16) -> u8 {
+        let val = match addr {
+            // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
+            0x0000...0x3fff => {
+                panic!("unimplemented: ROM bank 00")
+            }
+
+            // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
+            0x4000...0x7fff => {
+                panic!("unimplemented: ROM bank 01..NN")
+            }
+
+            // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
+            0x8000...0x9fff => {
+                panic!("unimplemented: video RAM")
+            }
+
+            // 8KB External RAM (in cartridge, switchable bank, if any)
+            0xa000...0xbfff => {
+                panic!("unimplemented: cartridge RAM")
+            }
+
+            // 4KB Work RAM Bank 0 (WRAM)
+            0xc000...0xcfff => {
+                panic!("unimplemented: work RAM")
+            }
+
+            // 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
+            0xd000...0xdfff => {
+                panic!("unimplemented: work RAM")
+            }
+
+            // Same as C000-DDFF (ECHO) (typically not used)
+            0xe000...0xfdff => {
+                panic!("unimplemented: work RAM echo")
+            }
+
+            // Sprite Attribute Table (OAM)
+            0xfe00...0xfe9f => {
+                panic!("unimplemented: sprite memory (OAM)")
+            }
+
+            // Not Usable
+            0xfea0...0xfeff => {
+                // TODO: Figure out what should happen if a game attempts a read here. (Ignore?
+                // Crash? Etc.)
+                panic!("unimplemented: unusable RAM")
+            }
+
+            // I/O Ports
+            0xff00...0xff7f => {
+                panic!("unimplemented: I/O ports")
+            }
+
+            // High RAM (HRAM)
+            0xff80...0xfffe => {
+                panic!("unimplemented: high RAM")
+            }
+
+            // Interrupt Enable Register
+            0xffff => {
+                panic!("unimplemented: interrupt enable register")
+            }
+
+            // This match is exhaustive but rustc doesn't check that for integer matches.
+            _ => unreachable!(),
+        };
+
+        println!("  {:04X} ==> {:02X}", addr, val);
+        val
+    }
+
+    fn write_mem(&mut self, addr: u16, val: u8) {
+        println!("  {:04X} <== {:02X}", addr, val);
+
+        match addr {
+            // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
+            0x0000...0x3fff => {
+                panic!("unimplemented: writes to this range control memory bank controllers")
+            }
+
+            // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
+            0x4000...0x7fff => {
+                panic!("unimplemented: writes to this range control memory bank controllers")
+            }
+
+            // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
+            0x8000...0x9fff => {
+                panic!("unimplemented: video RAM")
+            }
+
+            // 8KB External RAM (in cartridge, switchable bank, if any)
+            0xa000...0xbfff => {
+                panic!("unimplemented: cartridge RAM")
+            }
+
+            // 4KB Work RAM Bank 0 (WRAM)
+            0xc000...0xcfff => {
+                panic!("unimplemented: work RAM")
+            }
+
+            // 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
+            0xd000...0xdfff => {
+                panic!("unimplemented: work RAM")
+            }
+
+            // Same as C000-DDFF (ECHO) (typically not used)
+            0xe000...0xfdff => {
+                panic!("unimplemented: work RAM echo")
+            }
+
+            // Sprite Attribute Table (OAM)
+            0xfe00...0xfe9f => {
+                panic!("unimplemented: sprite memory (OAM)")
+            }
+
+            // Not Usable
+            0xfea0...0xfeff => {
+                // TODO: Figure out what should happen if a game attempts a write here. (Ignore?
+                // Crash? Etc.)
+                panic!("unimplemented: unusable RAM")
+            }
+
+            // I/O Ports
+            0xff00...0xff7f => {
+                panic!("unimplemented: I/O ports")
+            }
+
+            // High RAM (HRAM)
+            0xff80...0xfffe => {
+                panic!("unimplemented: high RAM")
+            }
+
+            // Interrupt Enable Register
+            0xffff => {
+                panic!("unimplemented: interrupt enable register")
+            }
+
+            // This match is exhaustive but rustc doesn't check that for integer matches.
+            _ => unreachable!(),
         }
     }
 }
