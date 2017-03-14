@@ -34,7 +34,10 @@ fn main() {
         ("run", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
             let rom = read_rom_file(rom_path);
-            let instruction_count = matches.value_of("INSTRUCTIONS").unwrap().parse().unwrap();
+            let instruction_count = check_error(
+                matches.value_of("INSTRUCTIONS").unwrap().parse(),
+                "Couldn't parse instruction count",
+            );
             let mut cpu = Cpu::new(rom);
             cpu.step_n(instruction_count);
         }
