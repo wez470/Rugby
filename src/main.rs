@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate bitflags;
 extern crate clap;
 
 use cpu::Cpu;
@@ -7,6 +9,7 @@ use clap::{Arg, App, AppSettings};
 use std::process::exit;
 use std::fmt::Display;
 
+mod cartridge;
 mod cpu;
 mod reg_16;
 
