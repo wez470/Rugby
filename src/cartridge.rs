@@ -1,50 +1,51 @@
 use std::fmt;
+use std::ops::Range;
 
-/// The cartridge header takes up the range from 0x100 to 0x150 (exclusive).
-const HEADER_SIZE: usize = 0x150 - 0x100;
+const HEADER_RANGE: Range<usize> = 0x100..0x150;
+const HEADER_SIZE: usize = HEADER_RANGE.end - HEADER_RANGE.start;
 
 #[derive(Clone, Debug, PartialEq)]
-struct CartHeader {
+pub struct CartHeader {
     /// The title of the game. At most 16 bytes.
-    title: String,
+    pub title: String,
 
     /// Specifies what kind of hardware is inside the cartridge, including memory bank controllers
     /// (MBC), RAM, etc.
-    cart_type: CartType,
+    pub cart_type: CartType,
 
     /// The size in bytes of the ROM in the cartridge.
-    rom_size: usize,
+    pub rom_size: usize,
 
     /// The size in bytes of the RAM in the cartridge.
-    ram_size: usize,
+    pub ram_size: usize,
 
     /// The level of Game Boy Color support the game has or requires.
-    gbc_flag: GbcFlag,
+    pub gbc_flag: GbcFlag,
 
     /// The level of Super Game Boy support the game has.
-    sgb_flag: SgbFlag,
+    pub sgb_flag: SgbFlag,
 
     /// Only present in newer cartridges.
-    manufacturer_code: Option<String>,
+    pub manufacturer_code: Option<String>,
 
     /// Indicates the company or publisher of the game.
-    licensee_code: LicenseeCode,
+    pub licensee_code: LicenseeCode,
 
     /// Indicates whether the cartridge is supposed to be sold in Japan or outside Japan.
-    destination_code: DestinationCode,
+    pub destination_code: DestinationCode,
 
     /// Some games have more than one version, and this byte indicates that. Usually zero.
-    rom_version: u8,
+    pub rom_version: u8,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-struct CartType {
-    mbc: MbcType,
-    hardware: CartHardware,
+pub struct CartType {
+    pub mbc: MbcType,
+    pub hardware: CartHardware,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum MbcType {
+pub enum MbcType {
     /// Plain ROM without an MBC.
     NoMbc,
     Mbc1,
@@ -61,7 +62,7 @@ enum MbcType {
 }
 
 bitflags! {
-    flags CartHardware: u8 {
+    pub flags CartHardware: u8 {
         const NONE          = 0,
         const RAM           = 1 << 0,
         const TIMER         = 1 << 1,
@@ -73,7 +74,7 @@ bitflags! {
 
 /// Represents the level of Game Boy Color support the game supports or requires.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum GbcFlag {
+pub enum GbcFlag {
     /// A GB game with no GBC support.
     Unsupported,
 
@@ -86,7 +87,7 @@ enum GbcFlag {
 
 /// Represents the level of Super Game Boy support the game supports.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum SgbFlag {
+pub enum SgbFlag {
     /// A GB or GBC game with no SGB support.
     Unsupported,
 
@@ -96,7 +97,7 @@ enum SgbFlag {
 
 /// Indicates the company or publisher of the game.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum LicenseeCode {
+pub enum LicenseeCode {
     /// A single byte licensee code, used in older cartridges.
     ///
     /// This will never be 0x33 because that value signals that the newer 2-byte code is used
@@ -109,13 +110,13 @@ enum LicenseeCode {
 
 /// Indicates whether the cartridge is supposed to be sold in Japan or outside Japan.
 #[derive(Clone, Copy, Debug, PartialEq)]
-enum DestinationCode {
+pub enum DestinationCode {
     Japan,
     International,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-enum HeaderParseError {
+pub enum HeaderParseError {
     InvalidCartType(u8),
     InvalidDestinationCode(u8),
     InvalidHeaderSize(usize),
@@ -126,9 +127,14 @@ enum HeaderParseError {
 }
 
 impl CartHeader {
-    /// Parse a cartridge header out of a cartridge. This must be passed exactly the range from
-    /// 0x100 to 0x14F (inclusive) from the cartridge data, which is 0x50 (80) bytes.
-    fn from_header_bytes(bytes: &[u8]) -> Result<Self, HeaderParseError> {
+    /// Parse the cartridge header from the given ROM.
+    pub fn from_rom(rom: &[u8]) -> Result<Self, HeaderParseError> {
+        Self::from_header_bytes(&rom[HEADER_RANGE])
+    }
+
+    /// Parse a cartridge header. This must be passed exactly the range from 0x100 to 0x14F
+    /// (inclusive) from the cartridge data, which is 0x50 (80) bytes.
+    pub fn from_header_bytes(bytes: &[u8]) -> Result<Self, HeaderParseError> {
         if bytes.len() != HEADER_SIZE {
             return Err(HeaderParseError::InvalidHeaderSize(bytes.len()));
         }
