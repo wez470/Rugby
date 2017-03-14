@@ -154,9 +154,9 @@ impl CartHeader {
         } else {
             // For GBC games, the first 11 bytes are used for the game title and the next 4 bytes
             // are used for the manufacturer code.
-            let manufacturer_code = String::from_utf8(bytes[0x40..0x43].to_vec())
+            let manufacturer_code = String::from_utf8(bytes[0x3F..0x43].to_vec())
                 .map_err(|e| HeaderParseError::InvalidManufacturerCodeUtf8(e.into_bytes()))?;
-            (&bytes[0x34..0x40], Some(manufacturer_code))
+            (&bytes[0x34..0x3F], Some(manufacturer_code))
         };
 
         // Ignore trailing null bytes.
@@ -179,7 +179,7 @@ impl CartHeader {
             LicenseeCode::New([bytes[0x44], bytes[0x45]])
         };
 
-        let cart_type = CartType::from_header_byte(bytes[47])?;
+        let cart_type = CartType::from_header_byte(bytes[0x47])?;
 
         let rom_size = match bytes[0x48] {
             n @ 0x00...0x08 => (32 * 1024) << n, // 32 KB << n
