@@ -1,8 +1,4 @@
 use std::fmt;
-use std::ops::Range;
-
-const HEADER_RANGE: Range<usize> = 0x100..0x150;
-const HEADER_SIZE: usize = HEADER_RANGE.end - HEADER_RANGE.start;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CartHeader {
@@ -119,25 +115,18 @@ pub enum DestinationCode {
 pub enum HeaderParseError {
     InvalidCartType(u8),
     InvalidDestinationCode(u8),
-    InvalidHeaderSize(usize),
     InvalidManufacturerCodeUtf8(Vec<u8>),
     InvalidRamSize(u8),
     InvalidRomSize(u8),
     InvalidTitleUtf8(Vec<u8>),
+    RomTooShort(usize),
 }
 
 impl CartHeader {
-    /// Parse the cartridge header from the given ROM.
+    /// Parse the cartridge header from the given ROM. The header is in the range 0x100..0x150, so
+    /// the input slice must be at least large enough to contain that.
     pub fn from_rom(rom: &[u8]) -> Result<Self, HeaderParseError> {
-        Self::from_header_bytes(&rom[HEADER_RANGE])
-    }
-
-    /// Parse a cartridge header. This must be passed exactly the range from 0x100 to 0x14F
-    /// (inclusive) from the cartridge data, which is 0x50 (80) bytes.
-    pub fn from_header_bytes(bytes: &[u8]) -> Result<Self, HeaderParseError> {
-        if bytes.len() != HEADER_SIZE {
-            return Err(HeaderParseError::InvalidHeaderSize(bytes.len()));
-        }
+        let bytes = rom.get(0x100..0x150).ok_or(HeaderParseError::RomTooShort(rom.len()))?;
 
         // The last byte of the title is used to determine if this is a Game Boy Color game. This
         // GBC flag uses byts which aren't valid ASCII, so we know this isn't actually part of the
@@ -272,12 +261,12 @@ impl fmt::Display for HeaderParseError {
                 writeln!(f, "invalid \"RAM size\" specification: {}", b),
             InvalidRomSize(b) =>
                 writeln!(f, "invalid \"ROM size\" specification: {}", b),
-            InvalidHeaderSize(n) =>
-                writeln!(f, "invalid cartridge header size: {}, should be {}", n, HEADER_SIZE),
             InvalidManufacturerCodeUtf8(ref bytes) =>
                 writeln!(f, "manufacturer code was not valid UTF-8: {:?}", bytes),
             InvalidTitleUtf8(ref bytes) =>
                 writeln!(f, "cartridge title was not valid UTF-8: {:?}", bytes),
+            RomTooShort(len) =>
+                writeln!(f, "cartridge had length {} which is too short to contain a header", len),
         }
     }
 }
