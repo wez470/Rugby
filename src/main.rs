@@ -61,11 +61,8 @@ fn read_rom_file<P: AsRef<Path>>(path: P) -> Box<[u8]> {
 }
 
 fn check_error<T, E: Display>(res: Result<T, E>, message: &'static str) -> T {
-    match res {
-        Ok(r) => r,
-        Err(e) => {
-            println!("{}: {}", message, e);
-            exit(1);
-        }
-    }
+    res.unwrap_or_else(|e| {
+        println!("{}: {}", message, e);
+        exit(1);
+    })
 }
