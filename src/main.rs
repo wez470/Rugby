@@ -10,7 +10,7 @@ use std::io::Read;
 use std::path::Path;
 use std::process::exit;
 
-mod cartridge;
+mod cart_header;
 mod cpu;
 mod reg_16;
 
@@ -46,7 +46,7 @@ fn main() {
             let rom_path = matches.value_of("ROM").unwrap();
             let rom = read_rom_file(rom_path);
             let cart_header = check_error(
-                cartridge::CartHeader::from_rom(&rom),
+                cart_header::CartHeader::from_rom(&rom),
                 "Couldn't parse cartridge header",
             );
             println!("{:#?}", cart_header);
