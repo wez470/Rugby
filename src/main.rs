@@ -4,12 +4,14 @@ extern crate clap;
 
 use clap::{Arg, App, AppSettings, SubCommand};
 use cpu::Cpu;
+use cart::Cart;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::process::exit;
 
+mod cart;
 mod cart_header;
 mod cpu;
 mod reg_16;
@@ -38,7 +40,12 @@ fn main() {
                 matches.value_of("INSTRUCTIONS").unwrap().parse(),
                 "Couldn't parse instruction count",
             );
-            let mut cpu = Cpu::new(rom);
+            let cart_header = check_error(
+                cart_header::CartHeader::from_rom(&rom),
+                "Couldn't parse cartridge header",
+            );
+            let cart = Cart::new(rom, &cart_header);
+            let mut cpu = Cpu::new(cart);
             cpu.step_n(instruction_count);
         }
 

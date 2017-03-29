@@ -1,5 +1,6 @@
 use reg_16::Register;
 use self::inst::{Cond, Inst, Operand8, Operand16};
+use cart::Cart;
 
 mod inst;
 
@@ -72,8 +73,8 @@ pub struct Cpu {
     /// Video RAM internal to the Gameboy.
     video_ram: Box<[u8]>,
 
-    /// ROM (game cartridge).
-    rom: Box<[u8]>,
+    /// Game cartridge.
+    cart: Cart,
 
     /// The opcode of the currently-executing instruction.
     current_opcode: u8,
@@ -100,7 +101,7 @@ pub struct Cpu {
 }
 
 impl Cpu {
-    pub fn new(rom: Box<[u8]>) -> Cpu {
+    pub fn new(cart: Cart) -> Cpu {
         let mut cpu = Cpu {
             reg_af: Register::default(),
             reg_bc: Register::default(),
@@ -111,7 +112,7 @@ impl Cpu {
             work_ram: Box::new([0; WORK_RAM_SIZE]),
             high_ram: Box::new([0; HIGH_RAM_SIZE]),
             video_ram: Box::new([0; VIDEO_RAM_SIZE]),
-            rom: rom,
+            cart: cart,
             current_opcode: 0,
             cycles: 0,
             interrupts_enabled: false,
@@ -791,7 +792,7 @@ impl Cpu {
     fn read_mem(&self, addr: u16) -> u8 {
         match addr {
             // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3FFF => self.rom[addr as usize],
+            0x0000...0x3FFF => self.cart.rom[addr as usize],
 
             // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
             0x4000...0x7FFF => {
@@ -932,7 +933,7 @@ impl Cpu {
 
             0x44 => {
                 // FIXME: Hilarious hacks.
-                let title = &self.rom[0x0134..0x0144];
+                let title = &self.cart.rom[0x0134..0x0144];
                 if title.starts_with(b"TETRIS") {
                     148
                 } else if title.starts_with(b"POKEMON RED") {
