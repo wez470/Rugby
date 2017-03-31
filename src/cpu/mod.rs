@@ -792,7 +792,7 @@ impl Cpu {
     fn read_mem(&self, addr: u16) -> u8 {
         match addr {
             // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3FFF => self.cart.rom[addr as usize],
+            0x0000...0x3FFF => self.cart.read(addr),
 
             // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
             0x4000...0x7FFF => {
@@ -933,12 +933,12 @@ impl Cpu {
 
             0x44 => {
                 // FIXME: Hilarious hacks.
-                let title = &self.cart.rom[0x0134..0x0144];
-                if title.starts_with(b"TETRIS") {
+                let title = &self.cart.title;
+                if title.starts_with("TETRIS") {
                     148
-                } else if title.starts_with(b"POKEMON RED") {
+                } else if title.starts_with("POKEMON RED") {
                     145
-                } else if title.starts_with(b"CPU_INSTRS") {
+                } else if title.starts_with("CPU_INSTRS") {
                     144
                 } else {
                     unimplemented!()

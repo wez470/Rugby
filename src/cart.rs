@@ -34,10 +34,12 @@ enum RomRamMode {
 
 #[derive(Clone, Debug)]
 pub struct Cart {
-    // TODO: Make methods to access this and remove pub access
-    pub rom: Box<[u8]>,
+    rom: Box<[u8]>,
     ram: Box<[u8]>,
     mbc: Mbc,
+    // FIXME: This is only being used in the read_io_port function as a hack to return proper
+    // values for the current game
+    pub title: String,
 }
 
 impl Cart {
@@ -46,6 +48,11 @@ impl Cart {
             rom: rom,
             ram: vec![0; cart_header.ram_size].into_boxed_slice(),
             mbc: Mbc::new(cart_header.cart_type.mbc),
+            title: cart_header.title.clone(),
         }
+    }
+
+    pub fn read(&self, addr: u16) -> u8 {
+        self.rom[addr as usize]
     }
 }
