@@ -1,5 +1,7 @@
 use cart_header::{CartHeader, MbcType};
 
+const ROM_BANK_SIZE: usize = 0x4000;
+
 #[derive(Clone, Debug)]
 enum Mbc {
     None,
@@ -53,6 +55,17 @@ impl Cart {
     }
 
     pub fn read(&self, addr: u16) -> u8 {
-        self.rom[addr as usize]
+        match self.mbc {
+            Mbc::None => self.rom[addr as usize],
+            Mbc::Mbc1 {rom_ram_mode, ram_enabled, rom_bank, ram_bank} => self.read_mbc_1(addr, rom_bank),
+        }
+    }
+
+    fn read_mbc_1(&self, addr: u16, rom_bank: u8) -> u8 {
+        let mut address = addr as usize;
+        if address >= 0x4000 && address < 0x8000 {
+            address = (address - 0x4000) + (rom_bank as usize * ROM_BANK_SIZE);
+        }
+        self.rom[address]
     }
 }
