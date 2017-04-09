@@ -791,11 +791,9 @@ impl Cpu {
 
     fn read_mem(&self, addr: u16) -> u8 {
         match addr {
-            // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3FFF => self.cart.read(addr),
-
-            // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
-            0x4000...0x7FFF => self.cart.read(addr),
+            // First 16KB is ROM Bank 00 (in cartridge, fixed at bank 00)
+            // Second 16KB are ROM Banks 01..NN (in cartridge, switchable bank number)
+            0x0000...0x7FFF => self.cart.read(addr),
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {

@@ -63,9 +63,14 @@ impl Cart {
 
     fn read_mbc_1(&self, addr: u16, rom_bank: u8) -> u8 {
         let mut address = addr as usize;
-        if address >= 0x4000 && address < 0x8000 {
-            address = (address - 0x4000) + (rom_bank as usize * ROM_BANK_SIZE);
+        if is_switchable_rom_bank(addr) {
+            address = (address - ROM_BANK_SIZE) + (rom_bank as usize * ROM_BANK_SIZE);
         }
         self.rom[address]
     }
+
+}
+
+fn is_switchable_rom_bank(addr: u16) -> bool {
+    return addr >= 0x4000 && addr < 0x8000
 }
