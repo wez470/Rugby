@@ -57,7 +57,7 @@ impl Cart {
     pub fn read(&self, addr: u16) -> u8 {
         match self.mbc {
             Mbc::None => self.rom[addr as usize],
-            Mbc::Mbc1 {rom_ram_mode, ram_enabled, rom_bank, ram_bank} => self.read_mbc_1(addr, rom_bank),
+            Mbc::Mbc1 {rom_bank, ..} => self.read_mbc_1(addr, rom_bank),
         }
     }
 
