@@ -5,25 +5,52 @@ const ROM_BANK_SIZE: usize = 0x4000;
 #[derive(Clone, Debug)]
 enum Mbc {
     None,
-    Mbc1 {
-        rom_ram_mode: RomRamMode,
-        ram_enabled: bool,
-        rom_bank: u8,
-        ram_bank: u8,
-    },
+    Mbc1(Mbc1),
 }
 
 impl Mbc {
     fn new(mbc_type: MbcType) -> Mbc {
         match mbc_type {
             MbcType::NoMbc => Mbc::None,
-            MbcType::Mbc1 => Mbc::Mbc1 {
+            MbcType::Mbc1 => Mbc::Mbc1(Mbc1 {
                 rom_ram_mode: RomRamMode::Rom,
                 ram_enabled: false,
                 rom_bank: 1,
                 ram_bank: 0,
-            },
+            }),
             _ => panic!("Unimplemented Mbc Type!"),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+struct Mbc1 {
+    rom_ram_mode: RomRamMode,
+    ram_enabled: bool,
+    rom_bank: u8,
+    ram_bank: u8,
+}
+
+impl Mbc1 {
+    fn read(&self, rom: &[u8], ram: &[u8], addr: u16) -> u8 {
+        let mut address = addr as usize;
+        if is_switchable_rom_bank(addr) {
+            address = (address - ROM_BANK_SIZE) + (self.rom_bank as usize * ROM_BANK_SIZE);
+        }
+        rom[address]
+    }
+
+    fn write(&mut self, ram: &mut [u8], addr: u16, val: u8) {
+        match addr {
+            0x2000...0x3FFF => {
+                let mut lower_5_bits = val & 0b11111;
+                if lower_5_bits == 0 {
+                    lower_5_bits = 1;
+                }
+                self.rom_bank &= 0b11100000;
+                self.rom_bank |= lower_5_bits;
+            }
+            _ => panic!("Unimplemented MBC1 write address"),
         }
     }
 }
@@ -57,16 +84,15 @@ impl Cart {
     pub fn read(&self, addr: u16) -> u8 {
         match self.mbc {
             Mbc::None => self.rom[addr as usize],
-            Mbc::Mbc1 { rom_bank, .. } => self.read_mbc_1(addr, rom_bank),
+            Mbc::Mbc1(ref mbc1) => mbc1.read(&self.rom, &self.ram, addr),
         }
     }
 
-    fn read_mbc_1(&self, addr: u16, rom_bank: u8) -> u8 {
-        let mut address = addr as usize;
-        if is_switchable_rom_bank(addr) {
-            address = (address - ROM_BANK_SIZE) + (rom_bank as usize * ROM_BANK_SIZE);
+    pub fn write(&mut self, addr: u16, val: u8) {
+        match self.mbc {
+            Mbc::None => {},
+            Mbc::Mbc1(ref mut mbc1) => mbc1.write(&mut self.ram, addr, val),
         }
-        self.rom[address]
     }
 }
 

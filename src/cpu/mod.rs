@@ -191,7 +191,7 @@ impl Cpu {
 
     fn execute(&mut self, inst: Inst) {
         match inst {
-            Inst::Nop => {},
+            Inst::Nop => {}
             Inst::Stop => panic!("unimplemented: STOP"),
             Inst::Halt => panic!("unimplemented: HALT"),
             Inst::Di => self.pending_disable_interrupts = true,
@@ -855,7 +855,7 @@ impl Cpu {
         match addr {
             // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
             0x0000...0x3FFF => {
-                panic!("unimplemented: writes to this range control memory bank controllers")
+                self.cart.write(addr, val);
             }
 
             // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
