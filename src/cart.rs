@@ -34,10 +34,18 @@ struct Mbc1 {
 impl Mbc1 {
     fn read(&self, rom: &[u8], ram: &[u8], addr: u16) -> u8 {
         let mut address = addr as usize;
-        if is_switchable_rom_bank(addr) {
-            address = (address - ROM_BANK_SIZE) + (self.rom_bank as usize * ROM_BANK_SIZE);
+        match address {
+            // ROM Bank 0
+            0x0000...0x3FFF => rom[address],
+
+            // Switchable ROM bank
+            0x4000...0x7FFF => {
+                address = (address - ROM_BANK_SIZE) + (self.rom_bank as usize * ROM_BANK_SIZE);
+                rom[address]
+            }
+
+            _ => panic!("Unimplemented MBC1 read at address: {}", addr),
         }
-        rom[address]
     }
 
     fn write(&mut self, ram: &mut [u8], addr: u16, val: u8) {
@@ -63,10 +71,6 @@ impl Mbc1 {
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
         }
     }
-}
-
-fn is_switchable_rom_bank(addr: u16) -> bool {
-    addr >= 0x4000 && addr < 0x8000
 }
 
 #[derive(Clone, Copy, Debug)]
