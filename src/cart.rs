@@ -50,6 +50,16 @@ impl Mbc1 {
                 self.rom_bank &= 0b11100000;
                 self.rom_bank |= lower_5_bits;
             }
+            0x4000...0x5FFF => {
+                match self.rom_ram_mode {
+                    RomRamMode::Rom => {
+                        let mut upper_2_bits = val & 0b01100000;
+                        self.rom_bank &= 0b10011111;
+                        self.rom_bank |= upper_2_bits;
+                    }
+                    _ => panic!("Unimplemented MBC1 write"),
+                }
+            }
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
         }
     }
