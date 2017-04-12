@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate bitflags;
 extern crate clap;
+extern crate rand;
 
 use clap::{Arg, App, AppSettings, SubCommand};
 use cpu::Cpu;

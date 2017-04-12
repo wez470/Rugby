@@ -6,3 +6,4 @@ version = "0.1.0"
 [dependencies]
 bitflags = "0.8.0"
 clap = "2.19.0"
+rand = "0.3.15"

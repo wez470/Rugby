@@ -926,6 +926,11 @@ impl Cpu {
 
     fn read_io_port(&self, port: u8) -> u8 {
         match port {
+            0x00 => {
+                // FIXME: This is just a hack to get farther in Tetris.
+                0
+            }
+
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register,
 
@@ -938,7 +943,7 @@ impl Cpu {
                 // FIXME: Hilarious hacks.
                 let title = &self.cart.title;
                 if title.starts_with("TETRIS") {
-                    148
+                    if ::rand::random() { 145 } else { 148 }
                 } else if title.starts_with("POKEMON RED") {
                     145
                 } else if title.starts_with("CPU_INSTRS") {
@@ -954,6 +959,8 @@ impl Cpu {
 
     fn write_io_port(&mut self, port: u8, val: u8) {
         match port {
+            0x00 => println!("  unimplemented: write to joypad I/O port"),
+
             0x01 | 0x02 => println!("  unimplemented: write to serial I/O port"),
 
             0x06 | 0x07 => println!("  unimplemented: write to timer I/O port"),
@@ -961,11 +968,19 @@ impl Cpu {
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
 
-            0x24 | 0x25 | 0x26 => println!("  unimplemented: write to sound I/O port"),
+            0x10 | 0x12 | 0x14 | 0x17 | 0x19 | 0x1A | 0x21 | 0x23 | 0x24 | 0x25 | 0x26 => {
+                println!("  unimplemented: write to sound I/O port");
+            }
 
             0x40 | 0x41 | 0x42 | 0x43 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
                 println!("  unimplemented: write to LCD I/O port");
             }
+
+            // Tetris seemingly accidentally writes to this port when zeroing the high RAM. It
+            // seems to be an undocumented port, so we'll just ignore the write.
+            //
+            // TODO: Can we figure out whether or not this port is used for anything?
+            0x7F => {}
 
             _ => panic!("unimplemented: write to I/O port 0x{:02X}", port),
         }
