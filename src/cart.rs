@@ -50,6 +50,7 @@ impl Mbc1 {
 
     fn write(&mut self, ram: &mut [u8], addr: u16, val: u8) {
         match addr {
+            // ROM bank lower bits write
             0x2000...0x3FFF => {
                 let mut lower_5_bits = val & 0b11111;
                 if lower_5_bits == 0 {
@@ -58,6 +59,8 @@ impl Mbc1 {
                 self.rom_bank &= 0b11100000;
                 self.rom_bank |= lower_5_bits;
             }
+
+            // RAM Bank / Upper ROM bank bits write
             0x4000...0x5FFF => {
                 match self.rom_ram_mode {
                     RomRamMode::Rom => {
@@ -68,6 +71,7 @@ impl Mbc1 {
                     _ => panic!("Unimplemented MBC1 write"),
                 }
             }
+
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
         }
     }
