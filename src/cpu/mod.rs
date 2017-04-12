@@ -8,6 +8,7 @@ mod inst;
 const WORK_RAM_SIZE: usize = 8 * 1024; // 8 KB
 const HIGH_RAM_SIZE: usize = 127; // For the address range 0xFF80-0xFFFE (inclusive).
 const VIDEO_RAM_SIZE: usize = 8 * 1024; // 8 KB
+const SPRITE_RAM_SIZE: usize = 160; // For the address range 0xFE00-0xFE9F (inclusive).
 
 #[derive(Clone, Copy, Debug)]
 pub enum Reg8 {
@@ -73,6 +74,9 @@ pub struct Cpu {
     /// Video RAM internal to the Gameboy.
     video_ram: Box<[u8]>,
 
+    /// Sprite RAM internal to the Gameboy, also known as OAM.
+    sprite_ram: Box<[u8]>,
+
     /// Game cartridge.
     cart: Cart,
 
@@ -112,6 +116,7 @@ impl Cpu {
             work_ram: Box::new([0; WORK_RAM_SIZE]),
             high_ram: Box::new([0; HIGH_RAM_SIZE]),
             video_ram: Box::new([0; VIDEO_RAM_SIZE]),
+            sprite_ram: Box::new([0; SPRITE_RAM_SIZE]),
             cart: cart,
             current_opcode: 0,
             cycles: 0,
@@ -823,7 +828,8 @@ impl Cpu {
 
             // Sprite Attribute Table (OAM)
             0xFE00...0xFE9F => {
-                panic!("unimplemented: sprite memory (OAM)")
+                let i = (addr - 0xFE00) as usize;
+                self.sprite_ram[i]
             }
 
             // Not Usable
@@ -891,7 +897,8 @@ impl Cpu {
 
             // Sprite Attribute Table (OAM)
             0xFE00...0xFE9F => {
-                panic!("unimplemented: sprite memory (OAM)")
+                let i = (addr - 0xFE00) as usize;
+                self.sprite_ram[i] = val;
             }
 
             // Not Usable
