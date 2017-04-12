@@ -50,7 +50,7 @@ impl Mbc1 {
                 self.rom_bank &= 0b11100000;
                 self.rom_bank |= lower_5_bits;
             }
-            _ => panic!("Unimplemented MBC1 write address"),
+            _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
         }
     }
 }

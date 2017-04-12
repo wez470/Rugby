@@ -948,6 +948,8 @@ impl Cpu {
                     145
                 } else if title.starts_with("CPU_INSTRS") {
                     144
+                } else if title.starts_with("ZELDA") {
+                    145
                 } else {
                     unimplemented!()
                 }
@@ -972,7 +974,7 @@ impl Cpu {
                 println!("  unimplemented: write to sound I/O port");
             }
 
-            0x40 | 0x41 | 0x42 | 0x43 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
+            0x40 | 0x41 | 0x42 | 0x43 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
                 println!("  unimplemented: write to LCD I/O port");
             }
 
