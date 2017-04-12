@@ -68,7 +68,6 @@ impl Cart {
         }
         self.rom[address]
     }
-
 }
 
 fn is_switchable_rom_bank(addr: u16) -> bool {
