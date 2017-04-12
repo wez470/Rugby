@@ -65,6 +65,10 @@ impl Mbc1 {
     }
 }
 
+fn is_switchable_rom_bank(addr: u16) -> bool {
+    addr >= 0x4000 && addr < 0x8000
+}
+
 #[derive(Clone, Copy, Debug)]
 enum RomRamMode {
     Rom,
@@ -104,8 +108,4 @@ impl Cart {
             Mbc::Mbc1(ref mut mbc1) => mbc1.write(&mut self.ram, addr, val),
         }
     }
-}
-
-fn is_switchable_rom_bank(addr: u16) -> bool {
-    addr >= 0x4000 && addr < 0x8000
 }
