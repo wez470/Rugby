@@ -57,7 +57,7 @@ impl Cart {
     pub fn read(&self, addr: u16) -> u8 {
         match self.mbc {
             Mbc::None => self.rom[addr as usize],
-            Mbc::Mbc1 {rom_bank, ..} => self.read_mbc_1(addr, rom_bank),
+            Mbc::Mbc1 { rom_bank, .. } => self.read_mbc_1(addr, rom_bank),
         }
     }
 
@@ -71,5 +71,5 @@ impl Cart {
 }
 
 fn is_switchable_rom_bank(addr: u16) -> bool {
-    return addr >= 0x4000 && addr < 0x8000
+    addr >= 0x4000 && addr < 0x8000
 }
