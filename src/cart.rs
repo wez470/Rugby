@@ -50,6 +50,11 @@ impl Mbc1 {
 
     fn write(&mut self, ram: &mut [u8], addr: u16, val: u8) {
         match addr {
+            // RAM Enable
+            0x0000...0x1FFF => {
+                self.ram_enabled = (val & 0b00001111) == 0x0A
+            }
+
             // ROM bank lower bits write
             0x2000...0x3FFF => {
                 let mut lower_5_bits = val & 0b11111;
