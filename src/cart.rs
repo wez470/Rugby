@@ -73,9 +73,26 @@ impl Mbc1 {
                         self.rom_bank &= 0b10011111;
                         self.rom_bank |= upper_2_bits;
                     }
-                    _ => panic!("Unimplemented MBC1 write"),
+                    RomRamMode::Ram => {
+                        self.ram_bank = val & 0b00000011;
+                    }
                 }
             }
+
+            // ROM / RAM Mode
+            0x6000...0x7FFF => {
+                let mode_val = val & 0b00000001;
+                if mode_val == 0 {
+                    self.rom_ram_mode = RomRamMode::Rom;
+                }
+                else {
+                    self.rom_ram_mode = RomRamMode::Ram;
+                }
+            }
+
+            // Switchable RAM bank
+            //0xA000...0xBFFF => {
+            //}
 
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
         }
