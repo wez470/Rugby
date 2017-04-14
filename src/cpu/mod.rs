@@ -807,9 +807,7 @@ impl Cpu {
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
-            0xA000...0xBFFF => {
-                panic!("unimplemented: cartridge RAM")
-            }
+            0xA000...0xBFFF => self.cart.read(addr),
 
             // C000-CFFF: 4KB Work RAM Bank 0 (WRAM)
             // D000-DFFF: 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
@@ -859,15 +857,8 @@ impl Cpu {
         println!("  {:04X} <== {:02X}", addr, val);
 
         match addr {
-            // 16KB ROM Bank 00 (in cartridge, fixed at bank 00)
-            0x0000...0x3FFF => {
-                self.cart.write(addr, val);
-            }
-
-            // 16KB ROM Bank 01..NN (in cartridge, switchable bank number)
-            0x4000...0x7FFF => {
-                panic!("unimplemented: writes to this range control memory bank controllers")
-            }
+            // 32KB cartridge write
+            0x0000...0x7FFF => self.cart.write(addr, val),
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
@@ -876,9 +867,7 @@ impl Cpu {
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
-            0xA000...0xBFFF => {
-                panic!("unimplemented: cartridge RAM")
-            }
+            0xA000...0xBFFF => self.cart.write(addr, val),
 
             // C000-CFFF: 4KB Work RAM Bank 0 (WRAM)
             // D000-DFFF: 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
