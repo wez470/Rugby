@@ -1,6 +1,7 @@
 use cart_header::{CartHeader, MbcType};
 
 const ROM_BANK_SIZE: usize = 0x4000;
+const MBC_1_RAM_BANK_SIZE: usize = 0x2000;
 
 #[derive(Clone, Debug)]
 enum Mbc {
@@ -40,7 +41,11 @@ impl Mbc1 {
 
             // Switchable ROM bank
             0x4000...0x7FFF => {
-                address = (address - ROM_BANK_SIZE) + (self.rom_bank as usize * ROM_BANK_SIZE);
+                let mut bank = self.rom_bank as usize;
+                if self.rom_ram_mode == RomRamMode::Ram {
+                    bank &= 0b11111
+                }
+                address = (address - ROM_BANK_SIZE) + (bank * ROM_BANK_SIZE);
                 rom[address]
             }
 
@@ -52,7 +57,7 @@ impl Mbc1 {
         match addr {
             // RAM Enable
             0x0000...0x1FFF => {
-                self.ram_enabled = (val & 0b00001111) == 0x0A
+                self.ram_enabled = (val & 0b1111) == 0x0A
             }
 
             // ROM bank lower bits write
@@ -69,19 +74,19 @@ impl Mbc1 {
             0x4000...0x5FFF => {
                 match self.rom_ram_mode {
                     RomRamMode::Rom => {
-                        let mut upper_2_bits = val & 0b01100000;
+                        let upper_2_bits = val & 0b1100000;
                         self.rom_bank &= 0b10011111;
                         self.rom_bank |= upper_2_bits;
                     }
                     RomRamMode::Ram => {
-                        self.ram_bank = val & 0b00000011;
+                        self.ram_bank = val & 0b11;
                     }
                 }
             }
 
             // ROM / RAM Mode
             0x6000...0x7FFF => {
-                let mode_val = val & 0b00000001;
+                let mode_val = val & 0b1;
                 if mode_val == 0 {
                     self.rom_ram_mode = RomRamMode::Rom;
                 }
@@ -91,15 +96,21 @@ impl Mbc1 {
             }
 
             // Switchable RAM bank
-            //0xA000...0xBFFF => {
-            //}
+            0xA000...0xBFFF => {
+                let mut bank = self.ram_bank as usize;
+                if self.rom_ram_mode == RomRamMode::Rom {
+                    bank = 0;
+                }
+                let ram_index = (addr - 0xA000) as usize;
+                ram[ram_index + bank * MBC_1_RAM_BANK_SIZE] = val;
+            }
 
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
         }
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum RomRamMode {
     Rom,
     Ram,
