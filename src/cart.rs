@@ -49,6 +49,16 @@ impl Mbc1 {
                 rom[address]
             }
 
+            // Switchable RAM bank
+            0xA000...0xBFFF => {
+                let mut bank = self.ram_bank as usize;
+                if self.rom_ram_mode == RomRamMode::Rom {
+                    bank = 0;
+                }
+                let ram_index = (addr - 0xA000) as usize;
+                ram[ram_index + bank * MBC_1_RAM_BANK_SIZE]
+            }
+
             _ => panic!("Unimplemented MBC1 read at address: {}", addr),
         }
     }
