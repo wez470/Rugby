@@ -1,7 +1,7 @@
 use cart_header::{CartHeader, MbcType};
 
 const ROM_BANK_SIZE: usize = 0x4000;
-const MBC_1_RAM_BANK_SIZE: usize = 0x2000;
+const RAM_BANK_SIZE: usize = 0x2000;
 
 #[derive(Clone, Debug)]
 enum Mbc {
@@ -51,12 +51,15 @@ impl Mbc1 {
 
             // Switchable RAM bank
             0xA000...0xBFFF => {
+                if !self.ram_enabled {
+                    panic!("Attempt to read from external RAM bank without RAM enabled");
+                }
                 let mut bank = self.ram_bank as usize;
                 if self.rom_ram_mode == RomRamMode::Rom {
                     bank = 0;
                 }
                 let ram_index = (addr - 0xA000) as usize;
-                ram[ram_index + bank * MBC_1_RAM_BANK_SIZE]
+                ram[ram_index + bank * RAM_BANK_SIZE]
             }
 
             _ => panic!("Unimplemented MBC1 read at address: {}", addr),
@@ -107,12 +110,15 @@ impl Mbc1 {
 
             // Switchable RAM bank
             0xA000...0xBFFF => {
+                if !self.ram_enabled {
+                    panic!("Attempt to write external RAM bank without RAM enabled");
+                }
                 let mut bank = self.ram_bank as usize;
                 if self.rom_ram_mode == RomRamMode::Rom {
                     bank = 0;
                 }
                 let ram_index = (addr - 0xA000) as usize;
-                ram[ram_index + bank * MBC_1_RAM_BANK_SIZE] = val;
+                ram[ram_index + bank * RAM_BANK_SIZE] = val;
             }
 
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
