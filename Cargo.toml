@@ -6,4 +6,7 @@ version = "0.1.0"
 [dependencies]
 bitflags = "0.8.0"
 clap = "2.19.0"
+glium = "0.15"
+glium_sdl2 = "0.13"
 rand = "0.3.15"
+sdl2 = "0.27"
