@@ -89,32 +89,30 @@ fn check_error<T, E: Display>(res: Result<T, E>, message: &'static str) -> T {
 
 fn open_window() {
     use glium_sdl2::DisplayBuild;
+    use glium::Surface;
 
-    let sdl_context = sdl2::init().unwrap();
-    let video_subsystem = sdl_context.video().unwrap();
+    let sdl = check_error(sdl2::init(), "Couldn't initialize SDL2");
+    let video_subsystem = check_error(sdl.video(), "Couldn't initialize SDL2 video subsystem");
 
-    let display = video_subsystem.window("My window", 800, 600)
-        .resizable()
-        .build_glium()
-        .unwrap();
+    let display = check_error(
+        video_subsystem
+            .window("My window", 800, 600)
+            .resizable()
+            .build_glium(),
+        "Couldn't initialize glium",
+    );
 
-    let mut running = true;
-    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut event_pump = check_error(sdl.event_pump(), "Couldn't initialize SDL2 event pump");
 
-    while running {
+    'main: loop {
         let mut target = display.draw();
-        // do drawing here...
-        target.finish().unwrap();
-
-        // Event loop: polls for events sent to all windows
+        target.clear_color(1.0, 1.0, 1.0, 1.0);
+        check_error(target.finish(), "Couldn't swap buffers");
 
         for event in event_pump.poll_iter() {
             use sdl2::event::Event;
-
             match event {
-                Event::Quit { .. } => {
-                    running = false;
-                },
+                Event::Quit { .. } => break 'main,
                 _ => ()
             }
         }
