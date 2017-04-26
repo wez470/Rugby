@@ -1,9 +1,6 @@
 #[macro_use]
 extern crate bitflags;
 extern crate clap;
-#[macro_use]
-extern crate glium;
-extern crate glium_sdl2;
 extern crate rand;
 extern crate sdl2;
 
@@ -35,14 +32,13 @@ fn main() {
             .arg(Arg::with_name("ROM")
                 .required(true)
                 .help("The game rom")))
-        .subcommand(SubCommand::with_name("window"))
         .get_matches();
 
     match app_matches.subcommand() {
         ("run", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
             let rom = read_rom_file(rom_path);
-            let instruction_count = check_error(
+            let instruction_count: usize = check_error(
                 matches.value_of("INSTRUCTIONS").unwrap().parse(),
                 "Couldn't parse instruction count",
             );
@@ -52,7 +48,78 @@ fn main() {
             );
             let cart = Cart::new(rom, &cart_header);
             let mut cpu = Cpu::new(cart);
-            cpu.step_n(instruction_count);
+
+            let sdl = check_error(sdl2::init(), "Couldn't initialize SDL2");
+            let video_subsystem = check_error(sdl.video(), "Couldn't initialize SDL2 video subsystem");
+
+            let window = check_error(
+                video_subsystem
+                    .window("My window", 1024, 1024)
+                    .resizable()
+                    .build(),
+                "Couldn't initialize SDL2 window",
+            );
+
+            let mut renderer = check_error(window.renderer().build(), "Couldn't initialize SDL2 renderer");
+            let mut event_pump = check_error(sdl.event_pump(), "Couldn't initialize SDL2 event pump");
+
+            'main: loop {
+                // TODO(solson): Heavily re-write all of the below code. 'tis the product of a
+                // horrific late-night hacking session.
+                const BPP: usize = 4;
+                const TILE_SIDE: usize = 8;
+                const NUM_TILES: usize = 32;
+                const SIDE: usize = TILE_SIDE * NUM_TILES;
+
+                let mut image = [0u8; SIDE * SIDE * BPP];
+                {
+                    let bg_map = &cpu.video_ram[0x1800..0x1C00];
+                    for tile_row in 0..NUM_TILES {
+                        for tile_col in 0..NUM_TILES {
+                            let tile_i = bg_map[tile_row * NUM_TILES + tile_col] as usize;
+                            let tile = &cpu.video_ram[tile_i * 16..(tile_i * 16 + 16)];
+                            for row in 0..TILE_SIDE {
+                                for col in 0..TILE_SIDE {
+                                    let upper_bit = (tile[row * 2 + 0] >> (TILE_SIDE - col - 1)) & 1;
+                                    let lower_bit = (tile[row * 2 + 1] >> (TILE_SIDE - col - 1)) & 1;
+                                    let tile_color = upper_bit << 1 | lower_bit;
+                                    let image_i = (
+                                        tile_row * SIDE * TILE_SIDE +
+                                        tile_col * TILE_SIDE +
+                                        row * SIDE +
+                                        col
+                                    ) * BPP;
+                                    image[image_i + 2] = GAMEBOY_COLORS[tile_color as usize].rgb().0;
+                                    image[image_i + 1] = GAMEBOY_COLORS[tile_color as usize].rgb().1;
+                                    image[image_i + 0] = GAMEBOY_COLORS[tile_color as usize].rgb().2;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let surface = sdl2::surface::Surface::from_data(
+                    &mut image[..],
+                    SIDE as u32,
+                    SIDE as u32,
+                    (SIDE * BPP) as u32,
+                    sdl2::pixels::PixelFormatEnum::RGB888,
+                ).unwrap();
+                let texture = renderer.create_texture_from_surface(&surface).unwrap();
+
+                renderer.copy(&texture, None, None).unwrap();
+                renderer.present();
+
+                for event in event_pump.poll_iter() {
+                    use sdl2::event::Event;
+                    match event {
+                        Event::Quit { .. } => break 'main,
+                        _ => ()
+                    }
+                }
+
+                cpu.step_n(100);
+            }
         }
 
         ("info", Some(matches)) => {
@@ -63,10 +130,6 @@ fn main() {
                 "Couldn't parse cartridge header",
             );
             println!("{:#?}", cart_header);
-        }
-
-        ("window", Some(_)) => {
-            open_window();
         }
 
         _ => unreachable!(),
@@ -87,34 +150,10 @@ fn check_error<T, E: Display>(res: Result<T, E>, message: &'static str) -> T {
     })
 }
 
-fn open_window() {
-    use glium_sdl2::DisplayBuild;
-    use glium::Surface;
-
-    let sdl = check_error(sdl2::init(), "Couldn't initialize SDL2");
-    let video_subsystem = check_error(sdl.video(), "Couldn't initialize SDL2 video subsystem");
-
-    let display = check_error(
-        video_subsystem
-            .window("My window", 800, 600)
-            .resizable()
-            .build_glium(),
-        "Couldn't initialize glium",
-    );
-
-    let mut event_pump = check_error(sdl.event_pump(), "Couldn't initialize SDL2 event pump");
-
-    'main: loop {
-        let mut target = display.draw();
-        target.clear_color(1.0, 1.0, 1.0, 1.0);
-        check_error(target.finish(), "Couldn't swap buffers");
-
-        for event in event_pump.poll_iter() {
-            use sdl2::event::Event;
-            match event {
-                Event::Quit { .. } => break 'main,
-                _ => ()
-            }
-        }
-    }
-}
+/// The four colors of the original Game Boy screen, from lightest to darkest, in RGB.
+const GAMEBOY_COLORS: [sdl2::pixels::Color; 4] = [
+    sdl2::pixels::Color::RGB(155, 188, 15),
+    sdl2::pixels::Color::RGB(139, 172, 15),
+    sdl2::pixels::Color::RGB(48, 98, 48),
+    sdl2::pixels::Color::RGB(15, 56, 15),
+];

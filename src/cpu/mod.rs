@@ -72,7 +72,8 @@ pub struct Cpu {
     high_ram: Box<[u8]>,
 
     /// Video RAM internal to the Gameboy.
-    video_ram: Box<[u8]>,
+    // TODO(solson): Un-pub.
+    pub video_ram: Box<[u8]>,
 
     /// Sprite RAM internal to the Gameboy, also known as OAM.
     sprite_ram: Box<[u8]>,
