@@ -66,12 +66,12 @@ fn main() {
             'main: loop {
                 // TODO(solson): Heavily re-write all of the below code. 'tis the product of a
                 // horrific late-night hacking session.
-                const BPP: usize = 4;
+                const BYTES_PER_PIXEL: usize = 4;
                 const TILE_SIDE: usize = 8;
                 const NUM_TILES: usize = 32;
                 const SIDE: usize = TILE_SIDE * NUM_TILES;
 
-                let mut image = [0u8; SIDE * SIDE * BPP];
+                let mut image = [0u8; SIDE * SIDE * BYTES_PER_PIXEL];
                 {
                     let bg_map = &cpu.video_ram[0x1800..0x1C00];
                     for tile_row in 0..NUM_TILES {
@@ -88,7 +88,7 @@ fn main() {
                                         tile_col * TILE_SIDE +
                                         row * SIDE +
                                         col
-                                    ) * BPP;
+                                    ) * BYTES_PER_PIXEL;
                                     image[image_i + 2] = GAMEBOY_COLORS[tile_color as usize].rgb().0;
                                     image[image_i + 1] = GAMEBOY_COLORS[tile_color as usize].rgb().1;
                                     image[image_i + 0] = GAMEBOY_COLORS[tile_color as usize].rgb().2;
@@ -102,7 +102,7 @@ fn main() {
                     &mut image[..],
                     SIDE as u32,
                     SIDE as u32,
-                    (SIDE * BPP) as u32,
+                    (SIDE * BYTES_PER_PIXEL) as u32,
                     sdl2::pixels::PixelFormatEnum::RGB888,
                 ).unwrap();
                 let texture = renderer.create_texture_from_surface(&surface).unwrap();
