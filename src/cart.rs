@@ -21,9 +21,8 @@ impl Mbc {
                 ram_bank: 0,
             }),
             MbcType::Mbc3 => Mbc::Mbc3(Mbc3 {
-                rom_ram_mode: RomRamMode::Rom,
-                ram_enabled: false,
                 rom_bank: 1,
+                ram_rtc_enabled: false,
                 ram_rtc_bank: 0,
             }),
             _ => panic!("Unimplemented Mbc Type!"),
@@ -135,9 +134,8 @@ impl Mbc1 {
 
 #[derive(Clone, Debug)]
 struct Mbc3 {
-    rom_ram_mode: RomRamMode,
-    ram_enabled: bool,
     rom_bank: u8,
+    ram_rtc_enabled: bool,
     ram_rtc_bank: u8,
 }
 
@@ -157,18 +155,27 @@ impl Mbc3 {
 
             // Switchable RAM bank
             0xA000...0xBFFF => {
-                if !self.ram_enabled {
-                    panic!("Attempt to read from external RAM bank without RAM enabled");
+                if !self.ram_rtc_enabled {
+                    panic!("Attempt to read from external RAM or RTC without RAM and RTC enabled");
                 }
-                let mut bank = self.ram_rtc_bank as usize;
-                if self.rom_ram_mode == RomRamMode::Rom {
-                    bank = 0;
+
+                let bank = self.ram_rtc_bank as usize;
+                match bank {
+                    // Read from RTC values
+                    0x8...0xC => {
+                        //TODO(wcarlson): Read from RTC values
+                        unimplemented!()
+                    }
+
+                    // Read from RAM bank
+                    _ => {
+                        let ram_index = (addr - 0xA000) as usize;
+                        ram[ram_index + bank * RAM_BANK_SIZE]
+                    }
                 }
-                let ram_index = (addr - 0xA000) as usize;
-                ram[ram_index + bank * RAM_BANK_SIZE]
             }
 
-            _ => panic!("Unimplemented MBC1 read at address: {}", addr),
+            _ => panic!("Unimplemented MBC3 read at address: {}", addr),
         }
     }
 
@@ -176,7 +183,7 @@ impl Mbc3 {
         match addr {
             // RAM Enable
             0x0000...0x1FFF => {
-                self.ram_enabled = (val & 0b1111) == 0x0A
+                self.ram_rtc_enabled = (val & 0b1111) == 0x0A
             }
 
             // ROM bank
@@ -194,28 +201,31 @@ impl Mbc3 {
                 self.ram_rtc_bank = val;
             }
 
-            // ROM / RAM Mode
+            // Latch clock data
             0x6000...0x7FFF => {
-                let mode_val = val & 0b1;
-                if mode_val == 0 {
-                    self.rom_ram_mode = RomRamMode::Rom;
-                }
-                else {
-                    self.rom_ram_mode = RomRamMode::Ram;
-                }
+                //TODO(wcarlson): latch clock data
             }
 
             // Switchable RAM bank
             0xA000...0xBFFF => {
-                if !self.ram_enabled {
-                    panic!("Attempt to write external RAM bank without RAM enabled");
+                if !self.ram_rtc_enabled {
+                    panic!("Attempt to write external RAM or RTC bank without RAM and RTC enabled");
                 }
-                let mut bank = self.ram_rtc_bank as usize;
-                if self.rom_ram_mode == RomRamMode::Rom {
-                    bank = 0;
+
+                let bank = self.ram_rtc_bank as usize;
+                match bank {
+                    // Write to RTC values
+                    0x8...0xC => {
+                        //TODO(wcarlson): Write to RTC values
+                    }
+
+                    // Write to RAM bank
+                    _ => {
+                        let ram_index = (addr - 0xA000) as usize;
+                        ram[ram_index + bank * RAM_BANK_SIZE] = val;
+                    }
                 }
-                let ram_index = (addr - 0xA000) as usize;
-                ram[ram_index + bank * RAM_BANK_SIZE] = val;
+
             }
 
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
@@ -253,7 +263,7 @@ impl Cart {
         match self.mbc {
             Mbc::None => self.rom[addr as usize],
             Mbc::Mbc1(ref mbc1) => mbc1.read(&self.rom, &self.ram, addr),
-            Mbc::Mbc3(ref mbc1) => mbc1.read(&self.rom, &self.ram, addr),
+            Mbc::Mbc3(ref mbc3) => mbc3.read(&self.rom, &self.ram, addr),
         }
     }
 
@@ -261,7 +271,7 @@ impl Cart {
         match self.mbc {
             Mbc::None => {},
             Mbc::Mbc1(ref mut mbc1) => mbc1.write(&mut self.ram, addr, val),
-            Mbc::Mbc3(ref mut mbc1) => mbc1.write(&mut self.ram, addr, val),
+            Mbc::Mbc3(ref mut mbc3) => mbc3.write(&mut self.ram, addr, val),
         }
     }
 }
