@@ -24,6 +24,7 @@ impl Mbc {
                 rom_bank: 1,
                 ram_rtc_enabled: false,
                 ram_rtc_bank: 0,
+                rtc: [0; 5],
             }),
             _ => panic!("Unimplemented Mbc Type!"),
         }
@@ -137,6 +138,7 @@ struct Mbc3 {
     rom_bank: u8,
     ram_rtc_enabled: bool,
     ram_rtc_bank: u8,
+    rtc: [u8; 5],
 }
 
 impl Mbc3 {
