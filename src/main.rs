@@ -12,11 +12,15 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use std::process::exit;
+use std::time::{Instant, Duration};
+use std::thread;
 
 mod cart;
 mod cart_header;
 mod cpu;
 mod reg_16;
+
+const CYCLES_PER_FRAME: usize = 69905;
 
 fn main() {
     let app_matches = App::new("Rustboy")
@@ -62,8 +66,11 @@ fn main() {
 
             let mut renderer = check_error(window.renderer().build(), "Couldn't initialize SDL2 renderer");
             let mut event_pump = check_error(sdl.event_pump(), "Couldn't initialize SDL2 event pump");
+            let frame_duration = Duration::new(0, 16666667); // Duration of a frame at 60 FPS
 
             'main: loop {
+                let frame_start_time = Instant::now();
+
                 // TODO(solson): Heavily re-write all of the below code. 'tis the product of a
                 // horrific late-night hacking session.
                 const BYTES_PER_PIXEL: usize = 4;
@@ -118,7 +125,15 @@ fn main() {
                     }
                 }
 
-                cpu.step_n(100);
+                cpu.step_n(CYCLES_PER_FRAME);
+
+                println!("Actual Frame duration: {} {}", frame_start_time.elapsed().as_secs(), frame_start_time.elapsed().subsec_nanos());
+                println!("Desired Frame duration: {} {}", frame_duration.as_secs(), frame_duration.subsec_nanos());
+                let sleep_duration = frame_duration.checked_sub(frame_start_time.elapsed());
+                if let Some(duration) = sleep_duration {
+                    println!("Sleeping for duration: {} {}", duration.as_secs(), duration.subsec_nanos());
+                    //thread::sleep(duration);
+                }
             }
         }
 

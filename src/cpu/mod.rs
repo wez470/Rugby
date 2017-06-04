@@ -167,9 +167,9 @@ impl Cpu {
         }
 
         // Log the current instruction address and bytes for debugging.
-        print!("{:04X}:", base_pc);
+        //print!("{:04X}:", base_pc);
         for b in &inst_bytes[..instruction_len] {
-            print!(" {:02X}", b);
+        //    print!(" {:02X}", b);
         }
 
         // Update clock cycle count based on the current instruction.
@@ -182,7 +182,7 @@ impl Cpu {
 
         // Decode the instruction.
         let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-        println!("\t\t(decoded: {:?})", inst);
+        //println!("\t\t(decoded: {:?})", inst);
 
         self.execute(inst);
 
@@ -855,7 +855,7 @@ impl Cpu {
     }
 
     fn write_mem(&mut self, addr: u16, val: u8) {
-        println!("  {:04X} <== {:02X}", addr, val);
+        //println!("  {:04X} <== {:02X}", addr, val);
 
         match addr {
             // 32KB cartridge write
