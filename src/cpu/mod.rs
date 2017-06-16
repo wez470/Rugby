@@ -951,21 +951,21 @@ impl Cpu {
 
     fn write_io_port(&mut self, port: u8, val: u8) {
         match port {
-            0x00 => println!("  unimplemented: write to joypad I/O port"),
+            0x00 => {},//println!("  unimplemented: write to joypad I/O port"),
 
-            0x01 | 0x02 => println!("  unimplemented: write to serial I/O port"),
+            0x01 | 0x02 => {}, //println!("  unimplemented: write to serial I/O port"),
 
-            0x06 | 0x07 => println!("  unimplemented: write to timer I/O port"),
+            0x06 | 0x07 => {}, //println!("  unimplemented: write to timer I/O port"),
 
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
 
             0x10 | 0x12 | 0x14 | 0x17 | 0x19 | 0x1A | 0x1C | 0x21 | 0x23 | 0x24 | 0x25 | 0x26 => {
-                println!("  unimplemented: write to sound I/O port");
+                //println!("  unimplemented: write to sound I/O port");
             }
 
             0x40 | 0x41 | 0x42 | 0x43 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
-                println!("  unimplemented: write to LCD I/O port");
+                //println!("  unimplemented: write to LCD I/O port");
             }
 
             // Tetris seemingly accidentally writes to this port when zeroing the high RAM. It

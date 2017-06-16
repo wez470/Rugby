@@ -21,6 +21,7 @@ mod cpu;
 mod reg_16;
 
 const CYCLES_PER_FRAME: usize = 69905;
+const ITERATIONS: usize = 1000;
 
 fn main() {
     let app_matches = App::new("Rustboy")
@@ -67,8 +68,9 @@ fn main() {
             let mut renderer = check_error(window.renderer().build(), "Couldn't initialize SDL2 renderer");
             let mut event_pump = check_error(sdl.event_pump(), "Couldn't initialize SDL2 event pump");
             let frame_duration = Duration::new(0, 16666667); // Duration of a frame at 60 FPS
+            let mut frames_too_slow = 0;
 
-            'main: loop {
+            for _ in 0..ITERATIONS {
                 let frame_start_time = Instant::now();
 
                 // TODO(solson): Heavily re-write all of the below code. 'tis the product of a
@@ -120,22 +122,30 @@ fn main() {
                 for event in event_pump.poll_iter() {
                     use sdl2::event::Event;
                     match event {
-                        Event::Quit { .. } => break 'main,
+                        Event::Quit { .. } => break,// 'main,
                         _ => ()
                     }
                 }
 
                 cpu.step_n(CYCLES_PER_FRAME);
 
-                println!("Actual Frame duration: {} {}", frame_start_time.elapsed().as_secs(), frame_start_time.elapsed().subsec_nanos());
-                println!("Desired Frame duration: {} {}", frame_duration.as_secs(), frame_duration.subsec_nanos());
-                let sleep_duration = frame_duration.checked_sub(frame_start_time.elapsed());
-                if let Some(duration) = sleep_duration {
-                    println!("Sleeping for duration: {} {}", duration.as_secs(), duration.subsec_nanos());
+                //println!("Desired Frame duration: {} {}", frame_duration.as_secs(), frame_duration.subsec_nanos());
+                let frame_done_time = Instant::now();
+                let sleep_duration = frame_done_time - frame_start_time;
+//                println!("Actual Frame duration: {}", sleep_duration.subsec_nanos());
+//                println!("Desired Frame duratio; 16666667");
+                if sleep_duration.subsec_nanos() < 16666667 {
+                    //println!("Sleeping for duration: {} {}", duration.as_secs(), duration.subsec_nanos());
                     //thread::sleep(duration);
                 }
+                else {
+                    //println!("Failed to calculate frame fast enough!");
+                    frames_too_slow += 1;
+                }
             }
+            println!("Frames too slow: {}", frames_too_slow);
         }
+
 
         ("info", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
