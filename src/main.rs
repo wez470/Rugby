@@ -14,6 +14,7 @@ use std::path::Path;
 use std::process::exit;
 use std::time::{Instant, Duration};
 use std::thread;
+use std::cmp;
 
 mod cart;
 mod cart_header;
@@ -21,6 +22,7 @@ mod cpu;
 mod reg_16;
 
 const CYCLES_PER_FRAME: usize = 69905;
+const NANOS_PER_FRAME: usize = 16666667;
 const ITERATIONS: usize = 1000;
 
 fn main() {
@@ -67,10 +69,9 @@ fn main() {
 
             let mut renderer = check_error(window.renderer().build(), "Couldn't initialize SDL2 renderer");
             let mut event_pump = check_error(sdl.event_pump(), "Couldn't initialize SDL2 event pump");
-            let frame_duration = Duration::new(0, 16666667); // Duration of a frame at 60 FPS
             let mut frames_too_slow = 0;
-            let mut total_time_over: u64 = 0;
-            let mut total_time_under: u64 = 0;
+            let mut total_time_over: i64 = 0;
+            let mut total_sleep_time: i64 = 0;
 
             for _ in 0..ITERATIONS {
                 let frame_start_time = Instant::now();
@@ -131,25 +132,29 @@ fn main() {
 
                 cpu.step_cycles(CYCLES_PER_FRAME);
 
-                //println!("Desired Frame duration: {} {}", frame_duration.as_secs(), frame_duration.subsec_nanos());
-                let frame_done_time = Instant::now();
-                let sleep_duration = frame_done_time - frame_start_time;
-//                println!("Actual Frame duration: {}", sleep_duration.subsec_nanos());
-//                println!("Desired Frame duratio; 16666667");
-                if sleep_duration.subsec_nanos() < 16666667 {
-                    total_time_under += 16666667 as u64 - sleep_duration.subsec_nanos() as u64;
-                    //println!("Sleeping for duration: {} {}", duration.as_secs(), duration.subsec_nanos());
-                    //thread::sleep(duration);
+                let frame_finish_time = Instant::now();
+                let curr_frame_nanos = (frame_finish_time - frame_start_time).subsec_nanos() as i64;
+                let mut sleep_duration_nanos = NANOS_PER_FRAME as i64 - curr_frame_nanos;
+                if sleep_duration_nanos > 0 {
+                    if total_time_over > 0 {
+                        let temp_sleep_dur = sleep_duration_nanos;
+                        sleep_duration_nanos -= total_time_over;
+                        total_time_over = cmp::max(0, total_time_over - temp_sleep_dur);
+                    }
+
+                    if sleep_duration_nanos > 0 {
+                        total_sleep_time += sleep_duration_nanos;
+                        thread::sleep(Duration::new(0, sleep_duration_nanos as u32));
+                    }
                 }
                 else {
-                    total_time_over += sleep_duration.subsec_nanos() as u64 - 16666667 as u64;
-                    //println!("Failed to calculate frame fast enough!");
+                    total_time_over += sleep_duration_nanos.abs();
                     frames_too_slow += 1;
                 }
             }
             println!("Frames too slow: {}", frames_too_slow);
-            println!("Average time over: {}", total_time_over / (ITERATIONS as u64));
-            println!("Average time under: {}", total_time_under / (ITERATIONS as u64));
+            println!("Total nanoseconds over: {}", total_time_over);
+            println!("Total nanoseconds sleep time: {}", total_sleep_time);
         }
 
 
