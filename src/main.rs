@@ -159,7 +159,7 @@ fn main() {
             println!("Frames too slow: {}", frames_too_slow);
             println!("Total nanoseconds over: {}", total_time_over);
             println!("Total nanoseconds sleep time: {}", total_sleep_time);
-            println!("Total time: {}", total_time)
+            println!("Total time: {}", total_time);
         }
 
 
