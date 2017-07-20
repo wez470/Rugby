@@ -129,7 +129,7 @@ fn main() {
                     }
                 }
 
-                cpu.step_n(CYCLES_PER_FRAME);
+                cpu.step_cycles(CYCLES_PER_FRAME);
 
                 //println!("Desired Frame duration: {} {}", frame_duration.as_secs(), frame_duration.subsec_nanos());
                 let frame_done_time = Instant::now();

@@ -141,13 +141,14 @@ impl Cpu {
         self.reg_sp.set(0xFFFE);
     }
 
-    pub fn step_n(&mut self, steps: usize) {
-        for _ in 0..steps {
-            self.step();
+    pub fn step_cycles(&mut self, cycles: usize) {
+        let mut curr_cycles: usize = 0;
+        while curr_cycles < cycles {
+            curr_cycles += self.step();
         }
     }
 
-    pub fn step(&mut self) {
+    pub fn step(&mut self) -> usize {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
@@ -173,7 +174,7 @@ impl Cpu {
         }
 
         // Update clock cycle count based on the current instruction.
-        self.cycles += if self.current_opcode == 0xCB {
+        let cycles = if self.current_opcode == 0xCB {
             let opcode_after_cb = inst_bytes[1];
             inst::PREFIX_CB_BASE_CYCLES[opcode_after_cb as usize]
         } else {
@@ -193,6 +194,8 @@ impl Cpu {
         if pending_disable_interrupts {
             self.interrupts_enabled = false;
         }
+
+        cycles
     }
 
     fn execute(&mut self, inst: Inst) {
@@ -1120,7 +1123,7 @@ mod tests {
         ]);
         actual.set_reg_8(Reg8::A, 0);
         actual.set_reg_8(Reg8::B, 0);
-        actual.step_n(2);
+        actual.step_cycles(2);
 
         expected.set_reg_8(Reg8::A, 0x13);
         expected.set_reg_8(Reg8::B, 0x42);
