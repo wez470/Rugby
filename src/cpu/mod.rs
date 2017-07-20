@@ -1007,7 +1007,26 @@ mod tests {
     use std::mem;
 
     fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
-        let mut cpu = Cpu::new(rom.into_boxed_slice());
+        use cart::Cart;
+        use cart_header::*;
+
+        let cart_header = CartHeader {
+            title: String::from("TEST"),
+            cart_type: CartType {
+                mbc: MbcType::NoMbc,
+                hardware: NONE,
+            },
+            rom_size: rom.len(),
+            ram_size: 0,
+            gbc_flag: GbcFlag::Unsupported,
+            sgb_flag: SgbFlag::Unsupported,
+            manufacturer_code: None,
+            licensee_code: LicenseeCode::Old(0),
+            destination_code: DestinationCode::Japan,
+            rom_version: 0,
+        };
+
+        let mut cpu = Cpu::new(Cart::new(rom.into_boxed_slice(), &cart_header));
         cpu.reg_pc.set(0);
         (cpu.clone(), cpu)
     }
@@ -1046,8 +1065,8 @@ mod tests {
             same &= diff_hex(&name, actual_cell, expected_cell);
         }
 
-        let actual_rom = actual.rom.iter();
-        let expected_rom = expected.rom.iter();
+        let actual_rom = actual.cart.rom.iter();
+        let expected_rom = expected.cart.rom.iter();
         for (i, (actual_cell, expected_cell)) in actual_rom.zip(expected_rom).enumerate() {
             let name = format!("ROM location 0x{:02X}", i);
             same &= diff_hex(&name, actual_cell, expected_cell);

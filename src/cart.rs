@@ -243,7 +243,8 @@ enum RomRamMode {
 
 #[derive(Clone, Debug)]
 pub struct Cart {
-    rom: Box<[u8]>,
+    // TODO(solson): Can this be private? It's used by tests in cpu::tests.
+    pub rom: Box<[u8]>,
     ram: Box<[u8]>,
     mbc: Mbc,
     // FIXME: This is only being used in the read_io_port function as a hack to return proper
