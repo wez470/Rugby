@@ -1044,7 +1044,6 @@ mod tests {
         same &= diff_hex("HL register", &actual.reg_hl.get(), &expected.reg_hl.get());
         same &= diff_hex("SP register", &actual.reg_sp.get(), &expected.reg_sp.get());
         same &= diff_hex("PC register", &actual.reg_pc.get(), &expected.reg_pc.get());
-        // same &= diff("cycles", &actual.cycles, &expected.cycles);
         same &= diff(
             "interrupts_enabled",
             &actual.interrupts_enabled,
@@ -1141,7 +1140,8 @@ mod tests {
     /// ```
     ///
     /// The `setup` and `expect` sections are optional, as are their `reg8` and `reg16`
-    /// subsections.
+    /// subsections. The `reg8` and `reg16` sections must use identifiers matching the `Reg8` and
+    /// `Reg16` enum variants, respectively.
     macro_rules! cpu_tests {
         (
             $(
