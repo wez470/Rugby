@@ -1171,7 +1171,7 @@ mod tests {
                         $( $( actual.set_reg_8(Reg8::$setup_reg8, $setup_reg8val); )* )*
                         $( $( actual.set_reg_16(Reg16::$setup_reg16, $setup_reg16val); )* )*
                     )*
-                    actual.step_n($steps);
+                    for _ in 0..$steps { actual.step(); }
                     $(
                         $( $( expected.set_reg_8(Reg8::$expect_reg8, $expect_reg8val); )* )*
                         $( $( expected.set_reg_16(Reg16::$expect_reg16, $expect_reg16val); )* )*
