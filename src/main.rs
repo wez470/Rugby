@@ -69,6 +69,8 @@ fn main() {
             let mut event_pump = check_error(sdl.event_pump(), "Couldn't initialize SDL2 event pump");
             let frame_duration = Duration::new(0, 16666667); // Duration of a frame at 60 FPS
             let mut frames_too_slow = 0;
+            let mut total_time_over = 0;
+            let mut total_time_under = 0;
 
             for _ in 0..ITERATIONS {
                 let frame_start_time = Instant::now();
@@ -135,15 +137,19 @@ fn main() {
 //                println!("Actual Frame duration: {}", sleep_duration.subsec_nanos());
 //                println!("Desired Frame duratio; 16666667");
                 if sleep_duration.subsec_nanos() < 16666667 {
+                    total_time_under += 16666667 - sleep_duration.subsec_nanos();
                     //println!("Sleeping for duration: {} {}", duration.as_secs(), duration.subsec_nanos());
                     //thread::sleep(duration);
                 }
                 else {
+                    total_time_over += sleep_duration.subsec_nanos() - 16666667;
                     //println!("Failed to calculate frame fast enough!");
                     frames_too_slow += 1;
                 }
             }
             println!("Frames too slow: {}", frames_too_slow);
+            println!("Average time over: {}", total_time_over / (ITERATIONS as u32));
+            println!("Average time under: {}", total_time_under / (ITERATIONS as u32));
         }
 
 
