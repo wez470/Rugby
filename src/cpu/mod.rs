@@ -1013,13 +1013,14 @@ mod tests {
         use cart::Cart;
         use cart_header::*;
 
+        let rom_size = rom.len();
         let cart_header = CartHeader {
             title: String::from("TEST"),
             cart_type: CartType {
                 mbc: MbcType::NoMbc,
                 hardware: NONE,
             },
-            rom_size: rom.len(),
+            rom_size,
             ram_size: 0,
             gbc_flag: GbcFlag::Unsupported,
             sgb_flag: SgbFlag::Unsupported,
@@ -1029,9 +1030,11 @@ mod tests {
             rom_version: 0,
         };
 
-        let mut cpu = Cpu::new(Cart::new(rom.into_boxed_slice(), &cart_header));
-        cpu.reg_pc.set(0);
-        (cpu.clone(), cpu)
+        let mut actual = Cpu::new(Cart::new(rom.into_boxed_slice(), &cart_header));
+        let mut expected = actual.clone();
+        actual.reg_pc.set(0);
+        expected.reg_pc.set(rom_size as u16);
+        (actual, expected)
     }
 
     /// Check if the actual and expected results are the same, pretty-printing any differences, and
@@ -1044,7 +1047,6 @@ mod tests {
         same &= diff_hex("HL register", &actual.reg_hl.get(), &expected.reg_hl.get());
         same &= diff_hex("SP register", &actual.reg_sp.get(), &expected.reg_sp.get());
         same &= diff_hex("PC register", &actual.reg_pc.get(), &expected.reg_pc.get());
-        same &= diff("cycles", &actual.cycles, &expected.cycles);
         same &= diff(
             "interrupts_enabled",
             &actual.interrupts_enabled,
@@ -1105,108 +1107,109 @@ mod tests {
         same
     }
 
-    #[test]
-    fn test_nop() {
-        let (mut actual, mut expected) = setup(vec![0x00]); // nop
-        actual.step();
-
-        expected.set_reg_16(Reg16::PC, 1);
-        expected.cycles = 4;
-        check_diff(&actual, &expected);
+    /// A macro for writing concise machine code CPU tests.
+    ///
+    /// # Format
+    ///
+    /// ```
+    /// test_name {
+    ///     steps = N,
+    ///     rom = [0x00, 0x01, ...],
+    ///     setup {
+    ///         reg8 {
+    ///             A = 0,
+    ///             B = 1,
+    ///             ...
+    ///         }
+    ///         reg16 {
+    ///             AF = 0,
+    ///             DE = 1,
+    ///             ...
+    ///         }
+    ///     }
+    ///     expect {
+    ///         reg8 {
+    ///             A = 0,
+    ///             B = 1,
+    ///             ...
+    ///         }
+    ///         reg16 {
+    ///             AF = 0,
+    ///             DE = 1,
+    ///             ...
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    ///
+    /// The `setup` and `expect` sections are optional, as are their `reg8` and `reg16`
+    /// subsections. The `reg8` and `reg16` sections must use identifiers matching the `Reg8` and
+    /// `Reg16` enum variants, respectively.
+    macro_rules! cpu_tests {
+        (
+            $(
+                $name:ident {
+                    steps = $steps:expr,
+                    rom = [ $( $rom:expr ),* $(,)* ],
+                    $(setup {
+                        $( reg8  { $( $setup_reg8:ident  = $setup_reg8val:expr  ),* $(,)* } )*
+                        $( reg16 { $( $setup_reg16:ident = $setup_reg16val:expr ),* $(,)* } )*
+                    })*
+                    $(expect {
+                        $( reg8  { $( $expect_reg8:ident  = $expect_reg8val:expr  ),* $(,)* } )*
+                        $( reg16 { $( $expect_reg16:ident = $expect_reg16val:expr ),* $(,)* } )*
+                    })*
+                }
+            )*
+        ) => (
+            $(
+                #[test]
+                #[allow(unused_mut)]
+                fn $name() {
+                    let (mut actual, mut expected) = setup(vec![ $( $rom ),* ]);
+                    $(
+                        $( $( actual.set_reg_8(Reg8::$setup_reg8, $setup_reg8val); )* )*
+                        $( $( actual.set_reg_16(Reg16::$setup_reg16, $setup_reg16val); )* )*
+                    )*
+                    actual.step_n($steps);
+                    $(
+                        $( $( expected.set_reg_8(Reg8::$expect_reg8, $expect_reg8val); )* )*
+                        $( $( expected.set_reg_16(Reg16::$expect_reg16, $expect_reg16val); )* )*
+                    )*
+                    check_diff(&actual, &expected);
+                }
+            )*
+        );
     }
 
-    #[test]
-    fn test_reg_8() {
-        let (mut actual, mut expected) = setup(vec![
-            0x3E, 0x13, // ld a, 0x13
-            0x06, 0x42, // ld b, 0x42
-        ]);
-        actual.set_reg_8(Reg8::A, 0);
-        actual.set_reg_8(Reg8::B, 0);
-        actual.step_cycles(2);
+    /// The actual tests.
+    cpu_tests! {
+        test_nop {
+            steps = 1,
+            rom = [0x00], // nop
+        }
 
-        expected.set_reg_8(Reg8::A, 0x13);
-        expected.set_reg_8(Reg8::B, 0x42);
-        expected.set_reg_16(Reg16::PC, 4);
-        expected.cycles = 16;
-        check_diff(&actual, &expected);
-    }
+        test_ld_reg8_imm8 {
+            steps = 2,
+            rom = [
+                0x3E, 0x13, // ld a, 0x13
+                0x06, 0x42, // ld b, 0x42
+            ],
+            setup  { reg8 { A = 0x00, B = 0x00 } }
+            expect { reg8 { A = 0x13, B = 0x42 } }
+        }
 
-    #[test]
-    fn test_reg_16() {
-        let (mut actual, mut expected) = setup(vec![
-            0x11, 0x34, 0x12, // ld de, 0x1234
-        ]);
-        actual.set_reg_16(Reg16::DE, 0);
-        actual.step();
+        test_ld_reg16_imm16 {
+            steps = 1,
+            rom = [0x11, 0x34, 0x12], // ld de, 0x1234
+            setup  { reg16 { DE = 0x0000 } }
+            expect { reg16 { DE = 0x1234 } }
+        }
 
-        expected.set_reg_16(Reg16::DE, 0x1234);
-        expected.set_reg_16(Reg16::PC, 3);
-        expected.cycles = 12;
-        check_diff(&actual, &expected);
-    }
-
-    #[test]
-    fn test_jp() {
-        let (mut actual, mut expected) = setup(vec![
-            0xC3, 0x34, 0x12, // jp 0x1234
-        ]);
-        actual.step();
-
-        expected.set_reg_16(Reg16::PC, 0x1234);
-        expected.cycles = 16;
-        check_diff(&actual, &expected);
-    }
-
-    #[test]
-    fn test_di() {
-        let (mut actual, mut expected) = setup(vec![
-            0xF3, 0x00, // di; nop
-        ]);
-        actual.interrupts_enabled = true;
-        actual.step(); // di
-
-        // After DI, interrupts still aren't disabled until the next instruction executes.
-        expected.interrupts_enabled = true;
-        expected.pending_disable_interrupts = true;
-        expected.set_reg_16(Reg16::PC, 1);
-        expected.cycles = 4;
-        check_diff(&actual, &expected);
-
-        println!("# Step 2");
-        actual.step(); // nop
-
-        // Now the instruction after DI has executed, so DI takes effect.
-        expected.interrupts_enabled = false;
-        expected.pending_disable_interrupts = false;
-        expected.set_reg_16(Reg16::PC, 2);
-        expected.cycles = 8;
-        check_diff(&actual, &expected);
-    }
-
-    #[test]
-    fn test_ei() {
-        let (mut actual, mut expected) = setup(vec![
-            0xFB, 0x00, // ei; nop
-        ]);
-        actual.interrupts_enabled = false;
-        actual.step(); // ei
-
-        // After EI, interrupts still aren't disabled until the next instruction executes.
-        expected.interrupts_enabled = false;
-        expected.pending_enable_interrupts = true;
-        expected.set_reg_16(Reg16::PC, 1);
-        expected.cycles = 4;
-        check_diff(&actual, &expected);
-
-        println!("# Step 2");
-        actual.step(); // nop
-
-        // Now the instruction after EI has executed, so EI takes effect.
-        expected.interrupts_enabled = true;
-        expected.pending_enable_interrupts = false;
-        expected.set_reg_16(Reg16::PC, 2);
-        expected.cycles = 8;
-        check_diff(&actual, &expected);
+        test_jp_imm16_unconditional {
+            steps = 1,
+            rom = [0xC3, 0x34, 0x12], // jp 0x1234
+            expect { reg16 { PC = 0x1234 } }
+        }
     }
 }
