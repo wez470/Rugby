@@ -73,6 +73,7 @@ fn main() {
             let mut total_time_over: i64 = 0;
             let mut total_sleep_time: i64 = 0;
 
+            let start_time = Instant::now();
             for _ in 0..ITERATIONS {
                 let frame_start_time = Instant::now();
 
@@ -152,9 +153,13 @@ fn main() {
                     frames_too_slow += 1;
                 }
             }
+            let end_time = Instant::now();
+            let total_duration = end_time - start_time;
+            let total_time = total_duration.as_secs() as f64 + (total_duration.subsec_nanos() as f64) / 1e9;
             println!("Frames too slow: {}", frames_too_slow);
             println!("Total nanoseconds over: {}", total_time_over);
             println!("Total nanoseconds sleep time: {}", total_sleep_time);
+            println!("Total time: {}", total_time)
         }
 
 
