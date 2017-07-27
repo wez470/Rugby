@@ -72,6 +72,7 @@ fn main() {
             let mut frames_too_slow = 0;
             let mut total_time_over: i64 = 0;
             let mut total_sleep_time: i64 = 0;
+            let mut over_under_time: i64 = 0;
 
             let start_time = Instant::now();
             for _ in 0..ITERATIONS {
@@ -135,7 +136,7 @@ fn main() {
 
                 let frame_finish_time = Instant::now();
                 let curr_frame_nanos = (frame_finish_time - frame_start_time).subsec_nanos() as i64;
-                let mut sleep_duration_nanos = NANOS_PER_FRAME as i64 - curr_frame_nanos;
+                let mut sleep_duration_nanos = NANOS_PER_FRAME as i64 - curr_frame_nanos - over_under_time;
                 if sleep_duration_nanos > 0 {
                     if total_time_over > 0 {
                         let temp_sleep_dur = sleep_duration_nanos;
@@ -145,7 +146,10 @@ fn main() {
 
                     if sleep_duration_nanos > 0 {
                         total_sleep_time += sleep_duration_nanos;
+                        let time_before_sleep = Instant::now();
                         thread::sleep(Duration::new(0, sleep_duration_nanos as u32));
+                        let actual_sleep_duration = Instant::now() - time_before_sleep;
+                        over_under_time = (actual_sleep_duration.subsec_nanos() as i64) - sleep_duration_nanos;
                     }
                 }
                 else {
