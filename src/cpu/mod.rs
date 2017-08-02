@@ -1107,6 +1107,21 @@ mod tests {
         same
     }
 
+    /// A helper for the `cpu_tests!` macro. This handles the `setup` and `expect` sections, which
+    /// set fields on the initial and expected `Cpu`s, respectively.
+    macro_rules! setup_cpu {
+        (
+            $cpu:ident,
+            {
+                $( reg8  { $( $reg8:ident  = $reg8val:expr  ),* $(,)* } )*
+                $( reg16 { $( $reg16:ident = $reg16val:expr ),* $(,)* } )*
+            }
+        ) => ({
+            $( $( $cpu.set_reg_8(Reg8::$reg8, $reg8val); )* )*
+            $( $( $cpu.set_reg_16(Reg16::$reg16, $reg16val); )* )*
+        })
+    }
+
     /// A macro for writing concise machine code CPU tests.
     ///
     /// # Format
@@ -1150,14 +1165,8 @@ mod tests {
             $(
                 $name:ident {
                     rom = [ $( $rom:expr ),* $(,)* ] $(,)*
-                    $(setup {
-                        $( reg8  { $( $setup_reg8:ident  = $setup_reg8val:expr  ),* $(,)* } )*
-                        $( reg16 { $( $setup_reg16:ident = $setup_reg16val:expr ),* $(,)* } )*
-                    })*
-                    $(expect {
-                        $( reg8  { $( $expect_reg8:ident  = $expect_reg8val:expr  ),* $(,)* } )*
-                        $( reg16 { $( $expect_reg16:ident = $expect_reg16val:expr ),* $(,)* } )*
-                    })*
+                    $(setup $setup:tt)*
+                    $(expect $expect:tt)*
                 }
             )*
         ) => (
@@ -1168,17 +1177,11 @@ mod tests {
                     let rom = vec![ $( $rom ),* ];
                     let rom_size = rom.len();
                     let (mut actual, mut expected) = setup(rom);
-                    $(
-                        $( $( actual.set_reg_8(Reg8::$setup_reg8, $setup_reg8val); )* )*
-                        $( $( actual.set_reg_16(Reg16::$setup_reg16, $setup_reg16val); )* )*
-                    )*
+                    $( setup_cpu!(actual, $setup); )*
+                    $( setup_cpu!(expected, $expect); )*
                     while actual.reg_pc.get() as usize != rom_size {
                         actual.step();
                     }
-                    $(
-                        $( $( expected.set_reg_8(Reg8::$expect_reg8, $expect_reg8val); )* )*
-                        $( $( expected.set_reg_16(Reg16::$expect_reg16, $expect_reg16val); )* )*
-                    )*
                     check_diff(&actual, &expected);
                 }
             )*
