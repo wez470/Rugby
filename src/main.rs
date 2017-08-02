@@ -1,6 +1,9 @@
 #[macro_use]
 extern crate bitflags;
 extern crate clap;
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
 extern crate rand;
 extern crate sdl2;
 

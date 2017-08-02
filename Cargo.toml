@@ -9,5 +9,8 @@ clap = "2.19.0"
 rand = "0.3.15"
 sdl2 = "0.29.1"
 
+[dev-dependencies]
+quickcheck = "0.4.1"
+
 [profile.release]
 debug = true

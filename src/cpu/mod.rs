@@ -1039,7 +1039,7 @@ mod tests {
 
     /// Check if the actual and expected results are the same, pretty-printing any differences, and
     /// panicking (failing the test) if there are any differences.
-    fn check_diff(actual: &Cpu, expected: &Cpu) {
+    fn check_diff(actual: &Cpu, expected: &Cpu) -> bool {
         let mut same = true;
         same &= diff_hex("AF register", &actual.reg_af.get(), &expected.reg_af.get());
         same &= diff_hex("BC register", &actual.reg_bc.get(), &expected.reg_bc.get());
@@ -1077,9 +1077,7 @@ mod tests {
             same &= diff_hex(&name, actual_cell, expected_cell);
         }
 
-        if !same {
-            panic!("actual and expected results differ");
-        }
+        same
     }
 
     /// Returns whether the actual and expected numbers are the same. Pretty-prints the numbers in
@@ -1163,7 +1161,9 @@ mod tests {
     macro_rules! cpu_tests {
         (
             $(
-                $name:ident {
+                $name:ident(
+                    $($var:ident : $var_ty:ty),* $(,)*
+                ) {
                     rom = [ $( $rom:expr ),* $(,)* ] $(,)*
                     $(setup $setup:tt)*
                     $(expect $expect:tt)*
@@ -1171,18 +1171,21 @@ mod tests {
             )*
         ) => (
             $(
-                #[test]
-                #[allow(unused_mut)]
-                fn $name() {
-                    let rom = vec![ $( $rom ),* ];
-                    let rom_size = rom.len();
-                    let (mut actual, mut expected) = setup(rom);
-                    $( setup_cpu!(actual, $setup); )*
-                    $( setup_cpu!(expected, $expect); )*
-                    while actual.reg_pc.get() as usize != rom_size {
-                        actual.step();
+                quickcheck! {
+                    #[allow(unused_mut)]
+                    fn $name(
+                        $($var : $var_ty),*
+                    ) -> bool {
+                        let rom = vec![ $( $rom ),* ];
+                        let rom_size = rom.len();
+                        let (mut actual, mut expected) = setup(rom);
+                        $( setup_cpu!(actual, $setup); )*
+                        $( setup_cpu!(expected, $expect); )*
+                        while actual.reg_pc.get() as usize != rom_size {
+                            actual.step();
+                        }
+                        check_diff(&actual, &expected)
                     }
-                    check_diff(&actual, &expected);
                 }
             )*
         );
@@ -1190,26 +1193,26 @@ mod tests {
 
     /// The actual tests.
     cpu_tests! {
-        test_nop {
+        test_nop() {
             rom = [0x00], // nop
         }
 
-        test_ld_reg8_imm8 {
+        test_ld_reg8_imm8(a_val: u8, b_val: u8) {
             rom = [
-                0x3E, 0x13, // ld a, 0x13
-                0x06, 0x42, // ld b, 0x42
+                0x3E, a_val, // ld a, $a_val
+                0x06, b_val, // ld b, $b_val
             ],
-            setup  { reg8 { A = 0x00, B = 0x00 } }
-            expect { reg8 { A = 0x13, B = 0x42 } }
+            setup  { reg8 { A = 0x00,  B = 0x00 } }
+            expect { reg8 { A = a_val, B = b_val } }
         }
 
-        test_ld_reg16_imm16 {
+        test_ld_reg16_imm16() {
             rom = [0x11, 0x34, 0x12], // ld de, 0x1234
             setup  { reg16 { DE = 0x0000 } }
             expect { reg16 { DE = 0x1234 } }
         }
 
-        test_jp_imm16_unconditional {
+        test_jp_imm16_unconditional() {
             // Test that we can jump past a halt instruction without stopping.
             rom = [
                 0xC3, 0x04, 0x00, // jp 0x0004
