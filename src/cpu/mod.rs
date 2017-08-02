@@ -1130,8 +1130,7 @@ mod tests {
     /// # Format
     ///
     /// ```
-    /// test_name {
-    ///     steps = N,
+    /// test_name(var1: var1_ty, var2: var2_ty, ...) {
     ///     rom = [0x00, 0x01, ...],
     ///     setup {
     ///         reg8 {
@@ -1159,6 +1158,10 @@ mod tests {
     ///     }
     /// }
     /// ```
+    ///
+    /// The arguments (`var1`, `var2`, ...) are randomly generated values of their repective types
+    /// from quickcheck. The argument types must each implement quickcheck's `Arbitrary` trait.
+    /// Many primitive and standard library types already do.
     ///
     /// The `setup` and `expect` sections are optional, as are their `reg8` and `reg16`
     /// subsections. The `reg8` and `reg16` sections must use identifiers matching the `Reg8` and
