@@ -1005,8 +1005,9 @@ fn get_add_half_carry_high(left: u16, right: u16) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use quickcheck::TestResult;
     use super::*;
-    use std::fmt::{Debug, UpperHex};
+    use std::fmt::{Debug, UpperHex, Write};
     use std::mem;
 
     fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
@@ -1039,70 +1040,74 @@ mod tests {
 
     /// Check if the actual and expected results are the same, pretty-printing any differences, and
     /// panicking (failing the test) if there are any differences.
-    fn check_diff(actual: &Cpu, expected: &Cpu) -> bool {
-        let mut same = true;
-        same &= diff_hex("AF register", &actual.reg_af.get(), &expected.reg_af.get());
-        same &= diff_hex("BC register", &actual.reg_bc.get(), &expected.reg_bc.get());
-        same &= diff_hex("DE register", &actual.reg_de.get(), &expected.reg_de.get());
-        same &= diff_hex("HL register", &actual.reg_hl.get(), &expected.reg_hl.get());
-        same &= diff_hex("SP register", &actual.reg_sp.get(), &expected.reg_sp.get());
-        same &= diff_hex("PC register", &actual.reg_pc.get(), &expected.reg_pc.get());
-        same &= diff(
+    fn check_diff(actual: &Cpu, expected: &Cpu) -> TestResult {
+        let mut err = String::new();
+
+        diff_hex("AF register", &actual.reg_af.get(), &expected.reg_af.get(), &mut err);
+        diff_hex("BC register", &actual.reg_bc.get(), &expected.reg_bc.get(), &mut err);
+        diff_hex("DE register", &actual.reg_de.get(), &expected.reg_de.get(), &mut err);
+        diff_hex("HL register", &actual.reg_hl.get(), &expected.reg_hl.get(), &mut err);
+        diff_hex("SP register", &actual.reg_sp.get(), &expected.reg_sp.get(), &mut err);
+        diff_hex("PC register", &actual.reg_pc.get(), &expected.reg_pc.get(), &mut err);
+        diff(
             "interrupts_enabled",
             &actual.interrupts_enabled,
-            &expected.interrupts_enabled
+            &expected.interrupts_enabled,
+            &mut err,
         );
-        same &= diff(
+        diff(
             "pending_disable_interrupts",
             &actual.pending_disable_interrupts,
-            &expected.pending_disable_interrupts
+            &expected.pending_disable_interrupts,
+            &mut err,
         );
-        same &= diff(
+        diff(
             "pending_enable_interrupts",
             &actual.pending_enable_interrupts,
-            &expected.pending_enable_interrupts
+            &expected.pending_enable_interrupts,
+            &mut err,
         );
 
         let actual_work_ram = actual.work_ram.iter();
         let expected_work_ram = expected.work_ram.iter();
         for (i, (actual_cell, expected_cell)) in actual_work_ram.zip(expected_work_ram).enumerate() {
             let name = format!("work_ramory location 0x{:02X}", i);
-            same &= diff_hex(&name, actual_cell, expected_cell);
+            diff_hex(&name, actual_cell, expected_cell, &mut err);
         }
 
         let actual_rom = actual.cart.rom.iter();
         let expected_rom = expected.cart.rom.iter();
         for (i, (actual_cell, expected_cell)) in actual_rom.zip(expected_rom).enumerate() {
             let name = format!("ROM location 0x{:02X}", i);
-            same &= diff_hex(&name, actual_cell, expected_cell);
+            diff_hex(&name, actual_cell, expected_cell, &mut err);
         }
 
-        same
+        if err.is_empty() {
+            TestResult::passed()
+        } else {
+            TestResult::error(err)
+        }
     }
 
     /// Returns whether the actual and expected numbers are the same. Pretty-prints the numbers in
     /// hex if they differ.
-    fn diff_hex<T: Debug + Eq + UpperHex>(name: &str, actual: &T, expected: &T) -> bool {
-        let same = actual == expected;
-        if !same {
+    fn diff_hex<T: Debug + Eq + UpperHex>(name: &str, actual: &T, expected: &T, err: &mut String) {
+        if actual != expected {
             let width = mem::size_of::<T>() * 2; // Number of hex digits for type T.
-            println!("\ndifference in {}:", name);
-            println!("  actual:   0x{0:01$X} ({0:?})", actual, width);
-            println!("  expected: 0x{0:01$X} ({0:?})", expected, width);
+            writeln!(err, "\ndifference in {}:", name).unwrap();
+            writeln!(err, "  actual:   0x{0:01$X} ({0:?})", actual, width).unwrap();
+            writeln!(err, "  expected: 0x{0:01$X} ({0:?})", expected, width).unwrap();
         }
-        same
     }
 
     /// Returns whether the actual and expected values are the same. Pretty-prints the values if
     /// they differ.
-    fn diff<T: Debug + Eq>(name: &str, actual: &T, expected: &T) -> bool {
-        let same = actual == expected;
-        if !same {
-            println!("\ndifference in {}:", name);
-            println!("  actual:   {:?}", actual);
-            println!("  expected: {:?}", expected);
+    fn diff<T: Debug + Eq>(name: &str, actual: &T, expected: &T, err: &mut String) {
+        if actual != expected {
+            writeln!(err, "\ndifference in {}:", name).unwrap();
+            writeln!(err, "  actual:   {:?}", actual).unwrap();
+            writeln!(err, "  expected: {:?}", expected).unwrap();
         }
-        same
     }
 
     /// A helper for the `cpu_tests!` macro. This handles the `setup` and `expect` sections, which
@@ -1175,7 +1180,7 @@ mod tests {
                     #[allow(unused_mut)]
                     fn $name(
                         $($var : $var_ty),*
-                    ) -> bool {
+                    ) -> TestResult {
                         let rom = vec![ $( $rom ),* ];
                         let rom_size = rom.len();
                         let (mut actual, mut expected) = setup(rom);
