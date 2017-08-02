@@ -1205,13 +1205,18 @@ mod tests {
             rom = [0x00], // nop
         }
 
-        test_ld_reg8_imm8(a_val: u8, b_val: u8) {
+        test_ld_reg8_imm8(a: u8, b: u8, c: u8, d: u8, e: u8, h: u8, l: u8) {
             rom = [
-                0x3E, a_val, // ld a, $a_val
-                0x06, b_val, // ld b, $b_val
+                0x3E, a, // ld a, $a
+                0x06, b, // ld b, $b
+                0x0E, c, // ld c, $c
+                0x16, d, // ld d, $d
+                0x1E, e, // ld e, $e
+                0x26, h, // ld h, $h
+                0x2E, l, // ld l, $l
             ],
-            setup  { reg8 { A = 0x00,  B = 0x00 } }
-            expect { reg8 { A = a_val, B = b_val } }
+            setup  { reg8 { A = 0, B = 0, C = 0, D = 0, E = 0, H = 0, L = 0 } }
+            expect { reg8 { A = a, B = b, C = c, D = d, E = e, H = h, L = l } }
         }
 
         test_ld_reg16_imm16() {
