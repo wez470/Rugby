@@ -1149,8 +1149,7 @@ mod tests {
         (
             $(
                 $name:ident {
-                    steps = $steps:expr,
-                    rom = [ $( $rom:expr ),* $(,)* ],
+                    rom = [ $( $rom:expr ),* $(,)* ] $(,)*
                     $(setup {
                         $( reg8  { $( $setup_reg8:ident  = $setup_reg8val:expr  ),* $(,)* } )*
                         $( reg16 { $( $setup_reg16:ident = $setup_reg16val:expr ),* $(,)* } )*
@@ -1166,12 +1165,16 @@ mod tests {
                 #[test]
                 #[allow(unused_mut)]
                 fn $name() {
-                    let (mut actual, mut expected) = setup(vec![ $( $rom ),* ]);
+                    let rom = vec![ $( $rom ),* ];
+                    let rom_size = rom.len();
+                    let (mut actual, mut expected) = setup(rom);
                     $(
                         $( $( actual.set_reg_8(Reg8::$setup_reg8, $setup_reg8val); )* )*
                         $( $( actual.set_reg_16(Reg16::$setup_reg16, $setup_reg16val); )* )*
                     )*
-                    for _ in 0..$steps { actual.step(); }
+                    while actual.reg_pc.get() as usize != rom_size {
+                        actual.step();
+                    }
                     $(
                         $( $( expected.set_reg_8(Reg8::$expect_reg8, $expect_reg8val); )* )*
                         $( $( expected.set_reg_16(Reg16::$expect_reg16, $expect_reg16val); )* )*
@@ -1185,12 +1188,10 @@ mod tests {
     /// The actual tests.
     cpu_tests! {
         test_nop {
-            steps = 1,
             rom = [0x00], // nop
         }
 
         test_ld_reg8_imm8 {
-            steps = 2,
             rom = [
                 0x3E, 0x13, // ld a, 0x13
                 0x06, 0x42, // ld b, 0x42
@@ -1200,16 +1201,17 @@ mod tests {
         }
 
         test_ld_reg16_imm16 {
-            steps = 1,
             rom = [0x11, 0x34, 0x12], // ld de, 0x1234
             setup  { reg16 { DE = 0x0000 } }
             expect { reg16 { DE = 0x1234 } }
         }
 
         test_jp_imm16_unconditional {
-            steps = 1,
-            rom = [0xC3, 0x34, 0x12], // jp 0x1234
-            expect { reg16 { PC = 0x1234 } }
+            // Test that we can jump past a halt instruction without stopping.
+            rom = [
+                0xC3, 0x04, 0x00, // jp 0x0004
+                0x76,             // halt
+            ],
         }
     }
 }
