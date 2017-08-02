@@ -1275,6 +1275,16 @@ mod tests {
         );
     }
 
+    // Helper functions for putting low/high bytes of 16-bit values into test ROMs.
+
+    fn low(x: u16) -> u8 {
+        (x & 0xFF) as u8
+    }
+
+    fn high(x: u16) -> u8 {
+        ((x >> 8) & 0xFF) as u8
+    }
+
     /// The actual tests.
     cpu_tests! {
         test_nop() {
@@ -1295,10 +1305,15 @@ mod tests {
             expect { reg8 { A = a, B = b, C = c, D = d, E = e, H = h, L = l } }
         }
 
-        test_ld_reg16_imm16() {
-            rom = [0x11, 0x34, 0x12], // ld de, 0x1234
-            setup  { reg16 { DE = 0x0000 } }
-            expect { reg16 { DE = 0x1234 } }
+        test_ld_reg16_imm16(bc: u16, de: u16, hl: u16, sp: u16) {
+            rom = [
+                0x01, low(bc), high(bc), // ld bc, $bc
+                0x11, low(de), high(de), // ld de, $de
+                0x21, low(hl), high(hl), // ld hl, $hl
+                0x31, low(sp), high(sp), // ld sp, $sp
+            ],
+            setup  { reg16 { BC = 0,  DE = 0,  HL = 0,  SP = 0 } }
+            expect { reg16 { BC = bc, DE = de, HL = hl, SP = sp } }
         }
 
         test_jp_imm16_unconditional() {
