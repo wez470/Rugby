@@ -41,6 +41,16 @@ enum Flag {
     Carry = 4,
 }
 
+/// Represents bit indexes of the interrupts
+#[derive(Clone, Copy)]
+enum Interrupt {
+    VerticalBlank = 0,
+    LCD = 1,
+    Timer = 2,
+    Serial = 3,
+    Joypad = 4,
+}
+
 #[derive(Clone)]
 pub struct Cpu {
     /// The 16-bit `AF` register, composed of two 8-bit registers:
@@ -154,6 +164,8 @@ impl Cpu {
         self.pending_enable_interrupts = false;
         self.pending_disable_interrupts = false;
 
+        self.handle_interrupts();
+
         // Get the opcode for the current instruction and find the total instruction length.
         let base_pc = self.reg_pc.get();
         self.current_opcode = self.read_mem(base_pc);
@@ -196,6 +208,70 @@ impl Cpu {
         }
 
         cycles
+    }
+
+    fn handle_interrupts(&mut self) {
+        self.check_vertical_blank();
+        self.check_lcd();
+        self.check_timer();
+        self.check_serial();
+        self.check_joypad();
+
+    }
+
+    fn check_vertical_blank(&mut self) {
+        if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
+            println!("Handling interrupt VerticalBlank");
+            self.reset_interrupt(Interrupt::VerticalBlank);
+        }
+    }
+
+    fn check_lcd(&mut self) {
+        if self.interrupts_enabled && self.interrupt_pending(Interrupt::LCD) && self.interrupt_enabled(Interrupt::LCD) {
+            println!("Handling interrupt LCD");
+            self.reset_interrupt(Interrupt::LCD);
+        }
+    }
+
+    fn check_timer(&mut self) {
+        if self.interrupts_enabled && self.interrupt_pending(Interrupt::Timer) && self.interrupt_enabled(Interrupt::Timer) {
+            println!("Handling interrupt Timer");
+            self.reset_interrupt(Interrupt::Timer);
+        }
+    }
+
+    fn check_serial(&mut self) {
+        if self.interrupts_enabled && self.interrupt_pending(Interrupt::Serial) && self.interrupt_enabled(Interrupt::Serial) {
+            println!("Handling interrupt Serial");
+            self.reset_interrupt(Interrupt::Serial);
+        }
+    }
+
+    fn check_joypad(&mut self) {
+        if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
+            println!("Handling interrupt Joypad");
+            self.reset_interrupt(Interrupt::Joypad);
+        }
+    }
+
+    fn interrupt_pending(&self, i: Interrupt) -> bool {
+        self.is_bit_set_at_location(i, 0xFF0F)
+    }
+
+    fn interrupt_enabled(&self, i: Interrupt) -> bool {
+        self.is_bit_set_at_location(i, 0xFF0F)
+    }
+
+    fn is_bit_set_at_location(&self, i: Interrupt, addr: u16) -> bool {
+        let val = self.read_mem(addr);
+        val >> (i as i32) & 1 != 0
+    }
+
+    fn reset_interrupt(&mut self, i: Interrupt) {
+        let addr = 0xFF0F;
+        let val = self.read_mem(addr);
+        let new_val = val & !(1 << (i as i32));
+        self.write_mem(addr, new_val);
     }
 
     fn execute(&mut self, inst: Inst) {

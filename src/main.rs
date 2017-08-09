@@ -78,7 +78,7 @@ fn main() {
             let mut over_under_time: i64 = 0;
 
             let start_time = Instant::now();
-            for _ in 0..ITERATIONS {
+            'main: for _ in 0..ITERATIONS {
                 let frame_start_time = Instant::now();
 
                 // TODO(solson): Heavily re-write all of the below code. 'tis the product of a
@@ -130,7 +130,7 @@ fn main() {
                 for event in event_pump.poll_iter() {
                     use sdl2::event::Event;
                     match event {
-                        Event::Quit { .. } => break,// 'main,
+                        Event::Quit { .. } => break 'main,
                         _ => ()
                     }
                 }
@@ -140,6 +140,7 @@ fn main() {
                 let frame_finish_time = Instant::now();
                 let curr_frame_nanos = (frame_finish_time - frame_start_time).subsec_nanos() as i64;
                 let mut sleep_duration_nanos = NANOS_PER_FRAME as i64 - curr_frame_nanos - over_under_time;
+                over_under_time = 0;
                 if sleep_duration_nanos > 0 {
                     if total_time_over > 0 {
                         let temp_sleep_dur = sleep_duration_nanos;
