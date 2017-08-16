@@ -222,6 +222,9 @@ impl Cpu {
     fn check_vertical_blank(&mut self) {
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
             println!("Handling interrupt VerticalBlank");
+            let pc = self.get_reg_16(Reg16::PC);
+            self.push_stack(pc);
+            self.set_reg_16(Reg16::PC, 0x0040);
             self.reset_interrupt(Interrupt::VerticalBlank);
         }
     }
@@ -259,7 +262,7 @@ impl Cpu {
     }
 
     fn interrupt_enabled(&self, i: Interrupt) -> bool {
-        self.is_bit_set_at_location(i, 0xFF0F)
+        self.is_bit_set_at_location(i, 0xFFFF)
     }
 
     fn is_bit_set_at_location(&self, i: Interrupt, addr: u16) -> bool {
