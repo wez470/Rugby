@@ -232,6 +232,9 @@ impl Cpu {
     fn check_lcd(&mut self) {
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::LCD) && self.interrupt_enabled(Interrupt::LCD) {
             println!("Handling interrupt LCD");
+            let pc = self.get_reg_16(Reg16::PC);
+            self.push_stack(pc);
+            self.set_reg_16(Reg16::PC, 0x0048);
             self.reset_interrupt(Interrupt::LCD);
         }
     }
@@ -239,6 +242,9 @@ impl Cpu {
     fn check_timer(&mut self) {
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Timer) && self.interrupt_enabled(Interrupt::Timer) {
             println!("Handling interrupt Timer");
+            let pc = self.get_reg_16(Reg16::PC);
+            self.push_stack(pc);
+            self.set_reg_16(Reg16::PC, 0x0050);
             self.reset_interrupt(Interrupt::Timer);
         }
     }
@@ -246,6 +252,9 @@ impl Cpu {
     fn check_serial(&mut self) {
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Serial) && self.interrupt_enabled(Interrupt::Serial) {
             println!("Handling interrupt Serial");
+            let pc = self.get_reg_16(Reg16::PC);
+            self.push_stack(pc);
+            self.set_reg_16(Reg16::PC, 0x0058);
             self.reset_interrupt(Interrupt::Serial);
         }
     }
@@ -253,6 +262,9 @@ impl Cpu {
     fn check_joypad(&mut self) {
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
             println!("Handling interrupt Joypad");
+            let pc = self.get_reg_16(Reg16::PC);
+            self.push_stack(pc);
+            self.set_reg_16(Reg16::PC, 0x0060);
             self.reset_interrupt(Interrupt::Joypad);
         }
     }
