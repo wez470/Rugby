@@ -43,7 +43,7 @@ enum Flag {
 
 /// Represents bit indexes of the interrupts
 #[derive(Clone, Copy)]
-enum Interrupt {
+pub enum Interrupt {
     VerticalBlank = 0,
     LCD = 1,
     Timer = 2,
@@ -270,16 +270,26 @@ impl Cpu {
     }
 
     fn interrupt_pending(&self, i: Interrupt) -> bool {
-        self.is_bit_set_at_location(i, 0xFF0F)
+        self.is_bit_set_at_location(i as i32, 0xFF0F)
     }
 
     fn interrupt_enabled(&self, i: Interrupt) -> bool {
-        self.is_bit_set_at_location(i, 0xFFFF)
+        self.is_bit_set_at_location(i as i32, 0xFFFF)
     }
 
-    fn is_bit_set_at_location(&self, i: Interrupt, addr: u16) -> bool {
+    pub fn request_interrupt(&mut self, i: Interrupt) {
+        self.set_bit_at_location(i as i32, 0xFF0F);
+    }
+
+    fn is_bit_set_at_location(&self, bit: i32, addr: u16) -> bool {
         let val = self.read_mem(addr);
-        val >> (i as i32) & 1 != 0
+        val >> bit & 1 != 0
+    }
+
+    fn set_bit_at_location(&mut self, bit: i32, addr: u16) {
+        let mut val = self.read_mem(addr);
+        val |= 1 << bit;
+        self.write_mem(addr, val);
     }
 
     fn reset_interrupt(&mut self, i: Interrupt) {
