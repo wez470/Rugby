@@ -1,6 +1,6 @@
-use reg_16::Register;
+use crate::reg_16::Register;
 use self::inst::{Cond, Inst, Operand8, Operand16};
-use cart::Cart;
+use crate::cart::Cart;
 
 mod inst;
 
@@ -181,7 +181,7 @@ impl Cpu {
 
         // Log the current instruction address and bytes for debugging.
         //print!("{:04X}:", base_pc);
-        for b in &inst_bytes[..instruction_len] {
+        for _b in &inst_bytes[..instruction_len] {
         //    print!(" {:02X}", b);
         }
 
@@ -1112,8 +1112,8 @@ mod tests {
     use std::mem;
 
     fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
-        use cart::Cart;
-        use cart_header::*;
+        use crate::cart::Cart;
+        use crate::cart_header::*;
 
         let rom_size = rom.len();
         let cart_header = CartHeader {

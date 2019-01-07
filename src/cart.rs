@@ -1,4 +1,4 @@
-use cart_header::{CartHeader, MbcType};
+use crate::cart_header::{CartHeader, MbcType};
 
 const ROM_BANK_SIZE: usize = 0x4000;
 const RAM_BANK_SIZE: usize = 0x2000;

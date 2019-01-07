@@ -1,4 +1,4 @@
-use cpu::{Reg8, Reg16};
+use crate::cpu::{Reg8, Reg16};
 
 // The below tables are based on the tables at
 // http://pastraiser.com/cpu/gameboy/gameboy_opcodes.html.
@@ -377,8 +377,8 @@ impl Inst {
         use self::Inst::*;
         use self::Operand8::*;
         use self::Operand16::*;
-        use cpu::Reg16::*;
-        use cpu::Reg8::*;
+        use crate::cpu::Reg16::*;
+        use crate::cpu::Reg8::*;
 
         /// Create a `u16` from its high and low bytes.
         fn to_u16(low: u8, high: u8) -> u16 {

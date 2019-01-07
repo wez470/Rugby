@@ -8,8 +8,8 @@ extern crate rand;
 extern crate sdl2;
 
 use clap::{Arg, App, AppSettings, SubCommand};
-use cpu::Cpu;
-use cart::Cart;
+use crate::cpu::Cpu;
+use crate::cart::Cart;
 use std::fmt::Display;
 use std::fs::File;
 use std::io::Read;
@@ -48,7 +48,7 @@ fn main() {
         ("run", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
             let rom = read_rom_file(rom_path);
-            let instruction_count: usize = check_error(
+            let _instruction_count: usize = check_error(
                 matches.value_of("INSTRUCTIONS").unwrap().parse(),
                 "Couldn't parse instruction count",
             );
