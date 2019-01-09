@@ -69,6 +69,11 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize) {
             use sdl2::event::Event;
             match event {
                 Event::Quit { .. } => break 'main,
+                Event::KeyDown { keycode, .. } => {
+                    if let Some(key) = keycode {
+                        println!("{}", key);
+                    }
+                },
                 _ => ()
             }
         }
