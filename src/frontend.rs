@@ -1,5 +1,4 @@
 use std::time::{Instant, Duration};
-use std::fmt::Display;
 use std::thread;
 use crate::cpu::Cpu;
 
@@ -75,8 +74,6 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize) {
         }
 
         cpu.step_cycles(CYCLES_PER_FRAME);
-
-        let frame_finish_time = Instant::now();
 
         while (Instant::now() - frame_start_time).subsec_nanos() < NANOS_PER_FRAME {
             thread::sleep(Duration::new(0, 1 as u32));

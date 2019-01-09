@@ -1,6 +1,6 @@
-use crate::reg_16::Register;
-use self::inst::{Cond, Inst, Operand8, Operand16};
 use crate::cart::Cart;
+use crate::reg_16::Register;
+use self::inst::{Cond, Inst, Operand16, Operand8};
 
 mod inst;
 
@@ -221,10 +221,10 @@ impl Cpu {
 
     fn check_vertical_blank(&mut self) {
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
-            println!("Handling interrupt VerticalBlank");
-            let pc = self.get_reg_16(Reg16::PC);
-            self.push_stack(pc);
-            self.set_reg_16(Reg16::PC, 0x0040);
+//            println!("Handling interrupt VerticalBlank");
+//            let pc = self.get_reg_16(Reg16::PC);
+//            self.push_stack(pc);
+//            self.set_reg_16(Reg16::PC, 0x0040);
             self.reset_interrupt(Interrupt::VerticalBlank);
         }
     }
@@ -1109,9 +1109,9 @@ fn get_add_half_carry_high(left: u16, right: u16) -> bool {
 #[cfg(test)]
 mod tests {
     use quickcheck::TestResult;
-    use super::*;
     use std::fmt::{Debug, UpperHex, Write};
     use std::mem;
+    use super::*;
 
     fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
         use crate::cart::Cart;
