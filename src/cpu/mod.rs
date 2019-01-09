@@ -1044,6 +1044,8 @@ impl Cpu {
                     144
                 } else if title.starts_with("ZELDA") {
                     145
+                } else if title.starts_with("DR.MARIO") {
+                    145
                 } else {
                     unimplemented!()
                 }
