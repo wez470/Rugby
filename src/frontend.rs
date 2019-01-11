@@ -1,3 +1,6 @@
+extern crate sdl2;
+
+use sdl2::keyboard::Keycode;
 use std::time::{Instant, Duration};
 use std::thread;
 use crate::cpu::Cpu;
@@ -5,7 +8,7 @@ use crate::cpu::Cpu;
 const CYCLES_PER_FRAME: usize = 69905;
 const NANOS_PER_FRAME: u32 = 16666667;
 
-pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize) {
+pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize, step_mode: bool) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
     let video_subsystem = sdl.video().expect("Failed to access SDL video subsystem");
     let window = video_subsystem
@@ -28,11 +31,11 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize) {
 
         let mut image = [0u8; SIDE * SIDE * BYTES_PER_PIXEL];
         {
-            let bg_map = &cpu.video_ram[0x1800..0x1C00];
+            let bg_map = &cpu.gpu.video_ram[0x1800..0x1C00];
             for tile_row in 0..NUM_TILES {
                 for tile_col in 0..NUM_TILES {
                     let tile_i = bg_map[tile_row * NUM_TILES + tile_col] as usize;
-                    let tile = &cpu.video_ram[tile_i * 16..(tile_i * 16 + 16)];
+                    let tile = &cpu.gpu.video_ram[tile_i * 16..(tile_i * 16 + 16)];
                     for row in 0..TILE_SIDE {
                         for col in 0..TILE_SIDE {
                             let upper_bit = (tile[row * 2 + 0] >> (TILE_SIDE - col - 1)) & 1;
@@ -65,18 +68,23 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize) {
         renderer.copy(&texture, None, None).unwrap();
         renderer.present();
 
-        for event in event_pump.poll_iter() {
-            use sdl2::event::Event;
-            match event {
-                Event::Quit { .. } => break 'main,
-                Event::KeyDown { keycode, .. } => {
-                    if let Some(key) = keycode {
-                        println!("{}", key);
-                    }
-                },
-                _ => ()
+        'wait: while {
+            for event in event_pump.poll_iter() {
+                use sdl2::event::Event;
+                match event {
+                    Event::Quit { .. } => break 'main,
+                    Event::KeyDown { keycode, .. } => {
+                        if let Some(key) = keycode {
+                            if key == Keycode::Space && step_mode {
+                                break 'wait;
+                            }
+                        }
+                    },
+                    _ => ()
+                }
             }
-        }
+            step_mode
+        } {}
 
         cpu.step_cycles(CYCLES_PER_FRAME);
 

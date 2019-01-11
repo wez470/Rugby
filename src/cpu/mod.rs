@@ -51,6 +51,40 @@ pub enum Interrupt {
     Joypad = 4,
 }
 
+const GPU_MODE_CYCLES: usize = 456; // Number of CPU cycles to cycle through LCD modes
+
+#[derive(Clone)]
+pub struct Gpu {
+    /// Video RAM internal to the Gameboy.
+    pub video_ram: Box<[u8]>,
+
+    /// Where we are at currently in the scanline cycle counter
+    cycle_counter: usize,
+
+    /// The current scanline
+    scan_line: usize,
+}
+
+impl Gpu {
+    pub fn new() -> Gpu {
+        Gpu {
+            video_ram: Box::new([0; VIDEO_RAM_SIZE]),
+            cycle_counter: 0,
+            scan_line: 0,
+        }
+    }
+
+    pub fn step(&mut self, cycles: usize) {
+        self.cycle_counter += cycles;
+
+        if self.cycle_counter >= GPU_MODE_CYCLES {
+            self.scan_line += 1;
+
+            self.cycle_counter %= GPU_MODE_CYCLES;
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Cpu {
     /// The 16-bit `AF` register, composed of two 8-bit registers:
@@ -83,7 +117,7 @@ pub struct Cpu {
 
     /// Video RAM internal to the Gameboy.
     // TODO(solson): Un-pub.
-    pub video_ram: Box<[u8]>,
+    pub gpu: Gpu,
 
     /// Sprite RAM internal to the Gameboy, also known as OAM.
     sprite_ram: Box<[u8]>,
@@ -126,7 +160,7 @@ impl Cpu {
             reg_pc: Register::default(),
             work_ram: Box::new([0; WORK_RAM_SIZE]),
             high_ram: Box::new([0; HIGH_RAM_SIZE]),
-            video_ram: Box::new([0; VIDEO_RAM_SIZE]),
+            gpu: Gpu::new(),
             sprite_ram: Box::new([0; SPRITE_RAM_SIZE]),
             cart: cart,
             current_opcode: 0,
@@ -154,7 +188,9 @@ impl Cpu {
     pub fn step_cycles(&mut self, cycles: usize) {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
-            curr_cycles += self.step();
+            let step_cycles = self.step();
+            self.gpu.step(step_cycles);
+            curr_cycles += step_cycles;
         }
     }
 
@@ -180,7 +216,7 @@ impl Cpu {
         }
 
         // Log the current instruction address and bytes for debugging.
-        //print!("{:04X}:", base_pc);
+        print!("{:04X}:", base_pc);
         for _b in &inst_bytes[..instruction_len] {
         //    print!(" {:02X}", b);
         }
@@ -195,7 +231,7 @@ impl Cpu {
 
         // Decode the instruction.
         let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-        //println!("\t\t(decoded: {:?})", inst);
+        println!("\t\t(decoded: {:?})", inst);
 
         self.execute(inst);
 
@@ -908,7 +944,7 @@ impl Cpu {
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
                 let i = (addr - 0x8000) as usize;
-                self.video_ram[i]
+                self.gpu.video_ram[i]
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
@@ -967,8 +1003,10 @@ impl Cpu {
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
-                let i = (addr - 0x8000) as usize;
-                self.video_ram[i] = val;
+                // Tile rows always start on an even address, so we have to bitwise and with
+                // 0xFFFE (zeroes out last binary digit) to make sure we have an even index.
+                let i = ((addr - 0x8000) & 0xFFFE) as usize;
+                self.gpu.video_ram[i] = val;
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)

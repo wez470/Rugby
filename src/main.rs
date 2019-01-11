@@ -29,7 +29,10 @@ fn main() {
                 .help("The game rom"))
             .arg(Arg::with_name("INSTRUCTIONS")
                 .required(true)
-                .help("The number of instructions to execute")))
+                .help("The number of instructions to execute"))
+            .arg(Arg::with_name("Step Mode")
+                .short("s")
+                .help("Allows step mode where 'space' will execute one frame")))
         .subcommand(SubCommand::with_name("info")
             .arg(Arg::with_name("ROM")
                 .required(true)
@@ -47,7 +50,7 @@ fn main() {
             let cart = Cart::new(rom, &cart_header);
             let mut cpu = Cpu::new(cart);
 
-            start_frontend(&mut cpu, instruction_count);
+            start_frontend(&mut cpu, instruction_count, matches.is_present("Step Mode"));
         }
 
 
