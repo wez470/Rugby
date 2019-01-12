@@ -970,9 +970,7 @@ impl Cpu {
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
-                // Tile rows always start on an even address, so we have to bitwise and with
-                // 0xFFFE (zeroes out last binary digit) to make sure we have an even index.
-                let i = ((addr - 0x8000) & 0xFFFE) as usize;
+                let i = (addr - 0x8000) as usize;
                 self.gpu.video_ram[i] = val;
             }
 
