@@ -1,13 +1,14 @@
 use crate::cart::Cart;
 use crate::reg_16::Register;
 use self::inst::{Cond, Inst, Operand16, Operand8};
+use self::gpu::Gpu;
 
+mod gpu;
 mod inst;
 
 // TODO: Refactor later to extract memory-related stuff out of the cpu module.
 const WORK_RAM_SIZE: usize = 8 * 1024; // 8 KB
 const HIGH_RAM_SIZE: usize = 127; // For the address range 0xFF80-0xFFFE (inclusive).
-const VIDEO_RAM_SIZE: usize = 8 * 1024; // 8 KB
 const SPRITE_RAM_SIZE: usize = 160; // For the address range 0xFE00-0xFE9F (inclusive).
 
 #[derive(Clone, Copy, Debug)]
@@ -49,40 +50,6 @@ pub enum Interrupt {
     Timer = 2,
     Serial = 3,
     Joypad = 4,
-}
-
-const GPU_MODE_CYCLES: usize = 456; // Number of CPU cycles to cycle through LCD modes
-
-#[derive(Clone)]
-pub struct Gpu {
-    /// Video RAM internal to the Gameboy.
-    pub video_ram: Box<[u8]>,
-
-    /// Where we are at currently in the scanline cycle counter
-    cycle_counter: usize,
-
-    /// The current scanline
-    scan_line: usize,
-}
-
-impl Gpu {
-    pub fn new() -> Gpu {
-        Gpu {
-            video_ram: Box::new([0; VIDEO_RAM_SIZE]),
-            cycle_counter: 0,
-            scan_line: 0,
-        }
-    }
-
-    pub fn step(&mut self, cycles: usize) {
-        self.cycle_counter += cycles;
-
-        if self.cycle_counter >= GPU_MODE_CYCLES {
-            self.scan_line += 1;
-
-            self.cycle_counter %= GPU_MODE_CYCLES;
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -1075,7 +1042,7 @@ impl Cpu {
                 // FIXME: Hilarious hacks.
                 let title = &self.cart.title;
                 if title.starts_with("TETRIS") {
-                    if ::rand::random() { 145 } else { 148 }
+                    if rand::random() { 145 } else { 148 }
                 } else if title.starts_with("POKEMON RED") {
                     145
                 } else if title.starts_with("CPU_INSTRS") {
@@ -1146,7 +1113,7 @@ fn get_add_half_carry_high(left: u16, right: u16) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use quickcheck::TestResult;
+    use quickcheck::{quickcheck, TestResult};
     use std::fmt::{Debug, UpperHex, Write};
     use std::mem;
     use super::*;

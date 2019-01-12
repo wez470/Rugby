@@ -1,12 +1,6 @@
-#[macro_use]
-extern crate bitflags;
-extern crate clap;
 #[cfg(test)]
-#[macro_use]
-extern crate quickcheck;
-extern crate rand;
 
-use clap::{Arg, App, AppSettings, SubCommand};
+use clap;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
@@ -21,20 +15,20 @@ mod frontend;
 mod reg_16;
 
 fn main() {
-    let app_matches = App::new("Rustboy")
-        .setting(AppSettings::ArgRequiredElseHelp)
-        .subcommand(SubCommand::with_name("run")
-            .arg(Arg::with_name("ROM")
+    let app_matches = clap::App::new("Rustboy")
+        .setting(clap::AppSettings::ArgRequiredElseHelp)
+        .subcommand(clap::SubCommand::with_name("run")
+            .arg(clap::Arg::with_name("ROM")
                 .required(true)
                 .help("The game rom"))
-            .arg(Arg::with_name("INSTRUCTIONS")
+            .arg(clap::Arg::with_name("INSTRUCTIONS")
                 .required(true)
                 .help("The number of instructions to execute"))
-            .arg(Arg::with_name("Step Mode")
+            .arg(clap::Arg::with_name("Step Mode")
                 .short("s")
                 .help("Allows step mode where 'space' will execute one frame")))
-        .subcommand(SubCommand::with_name("info")
-            .arg(Arg::with_name("ROM")
+        .subcommand(clap::SubCommand::with_name("info")
+            .arg(clap::Arg::with_name("ROM")
                 .required(true)
                 .help("The game rom")))
         .get_matches();

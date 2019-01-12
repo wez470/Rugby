@@ -1,5 +1,3 @@
-extern crate sdl2;
-
 use sdl2::keyboard::Keycode;
 use std::time::{Instant, Duration};
 use std::thread;
