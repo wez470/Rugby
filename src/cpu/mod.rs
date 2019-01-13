@@ -1025,33 +1025,22 @@ impl Cpu {
         match port {
             0x00 => {
                 // FIXME: This is just a hack to get farther in Tetris.
-                0
+                // Randomly selects start, select, a, or b to be selected.
+                if rand::random() { if rand::random() { 30 } else { 23 } } else { if rand::random() { 27 } else { 29 } }
             }
 
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register,
 
+            // LCD Control Register
             0x40 => {
                 // FIXME: This is just a hack to get farther in Pokemon Red.
-                0
+                // Hard coded to return that the background is on and the LCD is enabled
+                129
             }
 
             0x44 => {
-                // FIXME: Hilarious hacks.
-                let title = &self.cart.title;
-                if title.starts_with("TETRIS") {
-                    if rand::random() { 145 } else { 148 }
-                } else if title.starts_with("POKEMON RED") {
-                    145
-                } else if title.starts_with("CPU_INSTRS") {
-                    144
-                } else if title.starts_with("ZELDA") {
-                    145
-                } else if title.starts_with("DR.MARIO") {
-                    145
-                } else {
-                    unimplemented!()
-                }
+                self.gpu.scan_line
             }
 
             _ => panic!("unimplemented: read from I/O port 0x{:02X}", port),
