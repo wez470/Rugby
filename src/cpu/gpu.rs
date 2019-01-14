@@ -6,7 +6,7 @@ const VERTICAL_BLANK_START_LINE: u8 = 144; // The scan line at which we enter th
 const VERTICAL_BLANK_END_LINE: u8 = 154; // The scan line at which the vertical blank phase ends
 const VIDEO_RAM_SIZE: usize = 8 * 1024; // 8 KB
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Mode {
     HorizontalBlank = 0,
     VerticalBlank = 1,
@@ -29,13 +29,16 @@ pub struct Gpu {
     lcd_enabled: bool,
 
     /// The current LCD mode
-    mode: Mode,
+    pub mode: Mode,
+
+    /// Setting to False will clear the background
+    background_display: bool,
 
     /// True if the window is enabled
     window_enabled: bool,
 
-    /// True if the background is enabled
-    background_enabled: bool,
+    /// True if sprite display is enabled
+    obj_display_enabled: bool,
 
     /// The Coincidence flag (Bit 2 in 0xFF41)
     /// TODO(wcarlson): Add more documentation about this
@@ -72,7 +75,8 @@ impl Gpu {
             lcd_enabled: true,
             mode: Mode::OamRead,
             window_enabled: false,
-            background_enabled: false,
+            obj_display_enabled: false,
+            background_display: false,
             coincidence_flag: false,
             coincidence_interrupt: false,
             oam_enabled: false,
@@ -139,5 +143,47 @@ impl Gpu {
                 }
             },
         }
+    }
+
+    pub fn read_lcd_control(&self) -> u8 {
+        let mut lcd_control = 0;
+        if self.lcd_enabled {
+            lcd_control |= 1 << 7;
+        }
+
+        //TODO(wcarlson): Bit 6 - Window Tile Map Display Select
+
+        if self.window_enabled {
+            lcd_control |= 1 << 5;
+        }
+
+        //TODO(wcarlson): Bit 4 - BG & Window Tile Data Select
+        //TODO(wcarlson): Bit 3 - BG Tile Map Display Select
+        //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
+        //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
+
+        if self.obj_display_enabled {
+            lcd_control |= 1 << 1
+        }
+        if self.background_display {
+            lcd_control |= 1
+        }
+        lcd_control
+    }
+
+    pub fn write_lcd_control(&mut self, val: u8) {
+        self.lcd_enabled = (val >> 7) == 1;
+
+        //TODO(wcarlson): Bit 6 - Window Tile Map Display Select
+
+        self.window_enabled = ((val >> 5) & 1) == 1;
+
+        //TODO(wcarlson): Bit 4 - BG & Window Tile Data Select
+        //TODO(wcarlson): Bit 3 - BG Tile Map Display Select
+        //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
+        //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
+
+        self.obj_display_enabled = ((val >> 1) & 1) == 1;
+        self.background_display = (val & 1) == 1;
     }
 }

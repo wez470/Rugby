@@ -1025,7 +1025,7 @@ impl Cpu {
         match port {
             0x00 => {
                 // FIXME: This is just a hack to get farther in Tetris.
-                // Randomly selects start, select, a, or b to be selected.
+                // Randomly returns start, select, a, or b.
                 if rand::random() { if rand::random() { 30 } else { 23 } } else { if rand::random() { 27 } else { 29 } }
             }
 
@@ -1034,9 +1034,14 @@ impl Cpu {
 
             // LCD Control Register
             0x40 => {
-                // FIXME: This is just a hack to get farther in Pokemon Red.
-                // Hard coded to return that the background is on and the LCD is enabled
-                129
+                let val = self.gpu.read_lcd_control();
+                println!("lcd control read: {:08b}", val);
+                val
+            }
+
+            // LCD Control Status
+            0x41 => {
+                self.gpu.mode as u8
             }
 
             0x44 => {
@@ -1062,7 +1067,12 @@ impl Cpu {
                 //println!("  unimplemented: write to sound I/O port");
             }
 
-            0x40 | 0x41 | 0x42 | 0x43 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
+            0x40 => {
+                println!("lcd control write: {:08b}", val);
+                self.gpu.write_lcd_control(val)
+            }
+
+            0x41 | 0x42 | 0x43 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
                 //println!("  unimplemented: write to LCD I/O port");
             }
 
