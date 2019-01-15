@@ -14,6 +14,18 @@ pub enum Mode {
     VRamRead = 3,
 }
 
+#[derive(Clone, Copy)]
+pub enum TileMapLocation {
+    X9800 = 0,
+    X9C00 = 1,
+}
+
+#[derive(Clone, Copy)]
+pub enum BackgroundAndWindowTileDataLocation {
+    X8800 = 0,
+    X8000 = 1,
+}
+
 #[derive(Clone)]
 pub struct Gpu {
     /// Video RAM internal to the Gameboy.
@@ -64,6 +76,15 @@ pub struct Gpu {
     /// Window X and Y positions
     window_x: u8,
     window_y: u8,
+
+    /// The address which the window tile map starts
+    window_tile_map: TileMapLocation,
+
+    /// The address which the background and window tile data start
+    background_and_window_tile_data_location: BackgroundAndWindowTileDataLocation,
+
+    /// The address which the background tile map starts
+    background_tile_map: TileMapLocation,
 }
 
 impl Gpu {
@@ -86,6 +107,9 @@ impl Gpu {
             scan_y: 0,
             window_x: 0,
             window_y: 0,
+            window_tile_map: TileMapLocation::X9800,
+            background_and_window_tile_data_location: BackgroundAndWindowTileDataLocation::X8800,
+            background_tile_map: TileMapLocation::X9800,
         }
     }
 
@@ -150,16 +174,12 @@ impl Gpu {
         if self.lcd_enabled {
             lcd_control |= 1 << 7;
         }
-
-        //TODO(wcarlson): Bit 6 - Window Tile Map Display Select
-
+        lcd_control |= (self.window_tile_map as u8) << 6;
         if self.window_enabled {
             lcd_control |= 1 << 5;
         }
-
-        //TODO(wcarlson): Bit 4 - BG & Window Tile Data Select
-        //TODO(wcarlson): Bit 3 - BG Tile Map Display Select
-        //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
+        lcd_control |= (self.background_and_window_tile_data_location as u8) << 4;
+        lcd_control |= (self.background_tile_map as u8) << 3;
         //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
 
         if self.obj_display_enabled {
@@ -180,7 +200,6 @@ impl Gpu {
 
         //TODO(wcarlson): Bit 4 - BG & Window Tile Data Select
         //TODO(wcarlson): Bit 3 - BG Tile Map Display Select
-        //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
         //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
 
         self.obj_display_enabled = ((val >> 1) & 1) == 1;
