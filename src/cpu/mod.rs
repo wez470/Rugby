@@ -1038,15 +1038,10 @@ impl Cpu {
                 println!("lcd control read: {:08b}", val);
                 val
             }
-
-            // LCD Control Status
-            0x41 => {
-                self.gpu.mode as u8
-            }
-
-            0x44 => {
-                self.gpu.scan_line
-            }
+            0x41 => self.gpu.mode as u8, //TODO(wcarlson): Make this return a proper value
+            0x42 => self.gpu.scan_y,
+            0x43 => self.gpu.scan_x,
+            0x44 => self.gpu.scan_line,
 
             _ => panic!("unimplemented: read from I/O port 0x{:02X}", port),
         }
@@ -1069,10 +1064,14 @@ impl Cpu {
 
             0x40 => {
                 println!("lcd control write: {:08b}", val);
-                self.gpu.write_lcd_control(val)
+                self.gpu.write_lcd_control(val);
             }
 
-            0x41 | 0x42 | 0x43 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
+            0x42 => self.gpu.scan_y = val,
+            0x43 => self.gpu.scan_x = val,
+            0x44 => self.gpu.scan_line = 0,
+
+            0x41 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
                 //println!("  unimplemented: write to LCD I/O port");
             }
 

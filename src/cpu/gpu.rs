@@ -106,8 +106,8 @@ pub struct Gpu {
 
     /// X and Y positions in the 256x256 pixel background map to start at the top left
     /// of the LCD screen.
-    scan_x: u8,
-    scan_y: u8,
+    pub scan_x: u8,
+    pub scan_y: u8,
 
     /// Window X and Y positions
     window_x: u8,
