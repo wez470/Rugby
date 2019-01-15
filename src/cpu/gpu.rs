@@ -20,10 +20,46 @@ pub enum TileMapLocation {
     X9C00 = 1,
 }
 
+impl std::convert::From<u8> for TileMapLocation {
+    fn from(value: u8) -> TileMapLocation {
+        match value {
+            0 => TileMapLocation::X9800,
+            1 => TileMapLocation::X9C00,
+            _ => panic!("Invalid number for TileMapLocation"),
+        }
+    }
+}
+
 #[derive(Clone, Copy)]
 pub enum BackgroundAndWindowTileDataLocation {
     X8800 = 0,
     X8000 = 1,
+}
+
+impl std::convert::From<u8> for BackgroundAndWindowTileDataLocation {
+    fn from(value: u8) -> BackgroundAndWindowTileDataLocation {
+        match value {
+            0 => BackgroundAndWindowTileDataLocation::X8800,
+            1 => BackgroundAndWindowTileDataLocation::X8000,
+            _ => panic!("Invalid number for BackgroundAndWindowTileDataLocation"),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum ObjSize {
+    EightByEight = 0,
+    EightBySixteen = 1,
+}
+
+impl std::convert::From<u8> for ObjSize {
+    fn from(value: u8) -> ObjSize {
+        match value {
+            0 => ObjSize::EightByEight,
+            1 => ObjSize::EightBySixteen,
+            _ => panic!("Invalid number for ObjSize"),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -85,6 +121,9 @@ pub struct Gpu {
 
     /// The address which the background tile map starts
     background_tile_map: TileMapLocation,
+
+    /// The size of the objects (sprites). 8x8 or 8x16
+    obj_size: ObjSize,
 }
 
 impl Gpu {
@@ -110,6 +149,7 @@ impl Gpu {
             window_tile_map: TileMapLocation::X9800,
             background_and_window_tile_data_location: BackgroundAndWindowTileDataLocation::X8800,
             background_tile_map: TileMapLocation::X9800,
+            obj_size: ObjSize::EightByEight,
         }
     }
 
@@ -180,8 +220,7 @@ impl Gpu {
         }
         lcd_control |= (self.background_and_window_tile_data_location as u8) << 4;
         lcd_control |= (self.background_tile_map as u8) << 3;
-        //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
-
+        lcd_control |= (self.obj_size as u8) << 2;
         if self.obj_display_enabled {
             lcd_control |= 1 << 1
         }
@@ -193,15 +232,12 @@ impl Gpu {
 
     pub fn write_lcd_control(&mut self, val: u8) {
         self.lcd_enabled = (val >> 7) == 1;
-
-        //TODO(wcarlson): Bit 6 - Window Tile Map Display Select
-
+        self.window_tile_map = TileMapLocation::from((val >> 6) & 1);
         self.window_enabled = ((val >> 5) & 1) == 1;
-
-        //TODO(wcarlson): Bit 4 - BG & Window Tile Data Select
-        //TODO(wcarlson): Bit 3 - BG Tile Map Display Select
-        //TODO(wcarlson): Bit 2 - OBJ (Sprite) Size
-
+        self.background_and_window_tile_data_location =
+            BackgroundAndWindowTileDataLocation::from((val >> 4) & 1);
+        self.background_tile_map = TileMapLocation::from((val >> 3) & 1);
+        self.obj_size = ObjSize::from((val >> 2) & 1);
         self.obj_display_enabled = ((val >> 1) & 1) == 1;
         self.background_display = (val & 1) == 1;
     }
