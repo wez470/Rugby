@@ -970,7 +970,7 @@ impl Cpu {
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
-                let i = (addr - 0x8000);
+                let i = (addr - 0x8000) as usize;
                 self.gpu.write_mem(i, val);
             }
 
