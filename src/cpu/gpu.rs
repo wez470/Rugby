@@ -5,6 +5,8 @@ const SCAN_LINE_CYCLES: usize = 456; // One scan line takes 456 cycles.
 const VERTICAL_BLANK_START_LINE: u8 = 144; // The scan line at which we enter the vertical blank phase
 const VERTICAL_BLANK_END_LINE: u8 = 154; // The scan line at which the vertical blank phase ends
 const VIDEO_RAM_SIZE: usize = 8 * 1024; // 8 KB
+const TOTAL_TILES: usize = 384; // Total number of tiles in video ram
+const TILE_MAP_0_START: usize = 0x1800; // The starting address of tile map 0
 
 #[derive(Clone, Copy)]
 pub enum Mode {
@@ -62,10 +64,19 @@ impl std::convert::From<u8> for ObjSize {
     }
 }
 
+type Tile = [[u8; 8]; 8];
+
+fn init_tile() -> Tile {
+    [[0; 8]; 8]
+}
+
 #[derive(Clone)]
 pub struct Gpu {
     /// Video RAM internal to the Gameboy.
     pub video_ram: Box<[u8]>,
+
+    /// The current tiles in video ram.
+    tile_set: [Tile; TOTAL_TILES],
 
     /// The current scan line. (LY at address 0xFF44)
     pub scan_line: u8,
@@ -130,6 +141,7 @@ impl Gpu {
     pub fn new() -> Gpu {
         Gpu {
             video_ram: Box::new([0; VIDEO_RAM_SIZE]),
+            tile_set: [init_tile(); 384],
             cycles: 0,
             scan_line: 0,
             lcd_enabled: true,
@@ -150,6 +162,38 @@ impl Gpu {
             background_and_window_tile_data_location: BackgroundAndWindowTileDataLocation::X8800,
             background_tile_map: TileMapLocation::X9800,
             obj_size: ObjSize::EightByEight,
+        }
+    }
+
+    pub fn read_mem(&self, addr: u16) -> u8 {
+        self.video_ram[addr]
+    }
+
+    /// Write video ram
+    ///
+    /// This function also keeps the current tile set up to date
+    pub fn write_mem(&mut self, addr: u16, val: u8) {
+        self.video_ram[addr];
+        if addr >= TILE_MAP_0_START {
+            return
+        }
+
+        // Each row in the tile (8x8 pixels) is 2 bytes
+        let row_start = addr & 0xFFFE;
+        let byte1 = self.video_ram[row_start];
+        let byte2 = self.video_ram[row_start + 1];
+
+        // Each tile is 16 byte total
+        let tile_index = addr / 16;
+        // Each row in a tile is 2 bytes
+        let tile_row_index = (addr % 16) / 2;
+
+        for pixel in 0..8 {
+            let msb = byte2 >> (7 - pixel) & 1;
+            let lsb = byte1 >> (7 - pixel) & 1;
+            let new_pixel = (msb << 1) | lsb;
+
+            self.tile_set[tile_index][tile_row_index][pixel] = new_pixel;
         }
     }
 
