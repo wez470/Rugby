@@ -7,6 +7,8 @@ const VERTICAL_BLANK_END_LINE: u8 = 154; // The scan line at which the vertical 
 const VIDEO_RAM_SIZE: usize = 8 * 1024; // 8 KB
 const TOTAL_TILES: usize = 384; // Total number of tiles in video ram
 const TILE_MAP_0_START: usize = 0x1800; // The starting address of tile map 0
+const SCREEN_WIDTH: usize = 160;
+const SCREEN_HEIGHT: usize = 144;
 
 #[derive(Clone, Copy)]
 pub enum Mode {
@@ -72,6 +74,9 @@ fn init_tile() -> Tile {
 
 #[derive(Clone)]
 pub struct Gpu {
+    /// Current screen
+    pub screen_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
+
     /// Video RAM internal to the Gameboy.
     pub video_ram: Box<[u8]>,
 
@@ -140,6 +145,7 @@ pub struct Gpu {
 impl Gpu {
     pub fn new() -> Gpu {
         Gpu {
+            screen_buffer: [0; SCREEN_WIDTH * SCREEN_HEIGHT],
             video_ram: Box::new([0; VIDEO_RAM_SIZE]),
             tile_set: [init_tile(); 384],
             cycles: 0,
@@ -247,10 +253,14 @@ impl Gpu {
                 if self.cycles > VRAM_READ_CYCLES {
                     self.cycles %= VRAM_READ_CYCLES;
                     self.mode = Mode::HorizontalBlank;
-                    // TODO(wcarlson): Render scan line
+                    self.render_scan_line();
                 }
             },
         }
+    }
+
+    fn render_scan_line(&mut self) {
+        // TODO(wcarlson): Build the background map and then render the current row.
     }
 
     pub fn read_lcd_control(&self) -> u8 {
