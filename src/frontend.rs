@@ -23,20 +23,20 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize, step_mode: bool) 
         const BYTES_PER_PIXEL: usize = 4;
         let mut image = [0u8; 160 * 144 * BYTES_PER_PIXEL];
 
-        for tile_row in 0..160 {
-            for tile_col in 0..144 {
-                let tile_color = cpu.gpu.screen_buffer[tile_row * 144 + tile_col];
-                image[(tile_row * 144 + tile_col) * 4 + 2] = GAMEBOY_COLORS[tile_color as usize].rgb().0;
-                image[(tile_row * 144 + tile_col) * 4 + 1] = GAMEBOY_COLORS[tile_color as usize].rgb().1;
-                image[(tile_row * 144 + tile_col) * 4 + 0] = GAMEBOY_COLORS[tile_color as usize].rgb().2;
+        for tile_row in 0..144 {
+            for tile_col in 0..160 {
+                let tile_color = cpu.gpu.screen_buffer[tile_row][tile_col];
+                image[(tile_row * 160 + tile_col) * 4 + 2] = GAMEBOY_COLORS[tile_color as usize].rgb().0;
+                image[(tile_row * 160 + tile_col) * 4 + 1] = GAMEBOY_COLORS[tile_color as usize].rgb().1;
+                image[(tile_row * 160 + tile_col) * 4 + 0] = GAMEBOY_COLORS[tile_color as usize].rgb().2;
             }
         }
 
         let surface = sdl2::surface::Surface::from_data(
             &mut image[..],
-            144 as u32,
             160 as u32,
-            (144 * BYTES_PER_PIXEL) as u32,
+            144 as u32,
+            (160 * BYTES_PER_PIXEL) as u32,
             sdl2::pixels::PixelFormatEnum::RGB888,
         ).unwrap();
         let texture = renderer.create_texture_from_surface(&surface).unwrap();

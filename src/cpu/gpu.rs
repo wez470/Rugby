@@ -75,7 +75,7 @@ fn init_tile() -> Tile {
 #[derive(Clone)]
 pub struct Gpu {
     /// Current screen
-    pub screen_buffer: [u8; SCREEN_WIDTH * SCREEN_HEIGHT],
+    pub screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
 
     /// Video RAM internal to the Gameboy.
     pub video_ram: Box<[u8]>,
@@ -145,7 +145,7 @@ pub struct Gpu {
 impl Gpu {
     pub fn new() -> Gpu {
         Gpu {
-            screen_buffer: [0; SCREEN_WIDTH * SCREEN_HEIGHT],
+            screen_buffer: [[0u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
             video_ram: Box::new([0; VIDEO_RAM_SIZE]),
             tile_set: [init_tile(); 384],
             cycles: 0,
@@ -217,7 +217,7 @@ impl Gpu {
 
         match self.mode {
             Mode::HorizontalBlank => {
-                println!("HORIZONTAL BLANK");
+//                println!("HORIZONTAL BLANK");
                 if self.cycles >= HORIZONTAL_BLANK_CYCLES {
                     self.cycles %= HORIZONTAL_BLANK_CYCLES;
                     self.scan_line += 1;
@@ -230,7 +230,7 @@ impl Gpu {
                 }
             },
             Mode::VerticalBlank => {
-                println!("VERTICAL BLANK");
+//                println!("VERTICAL BLANK");
                 if self.cycles > SCAN_LINE_CYCLES {
                     self.cycles %= SCAN_LINE_CYCLES;
                     self.scan_line += 1;
@@ -242,14 +242,14 @@ impl Gpu {
                 }
             },
             Mode::OamRead => {
-                println!("OAM READ");
+//                println!("OAM READ");
                 if self.cycles > OAM_READ_CYCLES {
                     self.cycles %= OAM_READ_CYCLES;
                     self.mode = Mode::VRamRead;
                 }
             },
             Mode::VRamRead => {
-                println!("VRAM READ");
+//                println!("VRAM READ");
                 if self.cycles > VRAM_READ_CYCLES {
                     self.cycles %= VRAM_READ_CYCLES;
                     self.mode = Mode::HorizontalBlank;
@@ -283,7 +283,7 @@ impl Gpu {
         for i in 0..SCREEN_WIDTH {
             let pixel_x = (self.scan_x as usize + i) % 256;
             let pixel_y = (self.scan_line as usize + self.scan_y as usize) % 256;
-            self.screen_buffer[self.scan_line as usize * SCREEN_WIDTH + i] = background[pixel_y][pixel_x];
+            self.screen_buffer[self.scan_line as usize][i] = background[pixel_y][pixel_x];
         }
     }
 

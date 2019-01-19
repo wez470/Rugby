@@ -183,7 +183,7 @@ impl Cpu {
         }
 
         // Log the current instruction address and bytes for debugging.
-        print!("{:04X}:", base_pc);
+        // print!("{:04X}:", base_pc);
         for _b in &inst_bytes[..instruction_len] {
         //    print!(" {:02X}", b);
         }
@@ -198,7 +198,7 @@ impl Cpu {
 
         // Decode the instruction.
         let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-        println!("\t\t(decoded: {:?})", inst);
+        // println!("\t\t(decoded: {:?})", inst);
 
         self.execute(inst);
 
@@ -1034,9 +1034,7 @@ impl Cpu {
 
             // LCD Control Register
             0x40 => {
-                let val = self.gpu.read_lcd_control();
-                println!("lcd control read: {:08b}", val);
-                val
+                self.gpu.read_lcd_control()
             }
             0x41 => self.gpu.mode as u8, //TODO(wcarlson): Make this return a proper value
             0x42 => self.gpu.scan_y,
@@ -1063,7 +1061,6 @@ impl Cpu {
             }
 
             0x40 => {
-                println!("lcd control write: {:08b}", val);
                 self.gpu.write_lcd_control(val);
             }
 
