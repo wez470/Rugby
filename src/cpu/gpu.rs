@@ -35,16 +35,16 @@ impl std::convert::From<u8> for TileMapLocation {
 }
 
 #[derive(Clone, Copy)]
-pub enum BackgroundAndWindowTileDataLocation {
+pub enum BackgroundAndWindowLocation {
     X8800 = 0,
     X8000 = 1,
 }
 
-impl std::convert::From<u8> for BackgroundAndWindowTileDataLocation {
-    fn from(value: u8) -> BackgroundAndWindowTileDataLocation {
+impl std::convert::From<u8> for BackgroundAndWindowLocation {
+    fn from(value: u8) -> BackgroundAndWindowLocation {
         match value {
-            0 => BackgroundAndWindowTileDataLocation::X8800,
-            1 => BackgroundAndWindowTileDataLocation::X8000,
+            0 => BackgroundAndWindowLocation::X8800,
+            1 => BackgroundAndWindowLocation::X8000,
             _ => panic!("Invalid number for BackgroundAndWindowTileDataLocation"),
         }
     }
@@ -133,7 +133,7 @@ pub struct Gpu {
     window_tile_map: TileMapLocation,
 
     /// The address which the background and window tile data start
-    background_and_window_tile_data_location: BackgroundAndWindowTileDataLocation,
+    background_and_window_location: BackgroundAndWindowLocation,
 
     /// The address which the background tile map starts
     background_tile_map: TileMapLocation,
@@ -165,7 +165,7 @@ impl Gpu {
             window_x: 0,
             window_y: 0,
             window_tile_map: TileMapLocation::X9800,
-            background_and_window_tile_data_location: BackgroundAndWindowTileDataLocation::X8800,
+            background_and_window_location: BackgroundAndWindowLocation::X8800,
             background_tile_map: TileMapLocation::X9800,
             obj_size: ObjSize::EightByEight,
         }
@@ -260,7 +260,31 @@ impl Gpu {
     }
 
     fn render_scan_line(&mut self) {
-        // TODO(wcarlson): Build the background map and then render the current row.
+        let background_map = match self.background_tile_map {
+            TileMapLocation::X9800 => &self.video_ram[0x1800..0x1C00],
+            TileMapLocation::X9C00 => &self.video_ram[0x1C00..0x2000],
+        };
+
+        let mut background = [[0; 256]; 256];
+
+        for i in 0..0x400 {
+            let curr_tile_index: u8 = background_map[i];
+            let curr_tile = match self.background_and_window_location {
+                BackgroundAndWindowLocation::X8000 => self.tile_set[curr_tile_index as usize],
+                BackgroundAndWindowLocation::X8800 => self.tile_set[(256 + ((curr_tile_index as i8) as i16)) as usize]
+            };
+
+            let curr_tile_row = i / 32;
+            let curr_tile_col = i % 32;
+
+            update_background(&mut background, curr_tile_row, curr_tile_col, &curr_tile);
+        }
+
+        for i in 0..SCREEN_WIDTH {
+            let pixel_x = (self.scan_x as usize + i) % 256;
+            let pixel_y = (self.scan_line as usize + self.scan_y as usize) % 256;
+            self.screen_buffer[self.scan_line as usize * SCREEN_WIDTH + i] = background[pixel_y][pixel_x];
+        }
     }
 
     pub fn read_lcd_control(&self) -> u8 {
@@ -272,7 +296,7 @@ impl Gpu {
         if self.window_enabled {
             lcd_control |= 1 << 5;
         }
-        lcd_control |= (self.background_and_window_tile_data_location as u8) << 4;
+        lcd_control |= (self.background_and_window_location as u8) << 4;
         lcd_control |= (self.background_tile_map as u8) << 3;
         lcd_control |= (self.obj_size as u8) << 2;
         if self.obj_display_enabled {
@@ -288,11 +312,19 @@ impl Gpu {
         self.lcd_enabled = (val >> 7) == 1;
         self.window_tile_map = TileMapLocation::from((val >> 6) & 1);
         self.window_enabled = ((val >> 5) & 1) == 1;
-        self.background_and_window_tile_data_location =
-            BackgroundAndWindowTileDataLocation::from((val >> 4) & 1);
+        self.background_and_window_location =
+            BackgroundAndWindowLocation::from((val >> 4) & 1);
         self.background_tile_map = TileMapLocation::from((val >> 3) & 1);
         self.obj_size = ObjSize::from((val >> 2) & 1);
         self.obj_display_enabled = ((val >> 1) & 1) == 1;
         self.background_display = (val & 1) == 1;
+    }
+}
+
+fn update_background(background: &mut [[u8; 256]; 256], bg_row: usize, bg_col: usize, tile: &Tile) {
+    for r in 0..8 {
+        for c in 0..8 {
+            background[bg_row * 8 + r][bg_col * 8 + c] = tile[r][c];
+        }
     }
 }

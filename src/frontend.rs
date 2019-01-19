@@ -20,45 +20,23 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize, step_mode: bool) 
     'main: for _ in 0..instruction_count {
         let frame_start_time = Instant::now();
 
-        // TODO(solson): Heavily re-write all of the below code. 'tis the product of a
-        // horrific late-night hacking session.
         const BYTES_PER_PIXEL: usize = 4;
-        const TILE_SIDE: usize = 8;
-        const NUM_TILES: usize = 32;
-        const SIDE: usize = TILE_SIDE * NUM_TILES;
+        let mut image = [0u8; 160 * 144 * BYTES_PER_PIXEL];
 
-        let mut image = [0u8; SIDE * SIDE * BYTES_PER_PIXEL];
-        {
-            let bg_map = &cpu.gpu.video_ram[0x1800..0x1C00];
-            for tile_row in 0..NUM_TILES {
-                for tile_col in 0..NUM_TILES {
-                    let tile_i = bg_map[tile_row * NUM_TILES + tile_col] as usize;
-                    let tile = &cpu.gpu.video_ram[tile_i * 16..(tile_i * 16 + 16)];
-                    for row in 0..TILE_SIDE {
-                        for col in 0..TILE_SIDE {
-                            let upper_bit = (tile[row * 2 + 0] >> (TILE_SIDE - col - 1)) & 1;
-                            let lower_bit = (tile[row * 2 + 1] >> (TILE_SIDE - col - 1)) & 1;
-                            let tile_color = upper_bit << 1 | lower_bit;
-                            let image_i = (
-                                tile_row * SIDE * TILE_SIDE +
-                                    tile_col * TILE_SIDE +
-                                    row * SIDE +
-                                    col
-                            ) * BYTES_PER_PIXEL;
-                            image[image_i + 2] = GAMEBOY_COLORS[tile_color as usize].rgb().0;
-                            image[image_i + 1] = GAMEBOY_COLORS[tile_color as usize].rgb().1;
-                            image[image_i + 0] = GAMEBOY_COLORS[tile_color as usize].rgb().2;
-                        }
-                    }
-                }
+        for tile_row in 0..160 {
+            for tile_col in 0..144 {
+                let tile_color = cpu.gpu.screen_buffer[tile_row * 144 + tile_col];
+                image[(tile_row * 144 + tile_col) * 4 + 2] = GAMEBOY_COLORS[tile_color as usize].rgb().0;
+                image[(tile_row * 144 + tile_col) * 4 + 1] = GAMEBOY_COLORS[tile_color as usize].rgb().1;
+                image[(tile_row * 144 + tile_col) * 4 + 0] = GAMEBOY_COLORS[tile_color as usize].rgb().2;
             }
         }
 
         let surface = sdl2::surface::Surface::from_data(
             &mut image[..],
-            SIDE as u32,
-            SIDE as u32,
-            (SIDE * BYTES_PER_PIXEL) as u32,
+            144 as u32,
+            160 as u32,
+            (144 * BYTES_PER_PIXEL) as u32,
             sdl2::pixels::PixelFormatEnum::RGB888,
         ).unwrap();
         let texture = renderer.create_texture_from_surface(&surface).unwrap();
