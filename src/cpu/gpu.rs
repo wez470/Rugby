@@ -77,6 +77,9 @@ pub struct Gpu {
     /// Current screen
     pub screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
 
+    /// The current background
+    background: [[u8; 256]; 256],
+
     /// Video RAM internal to the Gameboy.
     pub video_ram: Box<[u8]>,
 
@@ -146,6 +149,7 @@ impl Gpu {
     pub fn new() -> Gpu {
         Gpu {
             screen_buffer: [[0u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
+            background: [[0u8; 256]; 256],
             video_ram: Box::new([0; VIDEO_RAM_SIZE]),
             tile_set: [init_tile(); 384],
             cycles: 0,
@@ -217,7 +221,6 @@ impl Gpu {
 
         match self.mode {
             Mode::HorizontalBlank => {
-//                println!("HORIZONTAL BLANK");
                 if self.cycles >= HORIZONTAL_BLANK_CYCLES {
                     self.cycles %= HORIZONTAL_BLANK_CYCLES;
                     self.scan_line += 1;
@@ -230,7 +233,6 @@ impl Gpu {
                 }
             },
             Mode::VerticalBlank => {
-//                println!("VERTICAL BLANK");
                 if self.cycles > SCAN_LINE_CYCLES {
                     self.cycles %= SCAN_LINE_CYCLES;
                     self.scan_line += 1;
@@ -242,14 +244,12 @@ impl Gpu {
                 }
             },
             Mode::OamRead => {
-//                println!("OAM READ");
                 if self.cycles > OAM_READ_CYCLES {
                     self.cycles %= OAM_READ_CYCLES;
                     self.mode = Mode::VRamRead;
                 }
             },
             Mode::VRamRead => {
-//                println!("VRAM READ");
                 if self.cycles > VRAM_READ_CYCLES {
                     self.cycles %= VRAM_READ_CYCLES;
                     self.mode = Mode::HorizontalBlank;
@@ -265,8 +265,6 @@ impl Gpu {
             TileMapLocation::X9C00 => &self.video_ram[0x1C00..0x2000],
         };
 
-        let mut background = [[0; 256]; 256];
-
         for i in 0..0x400 {
             let curr_tile_index: u8 = background_map[i];
             let curr_tile = match self.background_and_window_location {
@@ -277,13 +275,17 @@ impl Gpu {
             let curr_tile_row = i / 32;
             let curr_tile_col = i % 32;
 
-            update_background(&mut background, curr_tile_row, curr_tile_col, &curr_tile);
+            for r in 0..8 {
+                for c in 0..8 {
+                    self.background[curr_tile_row * 8 + r][curr_tile_col * 8 + c] = curr_tile[r][c];
+                }
+            }
         }
 
         for i in 0..SCREEN_WIDTH {
             let pixel_x = (self.scan_x as usize + i) % 256;
             let pixel_y = (self.scan_line as usize + self.scan_y as usize) % 256;
-            self.screen_buffer[self.scan_line as usize][i] = background[pixel_y][pixel_x];
+            self.screen_buffer[self.scan_line as usize][i] = self.background[pixel_y][pixel_x];
         }
     }
 
@@ -318,13 +320,5 @@ impl Gpu {
         self.obj_size = ObjSize::from((val >> 2) & 1);
         self.obj_display_enabled = ((val >> 1) & 1) == 1;
         self.background_display = (val & 1) == 1;
-    }
-}
-
-fn update_background(background: &mut [[u8; 256]; 256], bg_row: usize, bg_col: usize, tile: &Tile) {
-    for r in 0..8 {
-        for c in 0..8 {
-            background[bg_row * 8 + r][bg_col * 8 + c] = tile[r][c];
-        }
     }
 }
