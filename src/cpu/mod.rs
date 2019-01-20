@@ -1051,6 +1051,10 @@ impl Cpu {
             0x43 => self.gpu.scan_x,
             0x44 => self.gpu.scan_line,
 
+            // KEY1 - CGB Mode Only - Prepare Speed Switch
+            // Used for setting between normal and double speed mode for CGB
+            0x4D => 0,
+
             _ => panic!("unimplemented: read from I/O port 0x{:02X}", port),
         }
     }
@@ -1084,7 +1088,11 @@ impl Cpu {
 
             0x41 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
                 //println!("  unimplemented: write to LCD I/O port");
-            }
+            },
+
+            // KEY1 - CGB Mode Only - Prepare Speed Switch
+            // Used for setting between normal and double speed mode for CGB
+            0x4D => {}
 
             // Tetris seemingly accidentally writes to this port when zeroing the high RAM. It
             // seems to be an undocumented port, so we'll just ignore the write.
