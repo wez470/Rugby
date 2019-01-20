@@ -1,5 +1,7 @@
 use crate::cart::Cart;
 use crate::reg_16::Register;
+use crate::timer::Timer;
+use crate::interrupts::Interrupt;
 use self::inst::{Cond, Inst, Operand16, Operand8};
 use self::gpu::Gpu;
 
@@ -42,16 +44,6 @@ enum Flag {
     Carry = 4,
 }
 
-/// Represents bit indexes of the interrupts
-#[derive(Clone, Copy)]
-pub enum Interrupt {
-    VerticalBlank = 0,
-    LCD = 1,
-    Timer = 2,
-    Serial = 3,
-    Joypad = 4,
-}
-
 #[derive(Clone)]
 pub struct Cpu {
     /// The 16-bit `AF` register, composed of two 8-bit registers:
@@ -81,6 +73,9 @@ pub struct Cpu {
 
     /// High RAM internal to the Gameboy. This is a small range of 127 bytes at 0xFF80-0xFFFE.
     high_ram: Box<[u8]>,
+
+    /// The Gameboy timing registers
+    timer: Timer,
 
     /// Video RAM internal to the Gameboy.
     // TODO(solson): Un-pub.
@@ -127,6 +122,7 @@ impl Cpu {
             reg_pc: Register::default(),
             work_ram: Box::new([0; WORK_RAM_SIZE]),
             high_ram: Box::new([0; HIGH_RAM_SIZE]),
+            timer: Timer::new(),
             gpu: Gpu::new(),
             sprite_ram: Box::new([0; SPRITE_RAM_SIZE]),
             cart: cart,
@@ -156,7 +152,10 @@ impl Cpu {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
             let step_cycles = self.step();
-            self.gpu.step(step_cycles);
+            let interrupt = self.gpu.step(step_cycles);
+            if let Some(inter) = interrupt {
+                self.request_interrupt(inter)
+            }
             curr_cycles += step_cycles;
         }
     }
@@ -183,7 +182,7 @@ impl Cpu {
         }
 
         // Log the current instruction address and bytes for debugging.
-        // print!("{:04X}:", base_pc);
+         print!("{:04X}:", base_pc);
         for _b in &inst_bytes[..instruction_len] {
         //    print!(" {:02X}", b);
         }
@@ -198,7 +197,7 @@ impl Cpu {
 
         // Decode the instruction.
         let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-        // println!("\t\t(decoded: {:?})", inst);
+         println!("\t\t(decoded: {:?})", inst);
 
         self.execute(inst);
 
@@ -224,10 +223,10 @@ impl Cpu {
 
     fn check_vertical_blank(&mut self) {
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
-//            println!("Handling interrupt VerticalBlank");
-//            let pc = self.get_reg_16(Reg16::PC);
-//            self.push_stack(pc);
-//            self.set_reg_16(Reg16::PC, 0x0040);
+            println!("Handling interrupt VerticalBlank");
+            let pc = self.get_reg_16(Reg16::PC);
+            self.push_stack(pc);
+            self.set_reg_16(Reg16::PC, 0x0040);
             self.reset_interrupt(Interrupt::VerticalBlank);
         }
     }
@@ -281,6 +280,7 @@ impl Cpu {
     }
 
     pub fn request_interrupt(&mut self, i: Interrupt) {
+        println!("Requesting Interrupt: {:?}", i);
         self.set_bit_at_location(i as i32, 0xFF0F);
     }
 
@@ -1029,6 +1029,8 @@ impl Cpu {
                 if rand::random() { if rand::random() { 30 } else { 23 } } else { if rand::random() { 27 } else { 29 } }
             }
 
+            0x04 => self.timer.read_divider(),
+
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register,
 
@@ -1051,18 +1053,21 @@ impl Cpu {
 
             0x01 | 0x02 => {}, //println!("  unimplemented: write to serial I/O port"),
 
+            0x04 => self.timer.write_divider(),
+
             0x06 | 0x07 => {}, //println!("  unimplemented: write to timer I/O port"),
 
             // IF - Interrupt Flag register
-            0x0F => self.interrupt_flags_register = val,
+            0x0F => {
+                println!("Writing interrupts flag register: {}", val);
+                self.interrupt_flags_register = val;
+            },
 
             0x10 | 0x12 | 0x14 | 0x17 | 0x19 | 0x1A | 0x1C | 0x21 | 0x23 | 0x24 | 0x25 | 0x26 => {
                 //println!("  unimplemented: write to sound I/O port");
             }
 
-            0x40 => {
-                self.gpu.write_lcd_control(val);
-            }
+            0x40 => self.gpu.write_lcd_control(val),
 
             0x42 => self.gpu.scan_y = val,
             0x43 => self.gpu.scan_x = val,

@@ -1,3 +1,5 @@
+use crate::interrupts::Interrupt;
+
 const HORIZONTAL_BLANK_CYCLES: usize = 204; // Horizontal blank phase takes 201-207 cycles.
 const OAM_READ_CYCLES: usize = 80; // OAM read phase takes 77-83 cycles.
 const VRAM_READ_CYCLES: usize = 172; // VRAM read phase takes 169-175 cycles.
@@ -213,9 +215,9 @@ impl Gpu {
     /// `Mode::OamRead` -> `Mode::VRamRead` -> `Mode::HorizontalBlank` on each line.
     /// For lines 144-153, we stay in `Mode::VerticalBlank` for the whole line, after which
     /// we go back to line 0
-    pub fn step(&mut self, cycles: usize) {
+    pub fn step(&mut self, cycles: usize) -> Option<Interrupt> {
         if !self.lcd_enabled {
-            return
+            return None
         }
         self.cycles += cycles;
 
@@ -227,6 +229,7 @@ impl Gpu {
 
                     if self.scan_line >= VERTICAL_BLANK_START_LINE {
                         self.mode = Mode::VerticalBlank;
+                        return Some(Interrupt::VerticalBlank);
                     } else {
                         self.mode = Mode::OamRead;
                     }
@@ -257,6 +260,7 @@ impl Gpu {
                 }
             },
         }
+        None
     }
 
     fn render_scan_line(&mut self) {
