@@ -237,7 +237,7 @@ impl Cpu {
             self.halted = false
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
-            println!("Handling interrupt VerticalBlank");
+//            println!("Handling interrupt VerticalBlank");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0040);
@@ -250,7 +250,7 @@ impl Cpu {
             self.halted = false
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::LCD) && self.interrupt_enabled(Interrupt::LCD) {
-            println!("Handling interrupt LCD");
+//            println!("Handling interrupt LCD");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0048);
@@ -263,7 +263,7 @@ impl Cpu {
             self.halted = false
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Timer) && self.interrupt_enabled(Interrupt::Timer) {
-            println!("Handling interrupt Timer");
+//            println!("Handling interrupt Timer");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0050);
@@ -276,7 +276,7 @@ impl Cpu {
             self.halted = false
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Serial) && self.interrupt_enabled(Interrupt::Serial) {
-            println!("Handling interrupt Serial");
+//            println!("Handling interrupt Serial");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0058);
@@ -289,7 +289,7 @@ impl Cpu {
             self.halted = false
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
-            println!("Handling interrupt Joypad");
+//            println!("Handling interrupt Joypad");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0060);
@@ -306,7 +306,7 @@ impl Cpu {
     }
 
     pub fn request_interrupt(&mut self, i: Interrupt) {
-        println!("Requesting Interrupt: {:?}", i);
+//        println!("Requesting Interrupt: {:?}", i);
         self.set_bit_at_location(i as i32, 0xFF0F);
     }
 
@@ -1060,6 +1060,13 @@ impl Cpu {
             0x06 => self.timer.read_mem(port),
             0x07 => self.timer.read_mem(port),
 
+            0x10 | 0x11 | 0x12 | 0x13 | 0x14 | 0x1A | 0x1C | 0x1D | 0x1E => {
+                0
+            }
+
+            0x16...0x26 => 0,
+
+            0x30...0x3F => 0,
 
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register,
@@ -1093,14 +1100,15 @@ impl Cpu {
             0x07 => self.timer.write_mem(port, val),
 
             // IF - Interrupt Flag register
-            0x0F => {
-                println!("Writing interrupts flag register: {}", val);
-                self.interrupt_flags_register = val;
-            }
+            0x0F => self.interrupt_flags_register = val,
 
-            0x10 | 0x12 | 0x14 | 0x17 | 0x19 | 0x1A | 0x1C | 0x21 | 0x23 | 0x24 | 0x25 | 0x26 => {
+            0x10 | 0x11 | 0x12 | 0x13 | 0x14 | 0x1A | 0x1C | 0x1D | 0x1E => {
                 //println!("  unimplemented: write to sound I/O port");
             }
+
+            0x16...0x26 => {}
+
+            0x30...0x3F => {}
 
             0x40 => self.gpu.write_lcd_control(val),
 
