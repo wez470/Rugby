@@ -1,9 +1,9 @@
 use crate::cart::Cart;
+use crate::interrupts::Interrupt;
 use crate::reg_16::Register;
 use crate::timer::Timer;
-use crate::interrupts::Interrupt;
-use self::inst::{Cond, Inst, Operand16, Operand8};
 use self::gpu::Gpu;
+use self::inst::{Cond, Inst, Operand16, Operand8};
 
 mod gpu;
 mod inst;
@@ -109,6 +109,9 @@ pub struct Cpu {
 
     /// The `IE` Interrupt Enable register accessed via I/O port 0xFFFF.
     interrupt_enable_register: u8,
+
+    /// If the cpu is halted
+    halted: bool,
 }
 
 impl Cpu {
@@ -133,6 +136,7 @@ impl Cpu {
             pending_enable_interrupts: false,
             interrupt_flags_register: 0,
             interrupt_enable_register: 0,
+            halted: false,
         };
         cpu.reset();
         cpu
@@ -172,6 +176,10 @@ impl Cpu {
 
         self.handle_interrupts();
 
+        if self.halted {
+            return 4;
+        }
+
         // Get the opcode for the current instruction and find the total instruction length.
         let base_pc = self.reg_pc.get();
         self.current_opcode = self.read_mem(base_pc);
@@ -186,7 +194,7 @@ impl Cpu {
         }
 
         // Log the current instruction address and bytes for debugging.
-         print!("{:04X}:", base_pc);
+        print!("{:04X}:", base_pc);
         for _b in &inst_bytes[..instruction_len] {
         //    print!(" {:02X}", b);
         }
@@ -201,7 +209,7 @@ impl Cpu {
 
         // Decode the instruction.
         let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-         println!("\t\t(decoded: {:?})", inst);
+        println!("\t\t(decoded: {:?})", inst);
 
         self.execute(inst);
 
@@ -222,10 +230,12 @@ impl Cpu {
         self.check_timer();
         self.check_serial();
         self.check_joypad();
-
     }
 
     fn check_vertical_blank(&mut self) {
+        if self.interrupt_pending(Interrupt::VerticalBlank) {
+            self.halted = false
+        }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
             println!("Handling interrupt VerticalBlank");
             let pc = self.get_reg_16(Reg16::PC);
@@ -236,6 +246,9 @@ impl Cpu {
     }
 
     fn check_lcd(&mut self) {
+        if self.interrupt_pending(Interrupt::LCD) {
+            self.halted = false
+        }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::LCD) && self.interrupt_enabled(Interrupt::LCD) {
             println!("Handling interrupt LCD");
             let pc = self.get_reg_16(Reg16::PC);
@@ -246,6 +259,9 @@ impl Cpu {
     }
 
     fn check_timer(&mut self) {
+        if self.interrupt_pending(Interrupt::Timer) {
+            self.halted = false
+        }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Timer) && self.interrupt_enabled(Interrupt::Timer) {
             println!("Handling interrupt Timer");
             let pc = self.get_reg_16(Reg16::PC);
@@ -256,6 +272,9 @@ impl Cpu {
     }
 
     fn check_serial(&mut self) {
+        if self.interrupt_pending(Interrupt::Serial) {
+            self.halted = false
+        }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Serial) && self.interrupt_enabled(Interrupt::Serial) {
             println!("Handling interrupt Serial");
             let pc = self.get_reg_16(Reg16::PC);
@@ -266,6 +285,9 @@ impl Cpu {
     }
 
     fn check_joypad(&mut self) {
+        if self.interrupt_pending(Interrupt::Joypad) {
+            self.halted = false
+        }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
             println!("Handling interrupt Joypad");
             let pc = self.get_reg_16(Reg16::PC);
@@ -310,7 +332,7 @@ impl Cpu {
         match inst {
             Inst::Nop => {}
             Inst::Stop => panic!("unimplemented: STOP"),
-            Inst::Halt => panic!("unimplemented: HALT"),
+            Inst::Halt => self.halted = true,
             Inst::Di => self.pending_disable_interrupts = true,
             Inst::Ei => self.pending_enable_interrupts = true,
             Inst::Jp(loc, cond) => self.jump(loc, cond),
@@ -1061,9 +1083,9 @@ impl Cpu {
 
     fn write_io_port(&mut self, port: u8, val: u8) {
         match port {
-            0x00 => {},//println!("  unimplemented: write to joypad I/O port"),
+            0x00 => {} //println!("  unimplemented: write to joypad I/O port"),
 
-            0x01 | 0x02 => {}, //println!("  unimplemented: write to serial I/O port"),
+            0x01 | 0x02 => {} //println!("  unimplemented: write to serial I/O port"),
 
             0x04 => self.timer.write_mem(port, val),
             0x05 => self.timer.write_mem(port, val),
@@ -1074,7 +1096,7 @@ impl Cpu {
             0x0F => {
                 println!("Writing interrupts flag register: {}", val);
                 self.interrupt_flags_register = val;
-            },
+            }
 
             0x10 | 0x12 | 0x14 | 0x17 | 0x19 | 0x1A | 0x1C | 0x21 | 0x23 | 0x24 | 0x25 | 0x26 => {
                 //println!("  unimplemented: write to sound I/O port");
@@ -1088,7 +1110,7 @@ impl Cpu {
 
             0x41 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
                 //println!("  unimplemented: write to LCD I/O port");
-            },
+            }
 
             // KEY1 - CGB Mode Only - Prepare Speed Switch
             // Used for setting between normal and double speed mode for CGB
