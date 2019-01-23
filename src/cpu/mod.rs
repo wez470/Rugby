@@ -1079,13 +1079,12 @@ impl Cpu {
             0x0F => self.interrupt_flags_register,
 
             // LCD Control Register
-            0x40 => {
-                self.gpu.read_lcd_control()
-            }
-            0x41 => self.gpu.mode as u8, //TODO(wcarlson): Make this return a proper value
+            0x40 => self.gpu.read_lcd_control(),
+            0x41 => self.gpu.read_lcd_stat(),
             0x42 => self.gpu.scan_y,
             0x43 => self.gpu.scan_x,
             0x44 => self.gpu.scan_line,
+            0x45 => self.gpu.scan_line_compare,
             0x4A => self.gpu.window_y,
             0x4B => self.gpu.window_x + 7,
 
@@ -1120,14 +1119,15 @@ impl Cpu {
             0x30...0x3F => {}
 
             0x40 => self.gpu.write_lcd_control(val),
-
+            0x41 => self.gpu.write_lcd_stat(val),
             0x42 => self.gpu.scan_y = val,
             0x43 => self.gpu.scan_x = val,
             0x44 => self.gpu.scan_line = 0,
+            0x45 => self.gpu.scan_line_compare = val,
             0x4A => self.gpu.window_y = val,
             0x4B => self.gpu.window_x = val - 7,
 
-            0x41 | 0x45 | 0x47 | 0x48 | 0x49 => {
+            0x47 | 0x48 | 0x49 => {
                 //println!("  unimplemented: write to LCD I/O port");
             }
 

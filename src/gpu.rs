@@ -88,8 +88,12 @@ pub struct Gpu {
     /// The current tiles in video ram.
     tile_set: [Tile; TOTAL_TILES],
 
-    /// The current scan line. (LY at address 0xFF44)
+    /// The current scan line. (LY at 0xFF44)
     pub scan_line: u8,
+
+    /// The scan line compare register. (LYC at 0xFF45). An interrupt will occur (if enabled)
+    /// if the scan line equals the scan line compare
+    pub scan_line_compare: u8,
 
     /// Where we are at currently in the lcd cycle counter
     cycles: usize,
@@ -109,15 +113,11 @@ pub struct Gpu {
     /// True if sprite display is enabled
     obj_display_enabled: bool,
 
-    /// The Coincidence flag (Bit 2 in 0xFF41)
-    /// TODO(wcarlson): Add more documentation about this
-    coincidence_flag: bool,
-
     /// True if the coincidence interrupt is enabled (Bit 6 in 0xFF41)
     coincidence_interrupt: bool,
 
     /// True if OAM interrupt is enabled. (Bit 5 in 0xFF41)
-    oam_enabled: bool,
+    oam_interrupt: bool,
 
     /// True if the Vertical Blank interrupt is enabled. (Bit 4 in 0xFF41)
     vertical_blank_interrupt: bool,
@@ -156,14 +156,14 @@ impl Gpu {
             tile_set: [init_tile(); 384],
             cycles: 0,
             scan_line: 0,
+            scan_line_compare: 0,
             lcd_enabled: true,
             mode: Mode::OamRead,
             window_enabled: false,
             obj_display_enabled: false,
             background_display: false,
-            coincidence_flag: false,
             coincidence_interrupt: false,
-            oam_enabled: false,
+            oam_interrupt: false,
             vertical_blank_interrupt: false,
             horizontal_blank_interrupt: false,
             scan_x: 0,
@@ -324,5 +324,20 @@ impl Gpu {
         self.obj_size = ObjSize::from((val >> 2) & 1);
         self.obj_display_enabled = ((val >> 1) & 1) == 1;
         self.background_display = (val & 1) == 1;
+    }
+
+    pub fn read_lcd_stat(&self) -> u8 {
+        let mut lcd_stat = 0x80; // bit 7 is always 1
+        lcd_stat |= (self.coincidence_interrupt as u8) << 6;
+        lcd_stat |= (self.oam_interrupt as u8) << 5;
+        lcd_stat |= (self.vertical_blank_interrupt as u8) << 4;
+        lcd_stat |= (self.horizontal_blank_interrupt as u8) << 3;
+        lcd_stat |= ((self.scan_line == self.scan_line_compare) as u8) << 2;
+        lcd_stat |= self.mode as u8;
+        lcd_stat
+    }
+
+    pub fn write_lcd_stat(&mut self, val: u8) {
+        // TODO(wcarlson)
     }
 }
