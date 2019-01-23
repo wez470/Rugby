@@ -131,8 +131,8 @@ pub struct Gpu {
     pub scan_y: u8,
 
     /// Window X and Y positions
-    window_x: u8,
-    window_y: u8,
+    pub window_x: u8,
+    pub window_y: u8,
 
     /// The address which the window tile map starts
     window_tile_map: TileMapLocation,

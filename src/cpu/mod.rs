@@ -293,6 +293,9 @@ impl Cpu {
             self.halted = false;
             self.stopped = false;
         }
+        if rand::random::<u8>() < 20 {
+            self.request_interrupt(Interrupt::Joypad)
+        }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
 //            println!("Handling interrupt Joypad");
             let pc = self.get_reg_16(Reg16::PC);
@@ -1084,6 +1087,8 @@ impl Cpu {
             0x42 => self.gpu.scan_y,
             0x43 => self.gpu.scan_x,
             0x44 => self.gpu.scan_line,
+            0x4A => self.gpu.window_y,
+            0x4B => self.gpu.window_x - 7,
 
             // KEY1 - CGB Mode Only - Prepare Speed Switch
             // Used for setting between normal and double speed mode for CGB
@@ -1120,8 +1125,10 @@ impl Cpu {
             0x42 => self.gpu.scan_y = val,
             0x43 => self.gpu.scan_x = val,
             0x44 => self.gpu.scan_line = 0,
+            0x4A => self.gpu.window_y = val,
+            0x4B => self.gpu.window_x = val,
 
-            0x41 | 0x45 | 0x47 | 0x48 | 0x49 | 0x4A | 0x4B => {
+            0x41 | 0x45 | 0x47 | 0x48 | 0x49 => {
                 //println!("  unimplemented: write to LCD I/O port");
             }
 
