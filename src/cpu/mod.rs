@@ -792,16 +792,13 @@ impl Cpu {
     fn push_stack(&mut self, val: u16) {
         self.reg_sp.inc(-2);
         let addr = self.reg_sp.get();
-        self.write_mem(addr, val as u8); // low
-        self.write_mem(addr + 1, (val >> 8) as u8); // high
+        self.write_mem_16(addr, val);
     }
 
     fn pop_stack(&mut self) -> u16 {
         let addr = self.reg_sp.get();
         self.reg_sp.inc(2);
-        let low = self.read_mem(addr);
-        let high = self.read_mem(addr + 1);
-        ((high as u16) << 8) | low as u16
+        self.read_mem_16(addr)
     }
 
     fn set_flag(&mut self, flag: Flag, val: bool) {
@@ -885,7 +882,7 @@ impl Cpu {
         match dest {
             Operand16::Imm16(_) => panic!("Attempt to store to a 16-bit immediate value"),
             Operand16::Reg16(reg) => self.set_reg_16(reg, val),
-            Operand16::MemImm16(_) => unimplemented!(),
+            Operand16::MemImm16(addr) => self.write_mem_16(addr, val),
         }
     }
 
@@ -1052,6 +1049,17 @@ impl Cpu {
             // This match is exhaustive but rustc doesn't check that for integer matches.
             _ => unreachable!(),
         }
+    }
+
+    fn read_mem_16(&mut self, addr: u16) -> u16 {
+        let low = self.read_mem(addr);
+        let high = self.read_mem(addr + 1);
+        ((high as u16) << 8) | low as u16
+    }
+
+    fn write_mem_16(&mut self, addr: u16, val: u16) {
+        self.write_mem(addr, val as u8);
+        self.write_mem(addr + 1, (val >> 8) as u8);
     }
 
     fn read_io_port(&self, port: u8) -> u8 {
