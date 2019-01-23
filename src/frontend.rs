@@ -6,7 +6,7 @@ use crate::cpu::Cpu;
 const CYCLES_PER_FRAME: usize = 69905;
 const NANOS_PER_FRAME: u32 = 16666667;
 
-pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize, step_mode: bool) {
+pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
     let video_subsystem = sdl.video().expect("Failed to access SDL video subsystem");
     let window = video_subsystem
@@ -17,8 +17,15 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize, step_mode: bool) 
     let mut renderer = window.renderer().build().expect("Failed to get window renderer");
     let mut event_pump = sdl.event_pump().expect("Failed to get SDL event pump");
     let start_time = Instant::now();
-    'main: for _ in 0..instruction_count {
+
+    'main: for inst_count in 0.. {
         let frame_start_time = Instant::now();
+
+        if let Some(max) = inst_limit {
+            if inst_count >= max {
+                 break;
+            }
+        }
 
         const BYTES_PER_PIXEL: usize = 4;
         let mut image = [0u8; 160 * 144 * BYTES_PER_PIXEL];

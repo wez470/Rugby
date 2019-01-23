@@ -22,11 +22,15 @@ fn main() {
             .arg(clap::Arg::with_name("ROM")
                 .required(true)
                 .help("The game rom"))
-            .arg(clap::Arg::with_name("INSTRUCTIONS")
-                .required(true)
-                .help("The number of instructions to execute"))
-            .arg(clap::Arg::with_name("Step Mode")
+            .arg(clap::Arg::with_name("inst-limit")
+                .short("i")
+                .long("inst-limit")
+                .takes_value(true)
+                .value_name("COUNT")
+                .help("The maximum number of instructions to execute"))
+            .arg(clap::Arg::with_name("step-mode")
                 .short("s")
+                .long("step-mode")
                 .help("Allows step mode where 'space' will execute one frame")))
         .subcommand(clap::SubCommand::with_name("info")
             .arg(clap::Arg::with_name("ROM")
@@ -38,14 +42,15 @@ fn main() {
         ("run", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
             let rom = read_rom_file(rom_path);
-            let instruction_count: usize = matches.value_of("INSTRUCTIONS").unwrap().parse()
-                .expect("Couldn't parse instruction count");
+            let inst_limit: Option<usize> = matches
+                .value_of("inst-limit")
+                .map(|s| s.parse().expect("Couldn't parse instruction count"));
             let cart_header = cart_header::CartHeader::from_rom(&rom)
                 .expect("Couldn't parse cartridge header");
             let cart = Cart::new(rom, &cart_header);
             let mut cpu = Cpu::new(cart);
 
-            start_frontend(&mut cpu, instruction_count, matches.is_present("Step Mode"));
+            start_frontend(&mut cpu, inst_limit, matches.is_present("step-mode"));
         }
 
 
