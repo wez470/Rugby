@@ -349,8 +349,18 @@ pub enum Inst {
 
     /// `DAA`: Decimal adjust register A. This is used after adding or subtracting BCD
     /// (binary-coded decimal) values to obtain the correct result for BCD arithmetic.
-    // TODO(solson): Figure out the details from the manuals and document in detail here. This is a
-    // complicated instruction.
+    ///
+    /// In BCD, register A contains 2 digits, one in the upper 4 bits, one in the lower 4 bits,
+    /// each of which may have overflowed into non-BCD hex digits (i.e. greater than 9). For each
+    /// digit, an adjustment value will be applied if necessary. If the Sub flag is set, the
+    /// adjustment values are subtracted, otherwise added.
+    ///
+    /// DAA proceeds as follows:
+    ///
+    /// 1. If the lower 4 bits contain a non-BCD digit (i.e. greater than 9) or if the HalfCarry
+    ///    flag is set, then 0x06 is added/subtracted in register A.
+    /// 2. If the upper 4 bits contain a non-BCD digit (i.e. greater than 9) or if the Carry flag
+    ///    is set, then 0x60 is added/subtracted in register A.
     Daa,
 
     /// `CPL`: Complement register A, i.e. flip all bits.

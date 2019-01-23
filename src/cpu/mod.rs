@@ -397,7 +397,7 @@ impl Cpu {
             Inst::Bit(bit, n) => self.test_bit(bit, n),
             Inst::Res(bit, n) => self.reset_bit(bit, n),
             Inst::Set(bit, n) => self.set_bit(bit, n),
-            Inst::Daa => panic!("unimplemented: DAA"),
+            Inst::Daa => self.decimal_adjust_accum(),
             Inst::Cpl => self.complement_accum(),
             Inst::Ccf => self.complement_carry_flag(),
             Inst::Scf => self.set_carry_flag(),
@@ -745,6 +745,37 @@ impl Cpu {
     fn set_bit(&mut self, bit: u8, n: Operand8) {
         let val = self.get_operand_8(n) | (1 << bit);
         self.set_operand_8(n, val);
+    }
+
+    /// The `Inst::Daa` instruction.
+    fn decimal_adjust_accum(&mut self) {
+        let half_carry = self.get_flag(Flag::HalfCarry);
+        let carry = self.get_flag(Flag::Carry);
+        let sub = self.get_flag(Flag::Sub);
+
+        let mut accum = self.get_reg_8(Reg8::A);
+        let mut set_carry = false;
+        let mut correction = 0;
+
+        if half_carry || (!sub && accum & 0x0F > 0x09) {
+            correction |= 0x6;
+        }
+
+        if carry || (!sub && accum > 0x99) {
+            correction |= 0x60;
+            set_carry = true;
+        }
+
+        accum = if sub {
+            accum.wrapping_sub(correction)
+        } else {
+            accum.wrapping_add(correction)
+        };
+
+        self.set_reg_8(Reg8::A, accum);
+        self.set_flag(Flag::HalfCarry, false);
+        self.set_flag(Flag::Carry, set_carry);
+        self.set_flag(Flag::Zero, accum == 0);
     }
 
     /// The `Inst::Cpl` instruction.
