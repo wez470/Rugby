@@ -235,6 +235,40 @@ impl Mbc3 {
     }
 }
 
+fn read_mbc_none(rom: &[u8], ram: &[u8], addr: u16) -> u8 {
+    match addr {
+        // ROM
+        0x0000...0x7FFF => rom[addr as usize],
+
+        // RAM
+        0xA000...0xBFFF => {
+            let ram_index = (addr - 0xA000) as usize;
+            // If the RAM is not present, the hardware returns all bits set.
+            *ram.get(ram_index).unwrap_or(&0xFF)
+        }
+
+        _ => panic!("Unimplemented Mbc::None read address: {}", addr),
+    }
+}
+
+fn write_mbc_none(ram: &mut [u8], addr: u16, val: u8) {
+    match addr {
+        // ROM: Writes are ignored.
+        0x0000...0x7FFF => {}
+
+        // RAM
+        0xA000...0xBFFF => {
+            let ram_index = (addr - 0xA000) as usize;
+            // If the RAM is not present, the hardware ignores writes.
+            if let Some(p) = ram.get_mut(ram_index) {
+                *p = val;
+            }
+        }
+
+        _ => panic!("Unimplemented Mbc::None read address: {}", addr),
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum RomRamMode {
     Rom,
@@ -260,7 +294,7 @@ impl Cart {
 
     pub fn read(&self, addr: u16) -> u8 {
         match self.mbc {
-            Mbc::None => self.rom[addr as usize],
+            Mbc::None => read_mbc_none(&self.rom, &self.ram, addr),
             Mbc::Mbc1(ref mbc1) => mbc1.read(&self.rom, &self.ram, addr),
             Mbc::Mbc3(ref mbc3) => mbc3.read(&self.rom, &self.ram, addr),
         }
@@ -268,7 +302,7 @@ impl Cart {
 
     pub fn write(&mut self, addr: u16, val: u8) {
         match self.mbc {
-            Mbc::None => {},
+            Mbc::None => write_mbc_none(&mut self.ram, addr, val),
             Mbc::Mbc1(ref mut mbc1) => mbc1.write(&mut self.ram, addr, val),
             Mbc::Mbc3(ref mut mbc3) => mbc3.write(&mut self.ram, addr, val),
         }
