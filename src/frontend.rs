@@ -44,7 +44,7 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize, step_mode: bool) 
         renderer.copy(&texture, None, None).unwrap();
         renderer.present();
 
-        'wait: while {
+        'wait: loop {
             for event in event_pump.poll_iter() {
                 use sdl2::event::Event;
                 match event {
@@ -59,8 +59,8 @@ pub fn start_frontend(cpu: &mut Cpu, instruction_count: usize, step_mode: bool) 
                     _ => ()
                 }
             }
-            step_mode
-        } {}
+            if !step_mode { break; }
+        }
 
         cpu.step_cycles(CYCLES_PER_FRAME);
 
