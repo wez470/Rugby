@@ -10,9 +10,10 @@ mod cart;
 mod cart_header;
 mod cpu;
 mod frontend;
+mod gpu;
+mod interrupts;
 mod reg_16;
 mod timer;
-mod interrupts;
 
 fn main() {
     let app_matches = clap::App::new("Rustboy")

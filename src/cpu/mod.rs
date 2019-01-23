@@ -2,10 +2,9 @@ use crate::cart::Cart;
 use crate::interrupts::Interrupt;
 use crate::reg_16::Register;
 use crate::timer::Timer;
-use self::gpu::Gpu;
+use crate::gpu::Gpu;
 use self::inst::{Cond, Inst, Operand16, Operand8};
 
-mod gpu;
 mod inst;
 
 // TODO: Refactor later to extract memory-related stuff out of the cpu module.
