@@ -991,9 +991,7 @@ impl Cpu {
             }
 
             // Same as C000-DDFF (ECHO) (typically not used)
-            0xE000...0xFDFF => {
-                panic!("unimplemented: work RAM echo")
-            }
+            0xE000...0xFDFF => self.read_mem(addr - 0xE000 + 0xC000),
 
             // Sprite Attribute Table (OAM)
             0xFE00...0xFE9F => {
@@ -1051,9 +1049,7 @@ impl Cpu {
             }
 
             // Same as C000-DDFF (ECHO) (typically not used)
-            0xE000...0xFDFF => {
-                panic!("unimplemented: work RAM echo")
-            }
+            0xE000...0xFDFF => self.write_mem(addr - 0xE000 + 0xC000, val),
 
             // Sprite Attribute Table (OAM)
             0xFE00...0xFE9F => {
