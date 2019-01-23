@@ -136,7 +136,8 @@ impl Mbc1 {
             // Switchable RAM bank
             0xA000...0xBFFF => {
                 if !self.ram_enabled {
-                    panic!("Attempt to read from external RAM bank without RAM enabled");
+                    // When RAM is disabled, the hardware returns all bits set.
+                    return 0xFF;
                 }
                 let mut bank = self.ram_bank as usize;
                 if self.rom_ram_mode == RomRamMode::Rom {
@@ -195,7 +196,8 @@ impl Mbc1 {
             // Switchable RAM bank
             0xA000...0xBFFF => {
                 if !self.ram_enabled {
-                    panic!("Attempt to write external RAM bank without RAM enabled");
+                    // When RAM is disabled, the hardware ignores writes.
+                    return;
                 }
                 let mut bank = self.ram_bank as usize;
                 if self.rom_ram_mode == RomRamMode::Rom {
