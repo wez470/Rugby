@@ -152,7 +152,7 @@ impl Gpu {
         Gpu {
             screen_buffer: [[0u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
             background: [[0u8; 256]; 256],
-            video_ram: Box::new([0; VIDEO_RAM_SIZE]),
+            video_ram: vec![0; VIDEO_RAM_SIZE].into_boxed_slice(),
             tile_set: [init_tile(); 384],
             cycles: 0,
             scan_line: 0,
