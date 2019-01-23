@@ -112,6 +112,9 @@ pub struct Cpu {
 
     /// If the cpu is halted
     halted: bool,
+
+    /// If the cpu is stopped
+    stopped: bool,
 }
 
 impl Cpu {
@@ -137,6 +140,7 @@ impl Cpu {
             interrupt_flags_register: 0,
             interrupt_enable_register: 0,
             halted: false,
+            stopped: false,
         };
         cpu.reset();
         cpu
@@ -234,7 +238,7 @@ impl Cpu {
 
     fn check_vertical_blank(&mut self) {
         if self.interrupt_pending(Interrupt::VerticalBlank) {
-            self.halted = false
+            self.halted = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
 //            println!("Handling interrupt VerticalBlank");
@@ -247,7 +251,7 @@ impl Cpu {
 
     fn check_lcd(&mut self) {
         if self.interrupt_pending(Interrupt::LCD) {
-            self.halted = false
+            self.halted = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::LCD) && self.interrupt_enabled(Interrupt::LCD) {
 //            println!("Handling interrupt LCD");
@@ -260,7 +264,7 @@ impl Cpu {
 
     fn check_timer(&mut self) {
         if self.interrupt_pending(Interrupt::Timer) {
-            self.halted = false
+            self.halted = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Timer) && self.interrupt_enabled(Interrupt::Timer) {
 //            println!("Handling interrupt Timer");
@@ -273,7 +277,7 @@ impl Cpu {
 
     fn check_serial(&mut self) {
         if self.interrupt_pending(Interrupt::Serial) {
-            self.halted = false
+            self.halted = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Serial) && self.interrupt_enabled(Interrupt::Serial) {
 //            println!("Handling interrupt Serial");
@@ -286,7 +290,8 @@ impl Cpu {
 
     fn check_joypad(&mut self) {
         if self.interrupt_pending(Interrupt::Joypad) {
-            self.halted = false
+            self.halted = false;
+            self.stopped = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
 //            println!("Handling interrupt Joypad");
@@ -331,7 +336,7 @@ impl Cpu {
     fn execute(&mut self, inst: Inst) {
         match inst {
             Inst::Nop => {}
-            Inst::Stop => panic!("unimplemented: STOP"),
+            Inst::Stop => self.stopped = true,
             Inst::Halt => self.halted = true,
             Inst::Di => self.pending_disable_interrupts = true,
             Inst::Ei => self.pending_enable_interrupts = true,
