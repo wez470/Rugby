@@ -1070,10 +1070,7 @@ impl Cpu {
                 if rand::random() { if rand::random() { 30 } else { 23 } } else { if rand::random() { 27 } else { 29 } }
             }
 
-            0x04 => self.timer.read_mem(port),
-            0x05 => self.timer.read_mem(port),
-            0x06 => self.timer.read_mem(port),
-            0x07 => self.timer.read_mem(port),
+            0x04...0x07 => self.timer.read_mem(port),
 
             0x10 | 0x11 | 0x12 | 0x13 | 0x14 | 0x1A | 0x1C | 0x1D | 0x1E => {
                 0
@@ -1110,10 +1107,7 @@ impl Cpu {
 
             0x01 | 0x02 => {} //println!("  unimplemented: write to serial I/O port"),
 
-            0x04 => self.timer.write_mem(port, val),
-            0x05 => self.timer.write_mem(port, val),
-            0x06 => self.timer.write_mem(port, val),
-            0x07 => self.timer.write_mem(port, val),
+            0x04...0x07 => self.timer.write_mem(port, val),
 
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
