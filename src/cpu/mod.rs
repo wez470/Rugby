@@ -912,7 +912,8 @@ impl Cpu {
 
     fn set_reg_16(&mut self, reg: Reg16, val: u16) {
         match reg {
-            Reg16::AF => self.reg_af.set(val),
+            // The four low bits of F, the flag register, must always be zero.
+            Reg16::AF => self.reg_af.set(val & 0xFFF0),
             Reg16::BC => self.reg_bc.set(val),
             Reg16::DE => self.reg_de.set(val),
             Reg16::HL => self.reg_hl.set(val),
@@ -923,7 +924,8 @@ impl Cpu {
 
     fn get_reg_16(&self, reg: Reg16) -> u16 {
         match reg {
-            Reg16::AF => self.reg_af.get(),
+            // The four low bits of F, the flag register, must always be zero.
+            Reg16::AF => self.reg_af.get() & 0xFFF0,
             Reg16::BC => self.reg_bc.get(),
             Reg16::DE => self.reg_de.get(),
             Reg16::HL => self.reg_hl.get(),
