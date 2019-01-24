@@ -7,3 +7,10 @@ pub enum Interrupt {
     Serial = 3,
     Joypad = 4,
 }
+
+impl Interrupt {
+    /// Get the memory address of the code which handles this interrupt.
+    pub fn handler_addr(self) -> u16 {
+        0x0040 + 8 * (self as u16)
+    }
+}

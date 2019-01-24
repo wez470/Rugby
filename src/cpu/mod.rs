@@ -223,62 +223,22 @@ impl Cpu {
     }
 
     fn handle_interrupts(&mut self) {
-        self.check_vertical_blank();
-        self.check_lcd();
-        self.check_timer();
-        self.check_serial();
+        self.check_interrupt(Interrupt::VerticalBlank);
+        self.check_interrupt(Interrupt::LCD);
+        self.check_interrupt(Interrupt::Timer);
+        self.check_interrupt(Interrupt::Serial);
         self.check_joypad();
     }
 
-    fn check_vertical_blank(&mut self) {
-        if self.interrupt_pending(Interrupt::VerticalBlank) {
+    fn check_interrupt(&mut self, i: Interrupt) {
+        if self.interrupt_pending(i) {
             self.halted = false;
         }
-        if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
-            debug!("Handling interrupt VerticalBlank");
-            let pc = self.get_reg_16(Reg16::PC);
-            self.push_stack(pc);
-            self.set_reg_16(Reg16::PC, 0x0040);
-            self.reset_interrupt(Interrupt::VerticalBlank);
-        }
-    }
-
-    fn check_lcd(&mut self) {
-        if self.interrupt_pending(Interrupt::LCD) {
-            self.halted = false;
-        }
-        if self.interrupts_enabled && self.interrupt_pending(Interrupt::LCD) && self.interrupt_enabled(Interrupt::LCD) {
-            debug!("Handling interrupt LCD");
-            let pc = self.get_reg_16(Reg16::PC);
-            self.push_stack(pc);
-            self.set_reg_16(Reg16::PC, 0x0048);
-            self.reset_interrupt(Interrupt::LCD);
-        }
-    }
-
-    fn check_timer(&mut self) {
-        if self.interrupt_pending(Interrupt::Timer) {
-            self.halted = false;
-        }
-        if self.interrupts_enabled && self.interrupt_pending(Interrupt::Timer) && self.interrupt_enabled(Interrupt::Timer) {
-            debug!("Handling interrupt Timer");
-            let pc = self.get_reg_16(Reg16::PC);
-            self.push_stack(pc);
-            self.set_reg_16(Reg16::PC, 0x0050);
-            self.reset_interrupt(Interrupt::Timer);
-        }
-    }
-
-    fn check_serial(&mut self) {
-        if self.interrupt_pending(Interrupt::Serial) {
-            self.halted = false;
-        }
-        if self.interrupts_enabled && self.interrupt_pending(Interrupt::Serial) && self.interrupt_enabled(Interrupt::Serial) {
-            debug!("Handling interrupt Serial");
-            let pc = self.get_reg_16(Reg16::PC);
-            self.push_stack(pc);
-            self.set_reg_16(Reg16::PC, 0x0058);
-            self.reset_interrupt(Interrupt::Serial);
+        if self.interrupts_enabled && self.interrupt_pending(i) && self.interrupt_enabled(i) {
+            debug!("Handling interrupt {:?}", i);
+            self.push_stack(self.get_reg_16(Reg16::PC));
+            self.set_reg_16(Reg16::PC, i.handler_addr());
+            self.reset_interrupt(i);
         }
     }
 
