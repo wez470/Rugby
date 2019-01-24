@@ -308,7 +308,7 @@ impl Cpu {
     }
 
     pub fn request_interrupt(&mut self, i: Interrupt) {
-        debug!("Requesting Interrupt: {:?}", i);
+        debug!("Requesting interrupt: {:?}", i);
         self.set_bit_at_location(i as i32, 0xFF0F);
     }
 

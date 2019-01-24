@@ -1,3 +1,4 @@
+use log::warn;
 use crate::interrupts::Interrupt;
 
 const HORIZONTAL_BLANK_CYCLES: usize = 204; // Horizontal blank phase takes 201-207 cycles.
@@ -338,6 +339,7 @@ impl Gpu {
     }
 
     pub fn write_lcd_stat(&mut self, val: u8) {
+        warn!("unimplemented: write to LCD STAT register (value = {:?})", val);
         // TODO(wcarlson)
     }
 }
