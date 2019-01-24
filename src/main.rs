@@ -16,6 +16,8 @@ mod reg_16;
 mod timer;
 
 fn main() {
+    env_logger::init();
+
     let app_matches = clap::App::new("Rustboy")
         .setting(clap::AppSettings::ArgRequiredElseHelp)
         .subcommand(clap::SubCommand::with_name("run")

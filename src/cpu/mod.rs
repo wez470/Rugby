@@ -1,3 +1,4 @@
+use log::{debug, info, trace, warn};
 use crate::cart::Cart;
 use crate::interrupts::Interrupt;
 use crate::reg_16::Register;
@@ -196,12 +197,6 @@ impl Cpu {
             inst_bytes[i] = self.read_mem(base_pc + i as u16);
         }
 
-        // Log the current instruction address and bytes for debugging.
-//        print!("{:04X}:", base_pc);
-        for _b in &inst_bytes[..instruction_len] {
-        //    print!(" {:02X}", b);
-        }
-
         // Update clock cycle count based on the current instruction.
         let cycles = if self.current_opcode == 0xCB {
             let opcode_after_cb = inst_bytes[1];
@@ -212,7 +207,7 @@ impl Cpu {
 
         // Decode the instruction.
         let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-//        println!("\t\t(decoded: {:?})", inst);
+        trace!("PC=0x{:04X}: {:?}", base_pc, inst);
 
         self.execute(inst);
 
@@ -240,7 +235,7 @@ impl Cpu {
             self.halted = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::VerticalBlank) && self.interrupt_enabled(Interrupt::VerticalBlank) {
-//            println!("Handling interrupt VerticalBlank");
+            debug!("Handling interrupt VerticalBlank");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0040);
@@ -253,7 +248,7 @@ impl Cpu {
             self.halted = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::LCD) && self.interrupt_enabled(Interrupt::LCD) {
-//            println!("Handling interrupt LCD");
+            debug!("Handling interrupt LCD");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0048);
@@ -266,7 +261,7 @@ impl Cpu {
             self.halted = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Timer) && self.interrupt_enabled(Interrupt::Timer) {
-//            println!("Handling interrupt Timer");
+            debug!("Handling interrupt Timer");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0050);
@@ -279,7 +274,7 @@ impl Cpu {
             self.halted = false;
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Serial) && self.interrupt_enabled(Interrupt::Serial) {
-//            println!("Handling interrupt Serial");
+            debug!("Handling interrupt Serial");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0058);
@@ -296,7 +291,7 @@ impl Cpu {
             self.request_interrupt(Interrupt::Joypad)
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
-//            println!("Handling interrupt Joypad");
+            debug!("Handling interrupt Joypad");
             let pc = self.get_reg_16(Reg16::PC);
             self.push_stack(pc);
             self.set_reg_16(Reg16::PC, 0x0060);
@@ -313,7 +308,7 @@ impl Cpu {
     }
 
     pub fn request_interrupt(&mut self, i: Interrupt) {
-//        println!("Requesting Interrupt: {:?}", i);
+        debug!("Requesting Interrupt: {:?}", i);
         self.set_bit_at_location(i as i32, 0xFF0F);
     }
 
@@ -1023,7 +1018,7 @@ impl Cpu {
     }
 
     fn write_mem(&mut self, addr: u16, val: u8) {
-        //println!("  {:04X} <== {:02X}", addr, val);
+        trace!("mem[0x{:04X}] = 0x{:02X}", addr, val);
 
         match addr {
             // 32KB cartridge write
@@ -1096,7 +1091,11 @@ impl Cpu {
             0x00 => {
                 // FIXME: This is just a hack to get farther in Tetris.
                 // Randomly returns start, select, a, or b.
-                if rand::random() { if rand::random() { 30 } else { 23 } } else { if rand::random() { 27 } else { 29 } }
+                if rand::random() {
+                    if rand::random() { 30 } else { 23 }
+                } else {
+                    if rand::random() { 27 } else { 29 }
+                }
             }
 
             0x04...0x07 => self.timer.read_mem(port),
@@ -1132,9 +1131,13 @@ impl Cpu {
 
     fn write_io_port(&mut self, port: u8, val: u8) {
         match port {
-            0x00 => {} //println!("  unimplemented: write to joypad I/O port"),
+            0x00 => {
+                warn!("unimplemented: write to joypad I/O port 0x{:02X}", port);
+            }
 
-            0x01 | 0x02 => {} //println!("  unimplemented: write to serial I/O port"),
+            0x01 | 0x02 => {
+                warn!("unimplemented: write to serial I/O port 0x{:02X}", port);
+            }
 
             0x04...0x07 => self.timer.write_mem(port, val),
 
@@ -1142,7 +1145,7 @@ impl Cpu {
             0x0F => self.interrupt_flags_register = val,
 
             0x10 | 0x11 | 0x12 | 0x13 | 0x14 | 0x1A | 0x1C | 0x1D | 0x1E => {
-                //println!("  unimplemented: write to sound I/O port");
+                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
             }
 
             0x16...0x26 => {}
@@ -1159,18 +1162,22 @@ impl Cpu {
             0x4B => self.gpu.window_x = val - 7,
 
             0x47 | 0x48 | 0x49 => {
-                //println!("  unimplemented: write to LCD I/O port");
+                warn!("unimplemented: write to LCD I/O port 0x{:02X}", port);
             }
 
             // KEY1 - CGB Mode Only - Prepare Speed Switch
             // Used for setting between normal and double speed mode for CGB
-            0x4D => {}
+            0x4D => {
+                info!("write to ignored CGB I/O port 0x{:02X}", port);
+            }
 
             // Tetris seemingly accidentally writes to this port when zeroing the high RAM. It
             // seems to be an undocumented port, so we'll just ignore the write.
             //
             // TODO: Can we figure out whether or not this port is used for anything?
-            0x7F => {}
+            0x7F => {
+                warn!("unimplemented: write to undocumented I/O port 0x{:02X}", port);
+            }
 
             _ => panic!("unimplemented: write to I/O port 0x{:02X}", port),
         }
