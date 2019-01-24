@@ -14,7 +14,7 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
         .resizable()
         .build()
         .expect("Failed to create window");
-    let mut renderer = window.renderer().build().expect("Failed to get window renderer");
+    let mut canvas = window.into_canvas().build().expect("Failed to get window canvas");
     let mut event_pump = sdl.event_pump().expect("Failed to get SDL event pump");
     let start_time = Instant::now();
 
@@ -46,10 +46,11 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
             (160 * BYTES_PER_PIXEL) as u32,
             sdl2::pixels::PixelFormatEnum::RGB888,
         ).unwrap();
-        let texture = renderer.create_texture_from_surface(&surface).unwrap();
+        let texture_creator = canvas.texture_creator();
+        let texture = texture_creator.create_texture_from_surface(&surface).unwrap();
 
-        renderer.copy(&texture, None, None).unwrap();
-        renderer.present();
+        canvas.copy(&texture, None, None).unwrap();
+        canvas.present();
 
         'wait: loop {
             for event in event_pump.poll_iter() {
@@ -83,8 +84,8 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
 
 /// The four colors of the original Game Boy screen, from lightest to darkest, in RGB.
 const GAMEBOY_COLORS: [sdl2::pixels::Color; 4] = [
-    sdl2::pixels::Color::RGB(155, 188, 15),
-    sdl2::pixels::Color::RGB(139, 172, 15),
-    sdl2::pixels::Color::RGB(48, 98, 48),
-    sdl2::pixels::Color::RGB(15, 56, 15),
+    sdl2::pixels::Color { r: 155, g: 188, b: 15, a: 0xFF },
+    sdl2::pixels::Color { r: 139, g: 172, b: 15, a: 0xFF },
+    sdl2::pixels::Color { r: 48,  g: 98,  b: 48, a: 0xFF },
+    sdl2::pixels::Color { r: 15,  g: 56,  b: 15, a: 0xFF },
 ];

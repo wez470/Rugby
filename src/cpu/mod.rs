@@ -1220,7 +1220,7 @@ mod tests {
             title: String::from("TEST"),
             cart_type: CartType {
                 mbc: MbcType::NoMbc,
-                hardware: NONE,
+                hardware: CartHardware::empty(),
             },
             rom_size,
             ram_size: 0,

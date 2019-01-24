@@ -59,13 +59,12 @@ pub enum MbcType {
 }
 
 bitflags! {
-    pub flags CartHardware: u8 {
-        const NONE          = 0,
-        const RAM           = 1 << 0,
-        const TIMER         = 1 << 1,
-        const BATTERY       = 1 << 2,
-        const RUMBLE        = 1 << 3,
-        const ACCELEROMETER = 1 << 4,
+    pub struct CartHardware: u8 {
+        const RAM           = 1 << 0;
+        const TIMER         = 1 << 1;
+        const BATTERY       = 1 << 2;
+        const RUMBLE        = 1 << 3;
+        const ACCELEROMETER = 1 << 4;
     }
 }
 
@@ -215,34 +214,34 @@ impl CartType {
         use self::MbcType::*;
 
         let (mbc, flags) = match b {
-            0x00 => (NoMbc, NONE),
-            0x01 => (Mbc1, NONE),
-            0x02 => (Mbc1, RAM),
-            0x03 => (Mbc1, RAM | BATTERY),
-            0x05 => (Mbc2, NONE),
-            0x06 => (Mbc2, RAM | BATTERY),
-            0x08 => (NoMbc, RAM),
-            0x09 => (NoMbc, RAM | BATTERY),
-            0x0B => (Mmm01, NONE),
-            0x0C => (Mmm01, RAM),
-            0x0D => (Mmm01, RAM | BATTERY),
-            0x0F => (Mbc3, TIMER | BATTERY),
-            0x10 => (Mbc3, RAM | TIMER | BATTERY),
-            0x11 => (Mbc3, NONE),
-            0x12 => (Mbc3, RAM),
-            0x13 => (Mbc3, RAM | BATTERY),
-            0x19 => (Mbc5, NONE),
-            0x1A => (Mbc5, RAM),
-            0x1B => (Mbc5, RAM | BATTERY),
-            0x1C => (Mbc5, RUMBLE),
-            0x1D => (Mbc5, RAM | RUMBLE),
-            0x1E => (Mbc5, RAM | BATTERY | RUMBLE),
-            0x20 => (Mbc6, RAM | BATTERY),
-            0x22 => (Mbc7, RAM | BATTERY | ACCELEROMETER),
-            0xFC => (PocketCamera, NONE),
-            0xFD => (BandaiTama5, NONE),
-            0xFE => (HuC3, NONE),
-            0xFF => (HuC1, RAM | BATTERY),
+            0x00 => (NoMbc, CartHardware::empty()),
+            0x01 => (Mbc1, CartHardware::empty()),
+            0x02 => (Mbc1, CartHardware::RAM),
+            0x03 => (Mbc1, CartHardware::RAM | CartHardware::BATTERY),
+            0x05 => (Mbc2, CartHardware::empty()),
+            0x06 => (Mbc2, CartHardware::RAM | CartHardware::BATTERY),
+            0x08 => (NoMbc, CartHardware::RAM),
+            0x09 => (NoMbc, CartHardware::RAM | CartHardware::BATTERY),
+            0x0B => (Mmm01, CartHardware::empty()),
+            0x0C => (Mmm01, CartHardware::RAM),
+            0x0D => (Mmm01, CartHardware::RAM | CartHardware::BATTERY),
+            0x0F => (Mbc3, CartHardware::TIMER | CartHardware::BATTERY),
+            0x10 => (Mbc3, CartHardware::RAM | CartHardware::TIMER | CartHardware::BATTERY),
+            0x11 => (Mbc3, CartHardware::empty()),
+            0x12 => (Mbc3, CartHardware::RAM),
+            0x13 => (Mbc3, CartHardware::RAM | CartHardware::BATTERY),
+            0x19 => (Mbc5, CartHardware::empty()),
+            0x1A => (Mbc5, CartHardware::RAM),
+            0x1B => (Mbc5, CartHardware::RAM | CartHardware::BATTERY),
+            0x1C => (Mbc5, CartHardware::RUMBLE),
+            0x1D => (Mbc5, CartHardware::RAM | CartHardware::RUMBLE),
+            0x1E => (Mbc5, CartHardware::RAM | CartHardware::BATTERY | CartHardware::RUMBLE),
+            0x20 => (Mbc6, CartHardware::RAM | CartHardware::BATTERY),
+            0x22 => (Mbc7, CartHardware::RAM | CartHardware::BATTERY | CartHardware::ACCELEROMETER),
+            0xFC => (PocketCamera, CartHardware::empty()),
+            0xFD => (BandaiTama5, CartHardware::empty()),
+            0xFE => (HuC3, CartHardware::empty()),
+            0xFF => (HuC1, CartHardware::RAM | CartHardware::BATTERY),
             _ => return Err(HeaderParseError::InvalidCartType(b)),
         };
 
