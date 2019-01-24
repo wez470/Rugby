@@ -1090,23 +1090,21 @@ impl Cpu {
         match port {
             0x00 => {
                 // FIXME: This is just a hack to get farther in Tetris.
-                // Randomly returns start, select, a, or b.
-                if rand::random() {
+                let key = if rand::random() {
                     if rand::random() { 30 } else { 23 }
                 } else {
                     if rand::random() { 27 } else { 29 }
-                }
+                };
+                warn!("unimplemented: read from joypad I/O port 0x00; returning {}", key);
+                key
             }
 
             0x04...0x07 => self.timer.read_mem(port),
 
-            0x10 | 0x11 | 0x12 | 0x13 | 0x14 | 0x1A | 0x1C | 0x1D | 0x1E => {
+            0x10...0x14 | 0x16...0x26 | 0x30...0x3F => {
+                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0", port);
                 0
             }
-
-            0x16...0x26 => 0,
-
-            0x30...0x3F => 0,
 
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register,
@@ -1123,7 +1121,12 @@ impl Cpu {
 
             // KEY1 - CGB Mode Only - Prepare Speed Switch
             // Used for setting between normal and double speed mode for CGB
-            0x4D => 0,
+            0x4D => {
+                // FIXME(solson): Should this return 0xFF instead? I've read that unimplemented
+                // ports and disconnected hardware in the DMG often does.
+                info!("read from ignored CGB I/O port 0x{:02X}", port);
+                0
+            },
 
             _ => panic!("unimplemented: read from I/O port 0x{:02X}", port),
         }
@@ -1144,13 +1147,9 @@ impl Cpu {
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
 
-            0x10 | 0x11 | 0x12 | 0x13 | 0x14 | 0x1A | 0x1C | 0x1D | 0x1E => {
+            0x10...0x14 | 0x16...0x26 | 0x30...0x3F => {
                 warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
             }
-
-            0x16...0x26 => {}
-
-            0x30...0x3F => {}
 
             0x40 => self.gpu.write_lcd_control(val),
             0x41 => self.gpu.write_lcd_stat(val),
@@ -1161,7 +1160,7 @@ impl Cpu {
             0x4A => self.gpu.window_y = val,
             0x4B => self.gpu.window_x = val - 7,
 
-            0x47 | 0x48 | 0x49 => {
+            0x47...0x49 => {
                 warn!("unimplemented: write to LCD I/O port 0x{:02X}", port);
             }
 
