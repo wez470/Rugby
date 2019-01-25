@@ -216,9 +216,10 @@ impl Gpu {
     /// `Mode::OamRead` -> `Mode::VRamRead` -> `Mode::HorizontalBlank` on each line.
     /// For lines 144-153, we stay in `Mode::VerticalBlank` for the whole line, after which
     /// we go back to line 0
-    pub fn step(&mut self, cycles: usize) -> Option<Interrupt> {
+    pub fn step(&mut self, cycles: usize) -> Vec<Interrupt> {
+        let mut interrupts = Vec::new();
         if !self.lcd_enabled {
-            return None
+            return interrupts
         }
         self.cycles += cycles;
 
@@ -230,9 +231,16 @@ impl Gpu {
 
                     if self.scan_line >= VERTICAL_BLANK_START_LINE {
                         self.mode = Mode::VerticalBlank;
-                        return Some(Interrupt::VerticalBlank);
+                        if self.vertical_blank_interrupt {
+                            interrupts.push(Interrupt::LCD)
+                        }
+                        interrupts.push(Interrupt::VerticalBlank);
                     } else {
                         self.mode = Mode::OamRead;
+                    }
+
+                    if self.coincidence_interrupt && self.scan_line == self.scan_line_compare {
+                        interrupts.push(Interrupt::LCD)
                     }
                 }
             },
@@ -244,6 +252,13 @@ impl Gpu {
                     if self.scan_line >= VERTICAL_BLANK_END_LINE {
                         self.scan_line = 0;
                         self.mode = Mode::OamRead;
+                        if self.oam_interrupt {
+                            interrupts.push(Interrupt::LCD);
+                        }
+                    }
+
+                    if self.coincidence_interrupt && self.scan_line == self.scan_line_compare {
+                        interrupts.push(Interrupt::LCD)
                     }
                 }
             },
@@ -258,10 +273,14 @@ impl Gpu {
                     self.cycles %= VRAM_READ_CYCLES;
                     self.mode = Mode::HorizontalBlank;
                     self.render_scan_line();
+
+                    if self.horizontal_blank_interrupt {
+                        interrupts.push(Interrupt::LCD)
+                    }
                 }
             },
         }
-        None
+        interrupts
     }
 
     fn render_scan_line(&mut self) {

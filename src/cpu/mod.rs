@@ -160,8 +160,8 @@ impl Cpu {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
             let step_cycles = self.step();
-            let gpu_interrupt = self.gpu.step(step_cycles);
-            if let Some(inter) = gpu_interrupt {
+            let gpu_interrupts = self.gpu.step(step_cycles);
+            for inter in gpu_interrupts {
                 self.request_interrupt(inter)
             }
             let timer_interrupt = self.timer.step(step_cycles);
@@ -1077,7 +1077,7 @@ impl Cpu {
             0x44 => self.gpu.scan_line,
             0x45 => self.gpu.scan_line_compare,
             0x4A => self.gpu.window_y,
-            0x4B => self.gpu.window_x + 7,
+            0x4B => self.gpu.window_x,
 
             // KEY1 - CGB Mode Only - Prepare Speed Switch
             // Used for setting between normal and double speed mode for CGB
@@ -1121,7 +1121,7 @@ impl Cpu {
             0x44 => self.gpu.scan_line = 0,
             0x45 => self.gpu.scan_line_compare = val,
             0x4A => self.gpu.window_y = val,
-            0x4B => self.gpu.window_x = val - 7,
+            0x4B => self.gpu.window_x = val,
 
             0x47...0x49 => {
                 warn!("unimplemented: write to LCD I/O port 0x{:02X}", port);
