@@ -338,8 +338,13 @@ impl Gpu {
         lcd_stat
     }
 
+    /// Write the LCD stat register 0xFF41
+    ///
+    /// Bits 0-2 are read only
     pub fn write_lcd_stat(&mut self, val: u8) {
-        warn!("unimplemented: write to LCD STAT register (value = {:?})", val);
-        // TODO(wcarlson)
+        self.coincidence_interrupt = (val >> 6) & 1 == 1;
+        self.oam_interrupt = (val >> 5) & 1 == 1;
+        self.vertical_blank_interrupt = (val >> 4) & 1 == 1;
+        self.horizontal_blank_interrupt = (val >> 3) & 1 == 1;
     }
 }
