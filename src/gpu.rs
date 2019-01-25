@@ -296,22 +296,14 @@ impl Gpu {
 
     pub fn read_lcd_control(&self) -> u8 {
         let mut lcd_control = 0;
-        if self.lcd_enabled {
-            lcd_control |= 1 << 7;
-        }
+        lcd_control |= (self.lcd_enabled as u8) << 7;
         lcd_control |= (self.window_tile_map as u8) << 6;
-        if self.window_enabled {
-            lcd_control |= 1 << 5;
-        }
+        lcd_control |= (self.window_enabled as u8) << 5;
         lcd_control |= (self.background_and_window_location as u8) << 4;
         lcd_control |= (self.background_tile_map as u8) << 3;
         lcd_control |= (self.obj_size as u8) << 2;
-        if self.obj_display_enabled {
-            lcd_control |= 1 << 1
-        }
-        if self.background_display {
-            lcd_control |= 1
-        }
+        lcd_control |= (self.obj_display_enabled as u8) << 1;
+        lcd_control |= self.background_display as u8;
         lcd_control
     }
 
