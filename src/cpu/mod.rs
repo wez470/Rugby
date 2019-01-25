@@ -1104,6 +1104,9 @@ impl Cpu {
 
             0x04...0x07 => self.timer.write_mem(port, val),
 
+            0x08 => {}
+            0x09 => {}
+
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
 
