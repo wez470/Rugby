@@ -31,7 +31,8 @@ impl Sprite {
         }
     }
 
-    pub fn write_attribute(&mut self, val: u8) {
+    /// Write sprite byte 3. bits 0-3 are for CGB only
+    pub fn write_attributes(&mut self, val: u8) {
         self.above_background = ((val >> 7) & 1) == 0;
         self.flip_y = ((val >> 6) & 1) == 1;
         self.flip_x = ((val >> 5) & 1) == 1;

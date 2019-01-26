@@ -14,6 +14,7 @@ const TOTAL_TILES: usize = 384; // Total number of tiles in video ram
 const TILE_MAP_0_START: usize = 0x1800; // The starting address of tile map 0
 const SPRITE_RAM_SIZE: usize = 160; // For the address range 0xFE00-0xFE9F (inclusive).
 const TOTAL_SPRITES: usize = 40; // The number of sprites in sprite ram
+const BYTES_PER_SPRITE: usize = 4;
 const SCREEN_WIDTH: usize = 160;
 const SCREEN_HEIGHT: usize = 144;
 
@@ -195,7 +196,18 @@ impl Gpu {
     }
 
     pub fn write_sprite_ram(&mut self, addr: usize, val: u8) {
-        self.sprite_ram[addr] = val
+        self.sprite_ram[addr] = val;
+
+        let sprite_index = addr / BYTES_PER_SPRITE;
+        let sprite_byte = addr % BYTES_PER_SPRITE;
+        match sprite_byte {
+            0 => self.sprites[sprite_index].y = val,
+            1 => self.sprites[sprite_index].x = val,
+            2 => self.sprites[sprite_index].tile_num = val,
+            3 => self.sprites[sprite_index].write_attributes(val),
+            _ => panic!("Invalid sprite byte index"),
+        }
+
     }
 
     pub fn read_vram(&self, addr: usize) -> u8 {

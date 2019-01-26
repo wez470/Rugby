@@ -1073,6 +1073,8 @@ impl Cpu {
             0x45 => self.gpu.scan_line_compare,
             0x46 => 0, // Cannot read from DMA transfer register
             0x47 => 0x47, // Return default color palette for now
+            0x48 => 0x47, // Return default color palette for now
+            0x49 => 0x47, // Return default color palette for now
             0x4A => self.gpu.window_y,
             0x4B => self.gpu.window_x,
 
