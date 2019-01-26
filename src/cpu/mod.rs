@@ -1001,7 +1001,7 @@ impl Cpu {
             // Same as C000-DDFF (ECHO) (typically not used)
             0xE000...0xFDFF => self.write_mem(addr - 0xE000 + 0xC000, val),
 
-            // Sprite Attribute Table (OAM)
+            // Sprite Attribute Table (OAM). TODO: Can only write during H-Blank or V-Blank phase
             0xFE00...0xFE9F => {
                 let i = (addr - 0xFE00) as usize;
                 self.gpu.write_sprite_ram(i, val);
