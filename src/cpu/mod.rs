@@ -946,7 +946,7 @@ impl Cpu {
             // Sprite Attribute Table (OAM)
             0xFE00...0xFE9F => {
                 let i = (addr - 0xFE00) as usize;
-                self.gpu.sprite_ram[i]
+                self.gpu.read_sprite_ram(i)
             }
 
             // Not Usable
@@ -1004,7 +1004,7 @@ impl Cpu {
             // Sprite Attribute Table (OAM)
             0xFE00...0xFE9F => {
                 let i = (addr - 0xFE00) as usize;
-                self.gpu.sprite_ram[i] = val;
+                self.gpu.write_sprite_ram(i, val);
             }
 
             // Not Usable
@@ -1072,6 +1072,7 @@ impl Cpu {
             0x44 => self.gpu.scan_line,
             0x45 => self.gpu.scan_line_compare,
             0x46 => 0, // Cannot read from DMA transfer register
+            0x47 => 0x47, // Return default color palette for now
             0x4A => self.gpu.window_y,
             0x4B => self.gpu.window_x,
 

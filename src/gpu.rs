@@ -183,6 +183,14 @@ impl Gpu {
         }
     }
 
+    pub fn read_sprite_ram(&self, addr: usize) -> u8 {
+        self.sprite_ram[addr]
+    }
+
+    pub fn write_sprite_ram(&mut self, addr: usize, val: u8) {
+        self.sprite_ram[addr] = val
+    }
+
     pub fn read_vram(&self, addr: usize) -> u8 {
         self.video_ram[addr]
     }
@@ -289,6 +297,15 @@ impl Gpu {
     }
 
     fn render_scan_line(&mut self) {
+        {
+            self.render_background_line();
+        }
+        {
+            self.render_sprite_line();
+        }
+    }
+
+    fn render_background_line(&mut self) {
         let background_map = match self.background_tile_map {
             TileMapLocation::X9800 => &self.video_ram[0x1800..0x1C00],
             TileMapLocation::X9C00 => &self.video_ram[0x1C00..0x2000],
@@ -316,6 +333,10 @@ impl Gpu {
             let pixel_y = (self.scan_line as usize + self.scan_y as usize) % 256;
             self.screen_buffer[self.scan_line as usize][i] = self.background[pixel_y][pixel_x];
         }
+    }
+
+    fn render_sprite_line(&mut self) {
+        // TODO(wcarlson): Implement this
     }
 
     pub fn read_lcd_control(&self) -> u8 {
