@@ -183,14 +183,14 @@ impl Gpu {
         }
     }
 
-    pub fn read_mem(&self, addr: usize) -> u8 {
+    pub fn read_vram(&self, addr: usize) -> u8 {
         self.video_ram[addr]
     }
 
     /// Write video ram
     ///
     /// This function also keeps the current tile set up to date
-    pub fn write_mem(&mut self, addr: usize, val: u8) {
+    pub fn write_vram(&mut self, addr: usize, val: u8) {
         self.video_ram[addr] = val;
         if addr >= TILE_MAP_0_START {
             return

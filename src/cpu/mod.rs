@@ -924,7 +924,7 @@ impl Cpu {
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
                 let i = (addr - 0x8000) as usize;
-                self.gpu.read_mem(i)
+                self.gpu.read_vram(i)
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
@@ -982,7 +982,7 @@ impl Cpu {
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
             0x8000...0x9FFF => {
                 let i = (addr - 0x8000) as usize;
-                self.gpu.write_mem(i, val);
+                self.gpu.write_vram(i, val);
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
