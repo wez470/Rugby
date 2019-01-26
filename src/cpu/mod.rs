@@ -11,7 +11,6 @@ mod inst;
 // TODO: Refactor later to extract memory-related stuff out of the cpu module.
 const WORK_RAM_SIZE: usize = 8 * 1024; // 8 KB
 const HIGH_RAM_SIZE: usize = 127; // For the address range 0xFF80-0xFFFE (inclusive).
-const SPRITE_RAM_SIZE: usize = 160; // For the address range 0xFE00-0xFE9F (inclusive).
 
 #[derive(Clone, Copy, Debug)]
 pub enum Reg8 {
@@ -81,9 +80,6 @@ pub struct Cpu {
     // TODO(solson): Un-pub.
     pub gpu: Gpu,
 
-    /// Sprite RAM internal to the Gameboy, also known as OAM.
-    sprite_ram: Box<[u8]>,
-
     /// Game cartridge.
     cart: Cart,
 
@@ -130,8 +126,7 @@ impl Cpu {
             high_ram: Box::new([0; HIGH_RAM_SIZE]),
             timer: Timer::new(),
             gpu: Gpu::new(),
-            sprite_ram: Box::new([0; SPRITE_RAM_SIZE]),
-            cart: cart,
+            cart,
             current_opcode: 0,
             cycles: 0,
             interrupts_enabled: false,
@@ -951,7 +946,7 @@ impl Cpu {
             // Sprite Attribute Table (OAM)
             0xFE00...0xFE9F => {
                 let i = (addr - 0xFE00) as usize;
-                self.sprite_ram[i]
+                self.gpu.sprite_ram[i]
             }
 
             // Not Usable
@@ -1009,7 +1004,7 @@ impl Cpu {
             // Sprite Attribute Table (OAM)
             0xFE00...0xFE9F => {
                 let i = (addr - 0xFE00) as usize;
-                self.sprite_ram[i] = val;
+                self.gpu.sprite_ram[i] = val;
             }
 
             // Not Usable
@@ -1076,6 +1071,7 @@ impl Cpu {
             0x43 => self.gpu.scan_x,
             0x44 => self.gpu.scan_line,
             0x45 => self.gpu.scan_line_compare,
+            0x46 => 0, // Cannot read from DMA transfer register
             0x4A => self.gpu.window_y,
             0x4B => self.gpu.window_x,
 
@@ -1120,6 +1116,14 @@ impl Cpu {
             0x43 => self.gpu.scan_x = val,
             0x44 => self.gpu.scan_line = 0,
             0x45 => self.gpu.scan_line_compare = val,
+            // DMA Transfer - Takes 160 microseconds to complete. During this time, only HRAM can
+            // be accessed.
+            0x46 => {
+                let start_addr = (val / 0x100) << 2;
+                for i in 0..0x100 {
+                    self.write_mem(0xFE00 + i, self.read_mem(start_addr + i))
+                }
+            }
             0x4A => self.gpu.window_y = val,
             0x4B => self.gpu.window_x = val,
 
