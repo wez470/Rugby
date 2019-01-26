@@ -1,6 +1,8 @@
 use log::warn;
 use crate::interrupts::Interrupt;
 
+mod sprite;
+
 const HORIZONTAL_BLANK_CYCLES: usize = 204; // Horizontal blank phase takes 201-207 cycles.
 const OAM_READ_CYCLES: usize = 80; // OAM read phase takes 77-83 cycles.
 const VRAM_READ_CYCLES: usize = 172; // VRAM read phase takes 169-175 cycles.
@@ -8,9 +10,10 @@ const SCAN_LINE_CYCLES: usize = 456; // One scan line takes 456 cycles.
 const VERTICAL_BLANK_START_LINE: u8 = 144; // The scan line at which we enter the vertical blank phase
 const VERTICAL_BLANK_END_LINE: u8 = 154; // The scan line at which the vertical blank phase ends
 const VIDEO_RAM_SIZE: usize = 8 * 1024; // 8 KB
-const SPRITE_RAM_SIZE: usize = 160; // For the address range 0xFE00-0xFE9F (inclusive).
 const TOTAL_TILES: usize = 384; // Total number of tiles in video ram
 const TILE_MAP_0_START: usize = 0x1800; // The starting address of tile map 0
+const SPRITE_RAM_SIZE: usize = 160; // For the address range 0xFE00-0xFE9F (inclusive).
+const TOTAL_SPRITES: usize = 40; // The number of sprites in sprite ram
 const SCREEN_WIDTH: usize = 160;
 const SCREEN_HEIGHT: usize = 144;
 
@@ -87,11 +90,14 @@ pub struct Gpu {
     /// Video RAM internal to the Gameboy.
     pub video_ram: Box<[u8]>,
 
+    /// The current tiles in video ram.
+    tile_set: [Tile; TOTAL_TILES],
+
     /// Sprite RAM internal to the Game Boy, also known as OAM.
     pub sprite_ram: Box<[u8]>,
 
-    /// The current tiles in video ram.
-    tile_set: [Tile; TOTAL_TILES],
+    /// The current sprites in sprite ram
+    sprites: [sprite::Sprite; TOTAL_SPRITES],
 
     /// The current scan line. (LY at 0xFF44)
     pub scan_line: u8,
@@ -158,8 +164,9 @@ impl Gpu {
             screen_buffer: [[0u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
             background: [[0u8; 256]; 256],
             video_ram: vec![0; VIDEO_RAM_SIZE].into_boxed_slice(),
+            tile_set: [init_tile(); TOTAL_TILES],
             sprite_ram: vec![0; SPRITE_RAM_SIZE].into_boxed_slice(),
-            tile_set: [init_tile(); 384],
+            sprites: [sprite::Sprite::new(); TOTAL_SPRITES],
             cycles: 0,
             scan_line: 0,
             scan_line_compare: 0,

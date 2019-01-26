@@ -1,3 +1,4 @@
+#[derive(Clone, Copy)]
 pub struct Sprite {
     /// Sprite x and y positions
     pub x: u8,
