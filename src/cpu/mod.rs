@@ -564,7 +564,7 @@ impl Cpu {
         self.reg_af.high = result;
         self.set_flag(Flag::Zero, result == 0);
         self.set_flag(Flag::Sub, false);
-        self.set_flag(Flag::HalfCarry, true);
+        self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, false);
     }
 
