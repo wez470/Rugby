@@ -518,6 +518,7 @@ impl Cpu {
         let half_carry = get_add_half_carry(accum, n_val) || get_add_half_carry(midway_accum, carry_val);
         self.set_flag(Flag::HalfCarry, half_carry);
         self.set_flag(Flag::Carry, midway_carry || final_carry);
+        self.set_reg_8(Reg8::A, final_accum);
     }
 
     /// The `Inst::Sub` instruction
@@ -544,6 +545,7 @@ impl Cpu {
         let half_carry = get_sub_half_carry(accum, n_val) || get_sub_half_carry(midway_accum, carry_val);
         self.set_flag(Flag::HalfCarry, half_carry);
         self.set_flag(Flag::Carry, midway_carry || final_carry);
+        self.set_reg_8(Reg8::A, final_accum);
     }
 
     /// The `Inst::And` instruction.
