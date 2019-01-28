@@ -1111,8 +1111,9 @@ impl Cpu {
 
             0x04...0x07 => self.timer.write_mem(port, val),
 
-            0x08 => {}
-            0x09 => {}
+            0x08 | 0x09 => {
+                warn!("unimplemented: write to undocumented I/O port 0x{:02X}", port);
+            }
 
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
