@@ -1,4 +1,5 @@
-use log::warn;
+use std::collections::BinaryHeap;
+use log::{info, warn};
 use crate::interrupts::Interrupt;
 
 mod sprite;
@@ -161,7 +162,7 @@ pub struct Gpu {
 
 impl Gpu {
     pub fn new() -> Gpu {
-        Gpu {
+        let mut gpu = Gpu {
             screen_buffer: [[0u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
             background: [[0u8; 256]; 256],
             video_ram: vec![0; VIDEO_RAM_SIZE].into_boxed_slice(),
@@ -188,7 +189,11 @@ impl Gpu {
             background_and_window_location: BackgroundAndWindowLocation::X8800,
             background_tile_map: TileMapLocation::X9800,
             obj_size: ObjSize::EightByEight,
+        };
+        for i in 0..TOTAL_SPRITES {
+            gpu.sprites[i].index = i;
         }
+        gpu
     }
 
     pub fn read_sprite_ram(&self, addr: usize) -> u8 {
@@ -316,10 +321,10 @@ impl Gpu {
     }
 
     fn render_scan_line(&mut self) {
-        {
+        if self.background_display {
             self.render_background_line();
         }
-        {
+        if self.obj_display_enabled {
             self.render_sprite_line();
         }
     }
@@ -355,7 +360,24 @@ impl Gpu {
     }
 
     fn render_sprite_line(&mut self) {
-        // TODO(wcarlson): Implement this
+        let mut heap = BinaryHeap::new();
+        for i in 0..TOTAL_SPRITES {
+            let s = self.sprites[i];
+            // Sprites at y = 0 or y >= 160 are off screen
+            if self.scan_line < s.y && self.scan_line > s.y - 16 {
+                heap.push(s);
+            }
+        }
+        let sprites_to_render = heap.into_sorted_vec();
+        let mut num_rendered = 0;
+        for s in &sprites_to_render {
+            if num_rendered >= 10 {
+                break;
+            }
+            info!("index: {} x: {} y: {}", s.index, s.x, s.y);
+
+            num_rendered += 1;
+        }
     }
 
     pub fn read_lcd_control(&self) -> u8 {

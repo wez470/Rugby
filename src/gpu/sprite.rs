@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 #[derive(Clone, Copy)]
 pub struct Sprite {
     /// Sprite x and y positions
@@ -16,6 +18,9 @@ pub struct Sprite {
 
     /// Palette number of the sprite
     palette_num: u8,
+
+    /// The index of sprite in memory. Used to determine sprite priority
+    pub index: usize,
 }
 
 impl Sprite {
@@ -28,6 +33,7 @@ impl Sprite {
             flip_x: false,
             flip_y: false,
             palette_num: 0,
+            index: 0,
         }
     }
 
@@ -37,5 +43,25 @@ impl Sprite {
         self.flip_y = ((val >> 6) & 1) == 1;
         self.flip_x = ((val >> 5) & 1) == 1;
         self.palette_num = (val >> 4) & 1;
+    }
+}
+
+impl Eq for Sprite {}
+
+impl Ord for Sprite {
+    fn cmp(&self, other: &Sprite) -> Ordering {
+        (self.x, self.index).cmp(&(other.x, other.index))
+    }
+}
+
+impl PartialOrd for Sprite {
+    fn partial_cmp(&self, other: &Sprite) -> Option<Ordering> {
+        Some((self.x, self.index).cmp(&(other.x, other.index)))
+    }
+}
+
+impl PartialEq for Sprite {
+    fn eq(&self, other: &Sprite) -> bool {
+        (self.x, self.index) == (other.x, other.index)
     }
 }

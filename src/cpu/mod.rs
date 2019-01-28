@@ -1122,6 +1122,7 @@ impl Cpu {
             // DMA Transfer - Takes 160 microseconds to complete. During this time, only HRAM can
             // be accessed.
             0x46 => {
+                info!("DMA TRANSFER START");
                 let start_addr: u16 = val as u16 * 0x100; // Addresses are from 0xXX00 - 0xXX9F
                 for i in 0..0x100 {
                     self.write_mem(0xFE00 + i, self.read_mem(start_addr + i))
