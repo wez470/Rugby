@@ -16,7 +16,8 @@ mod reg_16;
 mod timer;
 
 fn main() {
-    env_logger::init();
+    let env = env_logger::Env::new().filter("RUSTBOY_LOG").write_style("RUSTBOY_LOG_STYLE");
+    env_logger::init_from_env(env);
 
     let app_matches = clap::App::new("Rustboy")
         .setting(clap::AppSettings::ArgRequiredElseHelp)
