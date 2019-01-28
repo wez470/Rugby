@@ -1,6 +1,6 @@
 use crate::interrupts::Interrupt;
 
-const CYCLES_PER_DIVIDE_INC: usize = 16384; // The number of cycles between increments of the divide register
+const CYCLES_PER_DIVIDE_INC: usize = 256; // The number of cycles between increments of the divide register
 
 #[derive(Clone, Copy)]
 enum CounterSpeed {
@@ -13,10 +13,10 @@ enum CounterSpeed {
 impl std::convert::From<CounterSpeed> for usize {
     fn from(value: CounterSpeed) -> usize {
         match value {
-            CounterSpeed::S4096 => 4096,
-            CounterSpeed::S262144 => 262144,
-            CounterSpeed::S65536 => 65536,
-            CounterSpeed::S16384 => 16384,
+            CounterSpeed::S4096 => 1024,
+            CounterSpeed::S262144 => 16,
+            CounterSpeed::S65536 => 64,
+            CounterSpeed::S16384 => 256,
         }
     }
 }
@@ -93,11 +93,13 @@ impl Timer {
         if self.counter_cycle_counter >= usize::from(self.counter_speed) {
             self.counter_cycle_counter %= usize::from(self.counter_speed);
             let (new_counter, overflow) = self.counter.overflowing_add(1);
-            self.counter = match overflow {
-                true => self.modulo,
-                false => new_counter,
+            match overflow {
+                true => {
+                    self.counter = self.modulo;
+                    return Some(Interrupt::Timer);
+                }
+                false => self.counter = new_counter,
             };
-            return Some(Interrupt::Timer);
         }
         None
     }
