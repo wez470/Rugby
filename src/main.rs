@@ -33,7 +33,11 @@ fn main() {
             .arg(clap::Arg::with_name("step-mode")
                 .short("s")
                 .long("step-mode")
-                .help("Allows step mode where 'space' will execute one frame")))
+                .help("Allows step mode where 'space' will execute one frame"))
+            .arg(clap::Arg::with_name("random-joypad")
+                .short("j")
+                .long("random-joypad")
+                .help("Randomly trigger joypad interrupts (to get past intro screens while we don't have input implemented)")))
         .subcommand(clap::SubCommand::with_name("info")
             .arg(clap::Arg::with_name("ROM")
                 .required(true)
@@ -52,6 +56,8 @@ fn main() {
             let cart = Cart::new(rom, &cart_header);
             let mut cpu = Cpu::new(cart);
 
+            // TODO(solson): Collect CLI options into a single struct.
+            cpu.random_joypad = matches.is_present("random-joypad");
             start_frontend(&mut cpu, inst_limit, matches.is_present("step-mode"));
         }
 

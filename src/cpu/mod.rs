@@ -111,6 +111,11 @@ pub struct Cpu {
 
     /// If the cpu is stopped
     stopped: bool,
+
+    /// Whether to randomly trigger Joypad interrupts (from the `j` CLI option).
+    // TODO(solson): Read this flag from a common CLI options struct instead of duplicating it in
+    // the `Cpu`.
+    pub random_joypad: bool,
 }
 
 impl Cpu {
@@ -136,6 +141,7 @@ impl Cpu {
             interrupt_enable_register: 0,
             halted: false,
             stopped: false,
+            random_joypad: false,
         };
         cpu.reset();
         cpu
@@ -242,7 +248,7 @@ impl Cpu {
             self.halted = false;
             self.stopped = false;
         }
-        if rand::random::<u8>() < 20 {
+        if self.random_joypad && rand::random::<u8>() < 20 {
             self.request_interrupt(Interrupt::Joypad)
         }
         if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
