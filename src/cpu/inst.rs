@@ -1,3 +1,4 @@
+use log::warn;
 use crate::cpu::{Reg8, Reg16};
 
 // The below tables are based on the tables at
@@ -413,6 +414,12 @@ impl Inst {
             0x0E => Ld8(Reg8(C), Imm8(bytes[1])),
             0x0F => Rrca,
             0x10 => {
+                // FIXME(solson): A valid STOP instruction must be followed by 0x00 according to
+                // the manual. I think I read that it has slightly different behaviour if it is
+                // not zero. More investigation needed.
+                if bytes[1] != 0 {
+                    warn!("STOP's second byte was 0x{:02X} instead of 0x00", bytes[0]);
+                }
                 Stop
             }
             0x11 => Ld16(Reg16(DE), Imm16(to_u16(bytes[1], bytes[2]))),
