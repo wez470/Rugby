@@ -55,12 +55,52 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
         'wait: loop {
             for event in event_pump.poll_iter() {
                 use sdl2::event::Event;
+                use sdl2::keyboard::Mod;
+                use crate::joypad::{ButtonKeys, DirKeys};
                 match event {
                     Event::Quit { .. } => break 'main,
-                    Event::KeyDown { keycode, .. } => {
-                        if let Some(key) = keycode {
-                            if key == Keycode::Space && step_mode {
-                                break 'wait;
+                    Event::KeyDown { keycode: Some(keycode), keymod, repeat, .. } => {
+                        let modifiers = Mod::LSHIFTMOD | Mod::RSHIFTMOD | Mod::LCTRLMOD |
+                            Mod::RCTRLMOD | Mod::LALTMOD | Mod::RALTMOD | Mod::LGUIMOD |
+                            Mod::RGUIMOD;
+                        if !keymod.intersects(modifiers) {
+                            if repeat {
+                                match keycode {
+                                    Keycode::Space => {
+                                        if step_mode { break 'wait; }
+                                    }
+                                    _ => {}
+                                }
+                            } else {
+                                match keycode {
+                                    Keycode::W => cpu.joypad.dir_key_down(DirKeys::UP),
+                                    Keycode::A => cpu.joypad.dir_key_down(DirKeys::LEFT),
+                                    Keycode::S => cpu.joypad.dir_key_down(DirKeys::DOWN),
+                                    Keycode::D => cpu.joypad.dir_key_down(DirKeys::RIGHT),
+                                    Keycode::Return => cpu.joypad.button_key_down(ButtonKeys::START),
+                                    Keycode::Tab => cpu.joypad.button_key_down(ButtonKeys::SELECT),
+                                    Keycode::K => cpu.joypad.button_key_down(ButtonKeys::A),
+                                    Keycode::J => cpu.joypad.button_key_down(ButtonKeys::B),
+                                    _ => {}
+                                }
+                            }
+                        }
+                    },
+                    Event::KeyUp { keycode: Some(keycode), keymod, .. } => {
+                        let modifiers = Mod::LSHIFTMOD | Mod::RSHIFTMOD | Mod::LCTRLMOD |
+                            Mod::RCTRLMOD | Mod::LALTMOD | Mod::RALTMOD | Mod::LGUIMOD |
+                            Mod::RGUIMOD;
+                        if !keymod.intersects(modifiers) {
+                            match keycode {
+                                Keycode::W => cpu.joypad.dir_key_up(DirKeys::UP),
+                                Keycode::A => cpu.joypad.dir_key_up(DirKeys::LEFT),
+                                Keycode::S => cpu.joypad.dir_key_up(DirKeys::DOWN),
+                                Keycode::D => cpu.joypad.dir_key_up(DirKeys::RIGHT),
+                                Keycode::Return => cpu.joypad.button_key_up(ButtonKeys::START),
+                                Keycode::Tab => cpu.joypad.button_key_up(ButtonKeys::SELECT),
+                                Keycode::K => cpu.joypad.button_key_up(ButtonKeys::A),
+                                Keycode::J => cpu.joypad.button_key_up(ButtonKeys::B),
+                                _ => {}
                             }
                         }
                     },

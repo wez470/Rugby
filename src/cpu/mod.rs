@@ -1,6 +1,7 @@
 use log::{debug, info, trace, warn};
 use crate::cart::Cart;
 use crate::interrupts::Interrupt;
+use crate::joypad::Joypad;
 use crate::reg_16::Register;
 use crate::timer::Timer;
 use crate::gpu::Gpu;
@@ -76,9 +77,11 @@ pub struct Cpu {
     /// The Gameboy timing registers
     timer: Timer,
 
-    /// Video RAM internal to the Gameboy.
-    // TODO(solson): Un-pub.
+    /// The graphics procession unit.
     pub gpu: Gpu,
+
+    /// The player controller hardware.
+    pub joypad: Joypad,
 
     /// Game cartridge.
     cart: Cart,
@@ -131,6 +134,7 @@ impl Cpu {
             high_ram: Box::new([0; HIGH_RAM_SIZE]),
             timer: Timer::new(),
             gpu: Gpu::new(),
+            joypad: Joypad::new(),
             cart,
             current_opcode: 0,
             cycles: 0,
@@ -1051,15 +1055,12 @@ impl Cpu {
 
     fn read_io_port(&self, port: u8) -> u8 {
         match port {
-            0x00 => {
-                // FIXME: This is just a hack to get farther in Tetris.
-                let key = if rand::random() {
-                    if rand::random() { 30 } else { 23 }
-                } else {
-                    if rand::random() { 27 } else { 29 }
-                };
-                warn!("unimplemented: read from joypad I/O port 0x00; returning {}", key);
-                key
+            // P1/JOYP - Joypad
+            0x00 => self.joypad.read_reg(),
+
+            0x01 | 0x02 => {
+                warn!("unimplemented: read from serial I/O port 0x{:02X}; returning 0", port);
+                0
             }
 
             0x04...0x07 => self.timer.read_mem(port),
@@ -1101,9 +1102,7 @@ impl Cpu {
 
     fn write_io_port(&mut self, port: u8, val: u8) {
         match port {
-            0x00 => {
-                warn!("unimplemented: write to joypad I/O port 0x{:02X}", port);
-            }
+            0x00 => self.joypad.write_reg(val),
 
             0x01 | 0x02 => {
                 warn!("unimplemented: write to serial I/O port 0x{:02X}", port);
