@@ -1,7 +1,11 @@
-use sdl2::keyboard::Keycode;
-use std::time::{Instant, Duration};
-use std::thread;
 use crate::cpu::Cpu;
+use crate::joypad::{ButtonKeys, DirKeys};
+use log::info;
+use sdl2::controller::Button;
+use sdl2::event::Event;
+use sdl2::keyboard::{Keycode, Mod};
+use std::thread;
+use std::time::{Instant, Duration};
 
 const CYCLES_PER_FRAME: usize = 69905;
 const NANOS_PER_FRAME: u32 = 16666667;
@@ -16,6 +20,8 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
         .expect("Failed to create window");
     let mut canvas = window.into_canvas().build().expect("Failed to get window canvas");
     let mut event_pump = sdl.event_pump().expect("Failed to get SDL event pump");
+    let game_controller_subsytem = sdl.game_controller().expect("Failed to get game controllers");
+    let mut controllers = vec![];
     let start_time = Instant::now();
 
     'main: for inst_count in 0.. {
@@ -54,9 +60,6 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
 
         'wait: loop {
             for event in event_pump.poll_iter() {
-                use sdl2::event::Event;
-                use sdl2::keyboard::Mod;
-                use crate::joypad::{ButtonKeys, DirKeys};
                 match event {
                     Event::Quit { .. } => break 'main,
                     Event::KeyDown { keycode: Some(keycode), keymod, repeat, .. } => {
@@ -104,6 +107,46 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
                             }
                         }
                     },
+                    Event::ControllerDeviceAdded { which, .. } => {
+                        if let Ok(controller) = game_controller_subsytem.open(which) {
+                            info!("Successfully opened new controller with index {}", which);
+                            controllers.push(controller);
+                        } else {
+                            info!("Failed to open new controller with index {}", which);
+                        }
+                    }
+                    Event::ControllerDeviceRemoved { which, .. } => {
+                        controllers.retain(|c| c.instance_id() != which);
+                        info!("Removed controller with index {}", which);
+                    }
+                    Event::ControllerButtonDown { button, .. } => {
+                        match button {
+                            Button::A => cpu.joypad.button_key_down(ButtonKeys::A),
+                            Button::X => cpu.joypad.button_key_down(ButtonKeys::B),
+                            Button::Start => cpu.joypad.button_key_down(ButtonKeys::START),
+                            Button::Back => cpu.joypad.button_key_down(ButtonKeys::SELECT),
+                            Button::DPadLeft => cpu.joypad.dir_key_down(DirKeys::LEFT),
+                            Button::DPadRight => cpu.joypad.dir_key_down(DirKeys::RIGHT),
+                            Button::DPadUp => cpu.joypad.dir_key_down(DirKeys::UP),
+                            Button::DPadDown => cpu.joypad.dir_key_down(DirKeys::DOWN),
+                            _ => {}
+                        }
+                        dbg!(&cpu.joypad);
+                    }
+                    Event::ControllerButtonUp { button, .. } => {
+                        match button {
+                            Button::A => cpu.joypad.button_key_up(ButtonKeys::A),
+                            Button::X => cpu.joypad.button_key_up(ButtonKeys::B),
+                            Button::Start => cpu.joypad.button_key_up(ButtonKeys::START),
+                            Button::Back => cpu.joypad.button_key_up(ButtonKeys::SELECT),
+                            Button::DPadLeft => cpu.joypad.dir_key_up(DirKeys::LEFT),
+                            Button::DPadRight => cpu.joypad.dir_key_up(DirKeys::RIGHT),
+                            Button::DPadUp => cpu.joypad.dir_key_up(DirKeys::UP),
+                            Button::DPadDown => cpu.joypad.dir_key_up(DirKeys::DOWN),
+                            _ => {}
+                        }
+                        dbg!(&cpu.joypad);
+                    }
                     _ => ()
                 }
             }
