@@ -109,7 +109,8 @@ impl Timer {
             0x04 => self.divider,
             0x05 => self.counter,
             0x06 => self.modulo,
-            0x07 => (self.counter_running as u8) << 2 | self.counter_speed as u8,
+            // The upper 5 bits are unused and always 1.
+            0x07 => 0b1111_1000 | (self.counter_running as u8) << 2 | self.counter_speed as u8,
             _ => panic!("Invalid read address for timer")
         }
     }
