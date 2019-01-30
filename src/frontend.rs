@@ -131,7 +131,6 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
                             Button::DPadDown => cpu.joypad.dir_key_down(DirKeys::DOWN),
                             _ => {}
                         }
-                        dbg!(&cpu.joypad);
                     }
                     Event::ControllerButtonUp { button, .. } => {
                         match button {
@@ -145,7 +144,6 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
                             Button::DPadDown => cpu.joypad.dir_key_up(DirKeys::DOWN),
                             _ => {}
                         }
-                        dbg!(&cpu.joypad);
                     }
                     _ => ()
                 }
