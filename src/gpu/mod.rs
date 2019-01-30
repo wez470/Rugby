@@ -364,19 +364,36 @@ impl Gpu {
         for i in 0..TOTAL_SPRITES {
             let s = self.sprites[i];
             // Sprites at y = 0 or y >= 160 are off screen
-            if self.scan_line < s.y && self.scan_line > s.y - 16 {
+            // Only support 8x8 for now.
+            if self.scan_line >= s.y && self.scan_line < s.y + 8 {
                 heap.push(s);
             }
         }
-        let sprites_to_render = heap.into_sorted_vec();
-        let mut num_rendered = 0;
-        for s in &sprites_to_render {
-            if num_rendered >= 10 {
-                break;
-            }
-            info!("index: {} x: {} y: {}", s.index, s.x, s.y);
+        let mut sprites_to_render = heap.into_sorted_vec();
+        sprites_to_render.truncate(10);
+        for s in sprites_to_render.iter().rev() {
+            info!("index: {:?} {:?} {:?} scan: {}", s.index, s.x, s.y, self.scan_line);
+            let tile_y = match s.flip_y {
+                true => 7 - self.scan_line - s.y,
+                false => self.scan_line - s.y,
+            };
 
-            num_rendered += 1;
+            if s.flip_x {
+                for i in 0..8 {
+                    info!("Tile num index: {} {}", s.tile_num, tile_y);
+                    if s.x + i >= 0 && s.x + i < 160 {
+                        self.screen_buffer[self.scan_line as usize][s.x as usize + i as usize] = self.tile_set[s.tile_num as usize][tile_y as usize][i as usize];
+                    }
+                }
+            }
+            else {
+                for i in 0..8 {
+                    info!("Tile num index: {} {}", s.tile_num, tile_y);
+                    if s.x + i >= 0 && s.x + i < 160 {
+                        self.screen_buffer[self.scan_line as usize][s.x as usize + i as usize] = self.tile_set[s.tile_num as usize][tile_y as usize][7 - i as usize];
+                    }
+                }
+            }
         }
     }
 

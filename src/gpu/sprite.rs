@@ -13,8 +13,8 @@ pub struct Sprite {
     above_background: bool,
 
     /// True if the sprite should be flipped
-    flip_x: bool,
-    flip_y: bool,
+    pub flip_x: bool,
+    pub flip_y: bool,
 
     /// Palette number of the sprite
     palette_num: u8,
