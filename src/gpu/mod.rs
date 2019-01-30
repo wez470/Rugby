@@ -374,7 +374,7 @@ impl Gpu {
         for s in sprites_to_render.iter().rev() {
             info!("index: {:?} {:?} {:?} scan: {}", s.index, s.x, s.y, self.scan_line);
             let tile_y = match s.flip_y {
-                true => 7 - self.scan_line - s.y,
+                true => 7 - (self.scan_line - s.y),
                 false => self.scan_line - s.y,
             };
 
