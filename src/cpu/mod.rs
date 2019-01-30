@@ -1097,7 +1097,7 @@ impl Cpu {
             }
 
             // Unmapped
-            0x27...0x29 => 0xFF,
+            0x27...0x2F => 0xFF,
 
             0x30...0x3F => {
                 warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0", port);
@@ -1163,7 +1163,7 @@ impl Cpu {
             }
 
             // Unmapped
-            0x27...0x29 => {},
+            0x27...0x2F => {},
 
             0x30...0x3F => {
                 warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
