@@ -1,5 +1,4 @@
 use bitflags::bitflags;
-use log::{debug, warn};
 
 bitflags! {
     pub struct ButtonKeys: u8 {
