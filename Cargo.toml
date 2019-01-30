@@ -17,3 +17,4 @@ quickcheck = "0.8.0"
 
 [profile.release]
 debug = true
+overflow-checks = true
