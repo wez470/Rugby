@@ -1059,19 +1059,50 @@ impl Cpu {
             0x00 => self.joypad.read_reg(),
 
             0x01 | 0x02 => {
-                warn!("unimplemented: read from serial I/O port 0x{:02X}; returning 0", port);
-                0
+                warn!("unimplemented: read from serial I/O port 0x{:02X}; returning 0xFF", port);
+                0xFF
             }
+
+            // Unmapped
+            0x03 => 0xFF,
 
             0x04...0x07 => self.timer.read_mem(port),
 
-            0x10...0x14 | 0x16...0x26 | 0x30...0x3F => {
+            // Unmapped
+            0x08...0x0E => 0xFF,
+
+            // IF - Interrupt Flag register
+            // The top 3 bits are unused and always 1.
+            0x0F => 0b1110_0000 | self.interrupt_flags_register,
+
+            0x10...0x14 => {
+                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0xFF", port);
+                0xFF
+            }
+
+            // Unmapped
+            0x15 => 0xFF,
+
+            0x16...0x1E => {
+                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0xFF", port);
+                0xFF
+            }
+
+            // Unmapped
+            0x1F => 0xFF,
+
+            0x20...0x26 => {
+                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0xFF", port);
+                0xFF
+            }
+
+            // Unmapped
+            0x27...0x29 => 0xFF,
+
+            0x30...0x3F => {
                 warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0", port);
                 0
             }
-
-            // IF - Interrupt Flag register
-            0x0F => self.interrupt_flags_register,
 
             // LCD Control Register
             0x40 => self.gpu.read_lcd_control(),
@@ -1087,14 +1118,8 @@ impl Cpu {
             0x4A => self.gpu.window_y,
             0x4B => self.gpu.window_x,
 
-            // KEY1 - CGB Mode Only - Prepare Speed Switch
-            // Used for setting between normal and double speed mode for CGB
-            0x4D => {
-                // FIXME(solson): Should this return 0xFF instead? I've read that unimplemented
-                // ports and disconnected hardware in the DMG often does.
-                info!("read from ignored CGB I/O port 0x{:02X}", port);
-                0
-            },
+            // Unmapped
+            0x4C...0x7F => 0xFF,
 
             _ => panic!("unimplemented: read from I/O port 0x{:02X}", port),
         }
@@ -1108,16 +1133,39 @@ impl Cpu {
                 warn!("unimplemented: write to serial I/O port 0x{:02X}", port);
             }
 
+            // Unmapped
+            0x03 => {}
+
             0x04...0x07 => self.timer.write_mem(port, val),
 
-            0x08 | 0x09 => {
-                warn!("unimplemented: write to undocumented I/O port 0x{:02X}", port);
-            }
+            // Unmapped
+            0x08...0x0E => {}
 
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
 
-            0x10...0x14 | 0x16...0x26 | 0x30...0x3F => {
+            0x10...0x14 => {
+                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
+            }
+
+            // Unmapped
+            0x15 => {}
+
+            0x16...0x1E => {
+                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
+            }
+
+            // Unmapped
+            0x1F => {},
+
+            0x20...0x26 => {
+                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
+            }
+
+            // Unmapped
+            0x27...0x29 => {},
+
+            0x30...0x3F => {
                 warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
             }
 
@@ -1143,19 +1191,8 @@ impl Cpu {
                 warn!("unimplemented: write to LCD I/O port 0x{:02X}", port);
             }
 
-            // KEY1 - CGB Mode Only - Prepare Speed Switch
-            // Used for setting between normal and double speed mode for CGB
-            0x4D => {
-                info!("write to ignored CGB I/O port 0x{:02X}", port);
-            }
-
-            // Tetris seemingly accidentally writes to this port when zeroing the high RAM. It
-            // seems to be an undocumented port, so we'll just ignore the write.
-            //
-            // TODO: Can we figure out whether or not this port is used for anything?
-            0x7F => {
-                warn!("unimplemented: write to undocumented I/O port 0x{:02X}", port);
-            }
+            // Unmapped
+            0x4C...0x7F => {},
 
             _ => panic!("unimplemented: write to I/O port 0x{:02X}", port),
         }
