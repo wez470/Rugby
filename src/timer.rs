@@ -93,13 +93,12 @@ impl Timer {
         if self.counter_cycle_counter >= usize::from(self.counter_speed) {
             self.counter_cycle_counter %= usize::from(self.counter_speed);
             let (new_counter, overflow) = self.counter.overflowing_add(1);
-            match overflow {
-                true => {
-                    self.counter = self.modulo;
-                    return Some(Interrupt::Timer);
-                }
-                false => self.counter = new_counter,
-            };
+            if overflow {
+                self.counter = self.modulo;
+                return Some(Interrupt::Timer);
+            } else {
+                self.counter = new_counter;
+            }
         }
         None
     }
