@@ -3,12 +3,6 @@ use crate::cart_header::{CartHeader, MbcType};
 const ROM_BANK_SIZE: usize = 0x4000;
 const RAM_BANK_SIZE: usize = 0x2000;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-enum RomRamMode {
-    Rom,
-    Ram,
-}
-
 #[derive(Clone, Debug)]
 pub struct Cart {
     // TODO(solson): Can this be private? It's used by tests in cpu::tests.
@@ -56,10 +50,10 @@ impl Mbc {
             MbcType::NoMbc => Mbc::None,
 
             MbcType::Mbc1 => Mbc::Mbc1(Mbc1 {
-                rom_ram_mode: RomRamMode::Rom,
+                mode: Mbc1Mode::Rom,
                 ram_enabled: false,
-                rom_bank: 1,
-                ram_bank: 0,
+                bank_reg1: 1,
+                bank_reg2: 0,
             }),
 
             MbcType::Mbc3 => Mbc::Mbc3(Mbc3 {
@@ -108,43 +102,56 @@ fn write_mbc_none(ram: &mut [u8], addr: u16, val: u8) {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Mbc1Mode {
+    Rom,
+    Ram,
+}
+
 #[derive(Clone, Debug)]
 struct Mbc1 {
-    rom_ram_mode: RomRamMode,
+    mode: Mbc1Mode,
     ram_enabled: bool,
-    rom_bank: u8,
-    ram_bank: u8,
+    bank_reg1: u8,
+    bank_reg2: u8,
 }
 
 impl Mbc1 {
-    fn read(&self, rom: &[u8], ram: &[u8], addr: u16) -> u8 {
-        let mut address = addr as usize;
-        match address {
-            // ROM Bank 0
-            0x0000...0x3FFF => rom[address],
+    fn rom_index(&self, rom: &[u8], bank: u8, addr: u16) -> usize {
+        let bank_base = bank as usize * ROM_BANK_SIZE;
+        let addr_in_bank = addr as usize & (ROM_BANK_SIZE - 1);
+        (bank_base | addr_in_bank) & (rom.len() - 1)
+    }
 
-            // Switchable ROM bank
-            0x4000...0x7FFF => {
-                let mut bank = self.rom_bank as usize;
-                if self.rom_ram_mode == RomRamMode::Ram {
-                    bank &= 0b11111
-                }
-                address = (address - ROM_BANK_SIZE) + (bank * ROM_BANK_SIZE);
-                rom[address]
+    fn ram_index(&self, ram: &[u8], bank: u8, addr: u16) -> usize {
+        let bank_base = bank as usize * RAM_BANK_SIZE;
+        let addr_in_bank = addr as usize & (RAM_BANK_SIZE - 1);
+        (bank_base | addr_in_bank) & (ram.len() - 1)
+    }
+
+    fn read(&self, rom: &[u8], ram: &[u8], addr: u16) -> u8 {
+        match addr {
+            0x0000...0x3FFF => {
+                let bank = match self.mode {
+                    Mbc1Mode::Rom => 0,
+                    Mbc1Mode::Ram => self.bank_reg2 << 5,
+                };
+                rom[self.rom_index(rom, bank, addr)]
             }
 
-            // Switchable RAM bank
+            0x4000...0x7FFF => {
+                let bank = self.bank_reg2 << 5 | self.bank_reg1;
+                rom[self.rom_index(rom, bank, addr)]
+            }
+
             0xA000...0xBFFF => {
-                if !self.ram_enabled {
-                    // When RAM is disabled, the hardware returns all bits set.
-                    return 0xFF;
-                }
-                let mut bank = self.ram_bank as usize;
-                if self.rom_ram_mode == RomRamMode::Rom {
-                    bank = 0;
-                }
-                let ram_index = (addr - 0xA000) as usize;
-                ram[ram_index + bank * RAM_BANK_SIZE]
+                // When RAM is disabled, the hardware returns all bits set.
+                if !self.ram_enabled { return 0xFF; }
+                let bank = match self.mode {
+                    Mbc1Mode::Rom => 0,
+                    Mbc1Mode::Ram => self.bank_reg2,
+                };
+                ram[self.ram_index(ram, bank, addr)]
             }
 
             _ => panic!("Unimplemented MBC1 read at address: {}", addr),
@@ -155,56 +162,36 @@ impl Mbc1 {
         match addr {
             // RAM Enable
             0x0000...0x1FFF => {
-                self.ram_enabled = (val & 0b1111) == 0x0A
+                self.ram_enabled = (val & 0b1111) == 0b1010;
             }
 
             // ROM bank lower bits write
             0x2000...0x3FFF => {
-                let mut lower_5_bits = val & 0b11111;
-                if lower_5_bits == 0 {
-                    lower_5_bits = 1;
+                self.bank_reg1 = val & 0b0001_1111;
+                if self.bank_reg1 == 0 {
+                    self.bank_reg1 = 1;
                 }
-                self.rom_bank &= 0b11100000;
-                self.rom_bank |= lower_5_bits;
             }
 
             // RAM Bank / Upper ROM bank bits write
             0x4000...0x5FFF => {
-                match self.rom_ram_mode {
-                    RomRamMode::Rom => {
-                        let upper_2_bits = val & 0b1100000;
-                        self.rom_bank &= 0b10011111;
-                        self.rom_bank |= upper_2_bits;
-                    }
-                    RomRamMode::Ram => {
-                        self.ram_bank = val & 0b11;
-                    }
-                }
+                self.bank_reg2 = val & 0b0011;
             }
 
             // ROM / RAM Mode
             0x6000...0x7FFF => {
-                let mode_val = val & 0b1;
-                if mode_val == 0 {
-                    self.rom_ram_mode = RomRamMode::Rom;
-                }
-                else {
-                    self.rom_ram_mode = RomRamMode::Ram;
-                }
+                self.mode = if val & 1 == 0 { Mbc1Mode::Rom } else { Mbc1Mode::Ram };
             }
 
             // Switchable RAM bank
             0xA000...0xBFFF => {
-                if !self.ram_enabled {
-                    // When RAM is disabled, the hardware ignores writes.
-                    return;
-                }
-                let mut bank = self.ram_bank as usize;
-                if self.rom_ram_mode == RomRamMode::Rom {
-                    bank = 0;
-                }
-                let ram_index = (addr - 0xA000) as usize;
-                ram[ram_index + bank * RAM_BANK_SIZE] = val;
+                // When RAM is disabled, the hardware ignores writes.
+                if !self.ram_enabled { return; }
+                let bank = match self.mode {
+                    Mbc1Mode::Rom => 0,
+                    Mbc1Mode::Ram => self.bank_reg2,
+                };
+                ram[self.ram_index(ram, bank, addr)] = val;
             }
 
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
