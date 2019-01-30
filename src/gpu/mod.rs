@@ -382,7 +382,7 @@ impl Gpu {
                 for i in 0..8 {
                     info!("Tile num index: {} {}", s.tile_num, tile_y);
                     if s.x + i >= 8 && s.x + i < 168 {
-                        if self.scan_line - 16 >= 0 && self.scan_line - 16 < 144 {
+                        if (self.scan_line as u16) as i16 - 16 >= 0 {
                             if self.tile_set[s.tile_num as usize][tile_y as usize][i as usize] != 0 {
                                 self.screen_buffer[self.scan_line as usize - 16][s.x as usize + i as usize - 8] = self.tile_set[s.tile_num as usize][tile_y as usize][i as usize];
                             }
@@ -394,7 +394,7 @@ impl Gpu {
                 for i in 0..8 {
                     info!("Tile num index: {} {}", s.tile_num, tile_y);
                     if s.x + i >= 8 && s.x + i < 168 {
-                        if self.scan_line - 16 >= 0 && self.scan_line - 16 < 144 {
+                        if (self.scan_line as u16) as i16 - 16 >= 0 {
                             if self.tile_set[s.tile_num as usize][tile_y as usize][7 - i as usize] != 0 {
                                 self.screen_buffer[self.scan_line as usize - 16][s.x as usize + i as usize - 8] = self.tile_set[s.tile_num as usize][tile_y as usize][7 - i as usize];
                             }
