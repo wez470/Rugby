@@ -36,8 +36,8 @@ pub struct Joypad {
 impl Joypad {
     pub fn new() -> Self {
         Joypad {
-            select_button_keys: false,
-            select_dir_keys: false,
+            select_button_keys: true,
+            select_dir_keys: true,
             button_keys_pressed: ButtonKeys::empty(),
             dir_keys_pressed: DirKeys::empty(),
         }
