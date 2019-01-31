@@ -399,7 +399,9 @@ impl Gpu {
                 } as usize;
                 let target_x = s.x.wrapping_add(7 - x);
                 if target_x < SCREEN_WIDTH as u8 {
-                    self.screen_buffer[self.scan_line as usize][target_x as usize] = tile[line as usize][tile_x];
+                    if self.scan_line as usize >= 16 && target_x >= 8{
+                        self.screen_buffer[self.scan_line as usize - 16][target_x as usize - 8] = tile[line as usize][tile_x];
+                    }
                 }
             }
         }
