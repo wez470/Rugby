@@ -452,6 +452,7 @@ impl Cpu {
         self.set_flag(Flag::Sub, false);
         // TODO(wcarlson): Potential bugs in this section. Unsure if these implementations are
         // correct
+        warn!("executing LdHlSp or AddSp which may be buggy");
         if offset >= 0 {
             self.set_flag(Flag::HalfCarry, get_add_half_carry((sp & 0xFF) as u8, offset as u8));
             self.set_flag(Flag::Carry, (sp & 0xFF) as u16 + offset as u16 > 0xFF);
