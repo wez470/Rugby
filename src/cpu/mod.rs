@@ -141,7 +141,7 @@ impl Cpu {
             interrupts_enabled: false,
             pending_disable_interrupts: false,
             pending_enable_interrupts: false,
-            interrupt_flags_register: 0,
+            interrupt_flags_register: 1,
             interrupt_enable_register: 0,
             halted: false,
             stopped: false,
