@@ -199,7 +199,7 @@ impl Cpu {
         let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
         inst_bytes[0] = self.current_opcode;
         for i in 1..instruction_len {
-            inst_bytes[i] = self.read_mem(base_pc + i as u16);
+            inst_bytes[i] = self.read_mem(base_pc.wrapping_add(i as u16));
         }
 
         // Update clock cycle count based on the current instruction.
