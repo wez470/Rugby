@@ -1234,7 +1234,7 @@ mod tests {
 
         let rom_size = rom.len();
         let cart_header = CartHeader {
-            title: String::from("TEST"),
+            title: b"TEST".to_vec(),
             cart_type: CartType {
                 mbc: MbcType::NoMbc,
                 hardware: CartHardware::empty(),
