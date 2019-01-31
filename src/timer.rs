@@ -71,10 +71,8 @@ impl Timer {
     }
 
     pub fn step(&mut self, cycles: usize) -> Option<Interrupt> {
-        {
-            self.update_divider(cycles);
-        }
-        return self.update_counter(cycles);
+        self.update_divider(cycles);
+        self.update_counter(cycles)
     }
 
     fn update_divider(&mut self, cycles: usize) {

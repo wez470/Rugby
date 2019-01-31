@@ -8,7 +8,7 @@ use std::thread;
 use std::time::{Instant, Duration};
 
 const CYCLES_PER_FRAME: usize = 69905;
-const NANOS_PER_FRAME: u32 = 16666667;
+const NANOS_PER_FRAME: u32 = 16_666_667;
 
 pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
@@ -38,10 +38,12 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
 
         for tile_row in 0..144 {
             for tile_col in 0..160 {
-                let tile_color = cpu.gpu.screen_buffer[tile_row][tile_col];
-                image[(tile_row * 160 + tile_col) * 4 + 2] = GAMEBOY_COLORS[tile_color as usize].rgb().0;
-                image[(tile_row * 160 + tile_col) * 4 + 1] = GAMEBOY_COLORS[tile_color as usize].rgb().1;
-                image[(tile_row * 160 + tile_col) * 4 + 0] = GAMEBOY_COLORS[tile_color as usize].rgb().2;
+                let pixel_i = (tile_row * 160 + tile_col) * 4;
+                let color_i = cpu.gpu.screen_buffer[tile_row][tile_col] as usize;
+                let color = GAMEBOY_COLORS[color_i].rgb();
+                image[pixel_i + 2] = color.0;
+                image[pixel_i + 1] = color.1;
+                image[pixel_i + 0] = color.2;
             }
         }
 

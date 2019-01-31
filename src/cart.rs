@@ -14,7 +14,7 @@ pub struct Cart {
 impl Cart {
     pub fn new(rom: Box<[u8]>, cart_header: &CartHeader) -> Cart {
         Cart {
-            rom: rom,
+            rom,
             ram: vec![0; cart_header.ram_size].into_boxed_slice(),
             mbc: Mbc::new(cart_header.cart_type.mbc),
         }
@@ -256,11 +256,11 @@ impl Mbc3 {
 
             // ROM bank
             0x2000...0x3FFF => {
-                let mut lower_7_bits = val & 0b1111111;
+                let mut lower_7_bits = val & 0b0111_1111;
                 if lower_7_bits == 0 {
                     lower_7_bits = 1;
                 }
-                self.rom_bank &= 0b10000000;
+                self.rom_bank &= 0b1000_0000;
                 self.rom_bank |= lower_7_bits;
             }
 

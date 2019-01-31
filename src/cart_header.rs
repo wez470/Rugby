@@ -1,5 +1,4 @@
 use bitflags::bitflags;
-use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CartHeader {
@@ -212,7 +211,7 @@ impl CartType {
     fn from_header_byte(b: u8) -> Result<Self, HeaderParseError> {
         use self::MbcType::*;
 
-        let (mbc, flags) = match b {
+        let (mbc, hardware) = match b {
             0x00 => (NoMbc, CartHardware::empty()),
             0x01 => (Mbc1, CartHardware::empty()),
             0x02 => (Mbc1, CartHardware::RAM),
@@ -244,12 +243,12 @@ impl CartType {
             _ => return Err(HeaderParseError::InvalidCartType(b)),
         };
 
-        Ok(CartType { mbc: mbc, hardware: flags })
+        Ok(CartType { mbc, hardware })
     }
 }
 
-impl fmt::Display for HeaderParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for HeaderParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use self::HeaderParseError::*;
         match *self {
             InvalidCartType(b) =>
