@@ -360,46 +360,46 @@ impl Gpu {
     }
 
     fn render_sprite_line(&mut self) {
+        let height = match self.obj_size {
+            ObjSize::EightBySixteen => 16,
+            ObjSize::EightByEight => 8,
+        };
+
         let mut heap = BinaryHeap::new();
         for i in 0..TOTAL_SPRITES {
             let s = self.sprites[i];
             // Sprites at y = 0 or y >= 160 are off screen
             // Only support 8x8 for now.
-            if self.scan_line >= s.y && self.scan_line < s.y + 8 {
+            if self.scan_line.wrapping_sub(s.y) < height {
                 heap.push(s);
             }
         }
         let mut sprites_to_render = heap.into_sorted_vec();
         sprites_to_render.truncate(10);
         for s in sprites_to_render.iter().rev() {
-            info!("index: {:?} {:?} {:?} scan: {}", s.index, s.x, s.y, self.scan_line);
-            let tile_y = match s.flip_y {
-                true => 7 - (self.scan_line - s.y),
-                false => self.scan_line - s.y,
+            let mut tile_num = s.tile_num as usize;
+            let mut line = if s.flip_y {
+                height - self.scan_line.wrapping_sub(s.y) - 1
+            } else {
+                self.scan_line.wrapping_sub(s.y)
             };
 
-            if !s.flip_x {
-                for i in 0..8 {
-                    info!("Tile num index: {} {}", s.tile_num, tile_y);
-                    if s.x < 170 && s.x + i >= 8 && s.x + i < 168 {
-                        if (self.scan_line as u16) as i16 - 16 >= 0 {
-                            if self.tile_set[s.tile_num as usize][tile_y as usize][i as usize] != 0 {
-                                self.screen_buffer[self.scan_line as usize - 16][s.x as usize + i as usize - 8] = self.tile_set[s.tile_num as usize][tile_y as usize][i as usize];
-                            }
-                        }
-                    }
-                }
+            if line >= 8 {
+                tile_num += 1;
+                line -= 8;
             }
-            else {
-                for i in 0..8 {
-                    info!("Tile num index: {} {}", s.tile_num, tile_y);
-                    if s.x < 170 && s.x + i >= 8 && s.x + i < 168 {
-                        if (self.scan_line as u16) as i16 - 16 >= 0 {
-                            if self.tile_set[s.tile_num as usize][tile_y as usize][7 - i as usize] != 0 {
-                                self.screen_buffer[self.scan_line as usize - 16][s.x as usize + i as usize - 8] = self.tile_set[s.tile_num as usize][tile_y as usize][7 - i as usize];
-                            }
-                        }
-                    }
+
+            let tile =  self.tile_set[tile_num];
+
+            for x in (0..8).rev() {
+                let tile_x = if s.flip_x {
+                    7 - x
+                } else {
+                    x
+                } as usize;
+                let target_x = s.x.wrapping_add(7 - x);
+                if target_x < SCREEN_WIDTH as u8 {
+                    self.screen_buffer[self.scan_line as usize][target_x as usize] = tile[line as usize][tile_x];
                 }
             }
         }

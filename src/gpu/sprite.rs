@@ -10,7 +10,7 @@ pub struct Sprite {
     pub tile_num: u8,
 
     /// True if the sprite is above the background
-    above_background: bool,
+    pub above_background: bool,
 
     /// True if the sprite should be flipped
     pub flip_x: bool,
