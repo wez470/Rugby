@@ -141,7 +141,7 @@ impl Cpu {
             interrupts_enabled: false,
             pending_disable_interrupts: false,
             pending_enable_interrupts: false,
-            interrupt_flags_register: 0,
+            interrupt_flags_register: 1,
             interrupt_enable_register: 0,
             halted: false,
             stopped: false,
@@ -199,7 +199,7 @@ impl Cpu {
         let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
         inst_bytes[0] = self.current_opcode;
         for i in 1..instruction_len {
-            inst_bytes[i] = self.read_mem(base_pc + i as u16);
+            inst_bytes[i] = self.read_mem(base_pc.wrapping_add(i as u16));
         }
 
         // Update clock cycle count based on the current instruction.
@@ -452,6 +452,7 @@ impl Cpu {
         self.set_flag(Flag::Sub, false);
         // TODO(wcarlson): Potential bugs in this section. Unsure if these implementations are
         // correct
+        warn!("executing LdHlSp or AddSp which may be buggy");
         if offset >= 0 {
             self.set_flag(Flag::HalfCarry, get_add_half_carry((sp & 0xFF) as u8, offset as u8));
             self.set_flag(Flag::Carry, (sp & 0xFF) as u16 + offset as u16 > 0xFF);
@@ -1044,34 +1045,55 @@ impl Cpu {
 
     fn read_mem_16(&mut self, addr: u16) -> u16 {
         let low = self.read_mem(addr);
-        let high = self.read_mem(addr + 1);
+        let high = self.read_mem(addr.wrapping_add(1));
         ((high as u16) << 8) | low as u16
     }
 
     fn write_mem_16(&mut self, addr: u16, val: u16) {
         self.write_mem(addr, val as u8);
-        self.write_mem(addr + 1, (val >> 8) as u8);
+        self.write_mem(addr.wrapping_add(1), (val >> 8) as u8);
     }
 
     fn read_io_port(&self, port: u8) -> u8 {
+        let warn_unimplemented = |desc| {
+            warn!("unimplemented: read from {} I/O port FF{:02X}; returning 0xFF", desc, port);
+            0xFF
+        };
+
         match port {
             // P1/JOYP - Joypad
             0x00 => self.joypad.read_reg(),
 
-            0x01 | 0x02 => {
-                warn!("unimplemented: read from serial I/O port 0x{:02X}; returning 0", port);
-                0
-            }
+            0x01 | 0x02 => warn_unimplemented("serial"),
+
+            // Unmapped
+            0x03 => 0xFF,
 
             0x04...0x07 => self.timer.read_mem(port),
 
-            0x10...0x14 | 0x16...0x26 | 0x30...0x3F => {
-                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0", port);
-                0
-            }
+            // Unmapped
+            0x08...0x0E => 0xFF,
 
             // IF - Interrupt Flag register
-            0x0F => self.interrupt_flags_register,
+            // The top 3 bits are unused and always 1.
+            0x0F => 0b1110_0000 | self.interrupt_flags_register,
+
+            0x10...0x14 => warn_unimplemented("sound"),
+
+            // Unmapped
+            0x15 => 0xFF,
+
+            0x16...0x1E => warn_unimplemented("sound"),
+
+            // Unmapped
+            0x1F => 0xFF,
+
+            0x20...0x26 => warn_unimplemented("sound"),
+
+            // Unmapped
+            0x27...0x2F => 0xFF,
+
+            0x30...0x3F => warn_unimplemented("sound"),
 
             // LCD Control Register
             0x40 => self.gpu.read_lcd_control(),
@@ -1087,39 +1109,53 @@ impl Cpu {
             0x4A => self.gpu.window_y,
             0x4B => self.gpu.window_x,
 
-            // KEY1 - CGB Mode Only - Prepare Speed Switch
-            // Used for setting between normal and double speed mode for CGB
-            0x4D => {
-                // FIXME(solson): Should this return 0xFF instead? I've read that unimplemented
-                // ports and disconnected hardware in the DMG often does.
-                info!("read from ignored CGB I/O port 0x{:02X}", port);
-                0
-            },
+            // Unmapped
+            0x4C...0x7F => 0xFF,
 
-            _ => panic!("unimplemented: read from I/O port 0x{:02X}", port),
+            _ => panic!("unimplemented: read from I/O port FF{:02X}", port),
         }
     }
 
     fn write_io_port(&mut self, port: u8, val: u8) {
+        let warn_unimplemented = |desc| {
+            warn!(
+                "unimplemented: write to {} I/O port FF{:02X}: 0x{2:02X} / 0b{2:08b} / {2}",
+                desc, port, val
+            );
+        };
+
         match port {
             0x00 => self.joypad.write_reg(val),
 
-            0x01 | 0x02 => {
-                warn!("unimplemented: write to serial I/O port 0x{:02X}", port);
-            }
+            0x01 | 0x02 => warn_unimplemented("serial"),
+
+            // Unmapped
+            0x03 => {}
 
             0x04...0x07 => self.timer.write_mem(port, val),
 
-            0x08 | 0x09 => {
-                warn!("unimplemented: write to undocumented I/O port 0x{:02X}", port);
-            }
+            // Unmapped
+            0x08...0x0E => {}
 
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
 
-            0x10...0x14 | 0x16...0x26 | 0x30...0x3F => {
-                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
-            }
+            0x10...0x14 => warn_unimplemented("sound"),
+
+            // Unmapped
+            0x15 => {}
+
+            0x16...0x1E => warn_unimplemented("sound"),
+
+            // Unmapped
+            0x1F => {},
+
+            0x20...0x26 => warn_unimplemented("sound"),
+
+            // Unmapped
+            0x27...0x2F => {},
+
+            0x30...0x3F => warn_unimplemented("sound"),
 
             0x40 => self.gpu.write_lcd_control(val),
             0x41 => self.gpu.write_lcd_stat(val),
@@ -1132,32 +1168,19 @@ impl Cpu {
             0x46 => {
                 info!("DMA TRANSFER START");
                 let start_addr: u16 = val as u16 * 0x100; // Addresses are from 0xXX00 - 0xXX9F
-                for i in 0..0x100 {
+                for i in 0..0xA0 {
                     self.write_mem(0xFE00 + i, self.read_mem(start_addr + i))
                 }
             }
             0x4A => self.gpu.window_y = val,
             0x4B => self.gpu.window_x = val,
 
-            0x47...0x49 => {
-                warn!("unimplemented: write to LCD I/O port 0x{:02X}", port);
-            }
+            0x47...0x49 => warn_unimplemented("LCD"),
 
-            // KEY1 - CGB Mode Only - Prepare Speed Switch
-            // Used for setting between normal and double speed mode for CGB
-            0x4D => {
-                info!("write to ignored CGB I/O port 0x{:02X}", port);
-            }
+            // Unmapped
+            0x4C...0x7F => {},
 
-            // Tetris seemingly accidentally writes to this port when zeroing the high RAM. It
-            // seems to be an undocumented port, so we'll just ignore the write.
-            //
-            // TODO: Can we figure out whether or not this port is used for anything?
-            0x7F => {
-                warn!("unimplemented: write to undocumented I/O port 0x{:02X}", port);
-            }
-
-            _ => panic!("unimplemented: write to I/O port 0x{:02X}", port),
+            _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }
     }
 }
@@ -1196,7 +1219,7 @@ mod tests {
 
         let rom_size = rom.len();
         let cart_header = CartHeader {
-            title: String::from("TEST"),
+            title: b"TEST".to_vec(),
             cart_type: CartType {
                 mbc: MbcType::NoMbc,
                 hardware: CartHardware::empty(),

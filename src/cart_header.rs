@@ -1,10 +1,9 @@
 use bitflags::bitflags;
-use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CartHeader {
     /// The title of the game. At most 16 bytes.
-    pub title: String,
+    pub title: Vec<u8>,
 
     /// Specifies what kind of hardware is inside the cartridge, including memory bank controllers
     /// (MBC), RAM, etc.
@@ -118,7 +117,6 @@ pub enum HeaderParseError {
     InvalidManufacturerCodeUtf8(Vec<u8>),
     InvalidRamSize(u8),
     InvalidRomSize(u8),
-    InvalidTitleUtf8(Vec<u8>),
     RomTooShort(usize),
 }
 
@@ -153,9 +151,7 @@ impl CartHeader {
             title_slice = &title_slice[..end];
         };
 
-        // Parse the title as UTF-8.
-        let title = String::from_utf8(title_slice.to_vec())
-            .map_err(|e| HeaderParseError::InvalidTitleUtf8(e.into_bytes()))?;
+        let title = title_slice.to_vec();
 
         let sgb_flag = match bytes[0x46] {
             0x03 => SgbFlag::Supported,
@@ -186,6 +182,8 @@ impl CartHeader {
             n => return Err(HeaderParseError::InvalidRamSize(n)),
         };
 
+        let ram_size = ram_size_kb * 1024;
+
         let destination_code = match bytes[0x4A] {
             0x00 => DestinationCode::Japan,
             0x01 => DestinationCode::International,
@@ -195,16 +193,16 @@ impl CartHeader {
         let rom_version = bytes[0x4C];
 
         Ok(CartHeader {
-            title: title,
-            cart_type: cart_type,
-            rom_size: rom_size,
-            ram_size: ram_size_kb * 1024,
-            gbc_flag: gbc_flag,
-            sgb_flag: sgb_flag,
-            manufacturer_code: manufacturer_code,
-            licensee_code: licensee_code,
-            destination_code: destination_code,
-            rom_version: rom_version,
+            title,
+            cart_type,
+            rom_size,
+            ram_size,
+            gbc_flag,
+            sgb_flag,
+            manufacturer_code,
+            licensee_code,
+            destination_code,
+            rom_version,
         })
     }
 }
@@ -213,7 +211,7 @@ impl CartType {
     fn from_header_byte(b: u8) -> Result<Self, HeaderParseError> {
         use self::MbcType::*;
 
-        let (mbc, flags) = match b {
+        let (mbc, hardware) = match b {
             0x00 => (NoMbc, CartHardware::empty()),
             0x01 => (Mbc1, CartHardware::empty()),
             0x02 => (Mbc1, CartHardware::RAM),
@@ -245,12 +243,12 @@ impl CartType {
             _ => return Err(HeaderParseError::InvalidCartType(b)),
         };
 
-        Ok(CartType { mbc: mbc, hardware: flags })
+        Ok(CartType { mbc, hardware })
     }
 }
 
-impl fmt::Display for HeaderParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl std::fmt::Display for HeaderParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         use self::HeaderParseError::*;
         match *self {
             InvalidCartType(b) =>
@@ -263,8 +261,6 @@ impl fmt::Display for HeaderParseError {
                 writeln!(f, "invalid \"ROM size\" specification: {}", b),
             InvalidManufacturerCodeUtf8(ref bytes) =>
                 writeln!(f, "manufacturer code was not valid UTF-8: {:?}", bytes),
-            InvalidTitleUtf8(ref bytes) =>
-                writeln!(f, "cartridge title was not valid UTF-8: {:?}", bytes),
             RomTooShort(len) =>
                 writeln!(f, "cartridge had length {} which is too short to contain a header", len),
         }

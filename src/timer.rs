@@ -60,7 +60,7 @@ pub struct Timer {
 impl Timer {
     pub fn new() -> Timer {
         Timer {
-            divider: 0,
+            divider: 0xAC, // Arbitrary value which passes the Mooneye on-boot values test.
             div_cycle_counter: 0,
             counter: 0,
             counter_cycle_counter: 0,
@@ -71,10 +71,8 @@ impl Timer {
     }
 
     pub fn step(&mut self, cycles: usize) -> Option<Interrupt> {
-        {
-            self.update_divider(cycles);
-        }
-        return self.update_counter(cycles);
+        self.update_divider(cycles);
+        self.update_counter(cycles)
     }
 
     fn update_divider(&mut self, cycles: usize) {
@@ -93,13 +91,12 @@ impl Timer {
         if self.counter_cycle_counter >= usize::from(self.counter_speed) {
             self.counter_cycle_counter %= usize::from(self.counter_speed);
             let (new_counter, overflow) = self.counter.overflowing_add(1);
-            match overflow {
-                true => {
-                    self.counter = self.modulo;
-                    return Some(Interrupt::Timer);
-                }
-                false => self.counter = new_counter,
-            };
+            if overflow {
+                self.counter = self.modulo;
+                return Some(Interrupt::Timer);
+            } else {
+                self.counter = new_counter;
+            }
         }
         None
     }
@@ -109,7 +106,8 @@ impl Timer {
             0x04 => self.divider,
             0x05 => self.counter,
             0x06 => self.modulo,
-            0x07 => (self.counter_running as u8) << 2 | self.counter_speed as u8,
+            // The upper 5 bits are unused and always 1.
+            0x07 => 0b1111_1000 | (self.counter_running as u8) << 2 | self.counter_speed as u8,
             _ => panic!("Invalid read address for timer")
         }
     }

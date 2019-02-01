@@ -176,7 +176,7 @@ impl Gpu {
             mode: Mode::OamRead,
             window_enabled: false,
             obj_display_enabled: false,
-            background_display: false,
+            background_display: true,
             coincidence_interrupt: false,
             oam_interrupt: false,
             vertical_blank_interrupt: false,
@@ -186,7 +186,7 @@ impl Gpu {
             window_x: 0,
             window_y: 0,
             window_tile_map: TileMapLocation::X9800,
-            background_and_window_location: BackgroundAndWindowLocation::X8800,
+            background_and_window_location: BackgroundAndWindowLocation::X8000,
             background_tile_map: TileMapLocation::X9800,
             obj_size: ObjSize::EightByEight,
         };
