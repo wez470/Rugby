@@ -1107,7 +1107,7 @@ impl Cpu {
             0x48 => 0x47, // Return default color palette for now
             0x49 => 0x47, // Return default color palette for now
             0x4A => self.gpu.window_y,
-            0x4B => self.gpu.window_x,
+            0x4B => self.gpu.window_x.wrapping_add(7),
 
             // Unmapped
             0x4C...0x7F => 0xFF,
@@ -1173,7 +1173,7 @@ impl Cpu {
                 }
             }
             0x4A => self.gpu.window_y = val,
-            0x4B => self.gpu.window_x = val,
+            0x4B => self.gpu.window_x = val.wrapping_sub(7),
 
             0x47...0x49 => warn_unimplemented("LCD"),
 

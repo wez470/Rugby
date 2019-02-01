@@ -89,6 +89,9 @@ pub struct Gpu {
     /// The current background
     background: [[u8; 256]; 256],
 
+    /// The current window
+    window: [[u8; 256]; 256],
+
     /// Video RAM internal to the Gameboy.
     pub video_ram: Box<[u8]>,
 
@@ -118,7 +121,7 @@ pub struct Gpu {
     pub mode: Mode,
 
     /// Setting to False will clear the background
-    background_display: bool,
+    background_enabled: bool,
 
     /// True if the window is enabled
     window_enabled: bool,
@@ -165,6 +168,7 @@ impl Gpu {
         let mut gpu = Gpu {
             screen_buffer: [[0u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
             background: [[0u8; 256]; 256],
+            window: [[0u8; 256]; 256],
             video_ram: vec![0; VIDEO_RAM_SIZE].into_boxed_slice(),
             tile_set: [init_tile(); TOTAL_TILES],
             sprite_ram: vec![0; SPRITE_RAM_SIZE].into_boxed_slice(),
@@ -176,7 +180,7 @@ impl Gpu {
             mode: Mode::OamRead,
             window_enabled: false,
             obj_display_enabled: false,
-            background_display: true,
+            background_enabled: true,
             coincidence_interrupt: false,
             oam_interrupt: false,
             vertical_blank_interrupt: false,
@@ -321,8 +325,11 @@ impl Gpu {
     }
 
     fn render_scan_line(&mut self) {
-        if self.background_display {
+        if self.background_enabled {
             self.render_background_line();
+        }
+        if self.window_enabled {
+            self.render_window_line();
         }
         if self.obj_display_enabled {
             self.render_sprite_line();
@@ -356,6 +363,43 @@ impl Gpu {
             let pixel_x = (self.scan_x as usize + i) % 256;
             let pixel_y = (self.scan_line as usize + self.scan_y as usize) % 256;
             self.screen_buffer[self.scan_line as usize][i] = self.background[pixel_y][pixel_x];
+        }
+    }
+
+    fn render_window_line(&mut self) {
+        let window_map = match self.window_tile_map {
+            TileMapLocation::X9800 => &self.video_ram[0x1800..0x1C00],
+            TileMapLocation::X9C00 => &self.video_ram[0x1C00..0x2000],
+        };
+
+        for i in 0..0x400 {
+            let curr_tile_index: u8 = window_map[i];
+            let curr_tile = match self.background_and_window_location {
+                BackgroundAndWindowLocation::X8000 => self.tile_set[curr_tile_index as usize],
+                BackgroundAndWindowLocation::X8800 => self.tile_set[(256 + ((curr_tile_index as i8) as i16)) as usize]
+            };
+
+            let curr_tile_row = i / 32;
+            let curr_tile_col = i % 32;
+
+            for r in 0..8 {
+                for c in 0..8 {
+                    self.window[curr_tile_row * 8 + r][curr_tile_col * 8 + c] = curr_tile[r][c];
+                }
+            }
+        }
+
+        let pixel_y = self.scan_line as usize;
+        for i in (self.window_x as usize)..SCREEN_WIDTH {
+            let mut pixel_x = (i as u8).wrapping_add(self.scan_x);
+            if pixel_x >= self.window_x {
+                pixel_x = (i as u8) - self.window_x;
+            }
+
+            let (y, overflow) = self.scan_line.overflowing_sub(self.window_y);
+            if !overflow && (y as usize) < SCREEN_HEIGHT {
+                self.screen_buffer[pixel_y][i] = self.window[y as usize][pixel_x as usize];
+            }
         }
     }
 
@@ -415,7 +459,7 @@ impl Gpu {
         lcd_control |= (self.background_tile_map as u8) << 3;
         lcd_control |= (self.obj_size as u8) << 2;
         lcd_control |= (self.obj_display_enabled as u8) << 1;
-        lcd_control |= self.background_display as u8;
+        lcd_control |= self.background_enabled as u8;
         lcd_control
     }
 
@@ -428,7 +472,7 @@ impl Gpu {
         self.background_tile_map = TileMapLocation::from((val >> 3) & 1);
         self.obj_size = ObjSize::from((val >> 2) & 1);
         self.obj_display_enabled = ((val >> 1) & 1) == 1;
-        self.background_display = (val & 1) == 1;
+        self.background_enabled = (val & 1) == 1;
     }
 
     pub fn read_lcd_stat(&self) -> u8 {
