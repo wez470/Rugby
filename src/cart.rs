@@ -146,7 +146,7 @@ impl Mbc1 {
 
             0xA000...0xBFFF => {
                 // When RAM is disabled, the hardware returns all bits set.
-                if !self.ram_enabled { return 0xFF; }
+                if !self.ram_enabled || ram.len() == 0 { return 0xFF; }
                 let bank = match self.mode {
                     Mbc1Mode::Rom => 0,
                     Mbc1Mode::Ram => self.bank_reg2,
@@ -186,7 +186,7 @@ impl Mbc1 {
             // Switchable RAM bank
             0xA000...0xBFFF => {
                 // When RAM is disabled, the hardware ignores writes.
-                if !self.ram_enabled { return; }
+                if !self.ram_enabled || ram.len() == 0 { return; }
                 let bank = match self.mode {
                     Mbc1Mode::Rom => 0,
                     Mbc1Mode::Ram => self.bank_reg2,
