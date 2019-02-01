@@ -1,5 +1,4 @@
 use std::collections::BinaryHeap;
-use log::info;
 use crate::interrupts::Interrupt;
 
 mod sprite;
