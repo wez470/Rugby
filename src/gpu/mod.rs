@@ -206,8 +206,8 @@ impl Gpu {
         let sprite_index = addr / BYTES_PER_SPRITE;
         let sprite_byte = addr % BYTES_PER_SPRITE;
         match sprite_byte {
-            0 => self.sprites[sprite_index].y = val,
-            1 => self.sprites[sprite_index].x = val,
+            0 => self.sprites[sprite_index].y = val.wrapping_sub(16),
+            1 => self.sprites[sprite_index].x = val.wrapping_sub(8),
             2 => self.sprites[sprite_index].tile_num = val,
             3 => self.sprites[sprite_index].write_attributes(val),
             _ => panic!("Invalid sprite byte index"),
@@ -369,7 +369,6 @@ impl Gpu {
         for i in 0..TOTAL_SPRITES {
             let s = self.sprites[i];
             // Sprites at y = 0 or y >= 160 are off screen
-            // Only support 8x8 for now.
             if self.scan_line.wrapping_sub(s.y) < height {
                 heap.push(s);
             }
@@ -397,10 +396,10 @@ impl Gpu {
                 } else {
                     x
                 } as usize;
-                let target_x = s.x.wrapping_add(7 - x);
+                let target_x = s.x.wrapping_add(x);
                 if target_x < SCREEN_WIDTH as u8 {
-                    if self.scan_line as usize >= 16 && target_x >= 8{
-                        self.screen_buffer[self.scan_line as usize - 16][target_x as usize - 8] = tile[line as usize][tile_x];
+                    if tile[line as usize][tile_x] > 0 && (s.above_background || (!s.above_background && self.screen_buffer[self.scan_line as usize][target_x as usize] == 0)) {
+                        self.screen_buffer[self.scan_line as usize][target_x as usize] = tile[line as usize][tile_x];
                     }
                 }
             }
