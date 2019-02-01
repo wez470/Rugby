@@ -1055,14 +1055,16 @@ impl Cpu {
     }
 
     fn read_io_port(&self, port: u8) -> u8 {
+        let warn_unimplemented = |desc| {
+            warn!("unimplemented: read from {} I/O port FF{:02X}; returning 0xFF", desc, port);
+            0xFF
+        };
+
         match port {
             // P1/JOYP - Joypad
             0x00 => self.joypad.read_reg(),
 
-            0x01 | 0x02 => {
-                warn!("unimplemented: read from serial I/O port 0x{:02X}; returning 0xFF", port);
-                0xFF
-            }
+            0x01 | 0x02 => warn_unimplemented("serial"),
 
             // Unmapped
             0x03 => 0xFF,
@@ -1076,34 +1078,22 @@ impl Cpu {
             // The top 3 bits are unused and always 1.
             0x0F => 0b1110_0000 | self.interrupt_flags_register,
 
-            0x10...0x14 => {
-                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0xFF", port);
-                0xFF
-            }
+            0x10...0x14 => warn_unimplemented("sound"),
 
             // Unmapped
             0x15 => 0xFF,
 
-            0x16...0x1E => {
-                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0xFF", port);
-                0xFF
-            }
+            0x16...0x1E => warn_unimplemented("sound"),
 
             // Unmapped
             0x1F => 0xFF,
 
-            0x20...0x26 => {
-                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0xFF", port);
-                0xFF
-            }
+            0x20...0x26 => warn_unimplemented("sound"),
 
             // Unmapped
             0x27...0x2F => 0xFF,
 
-            0x30...0x3F => {
-                warn!("unimplemented: read from sound I/O port 0x{:02X}; returning 0", port);
-                0
-            }
+            0x30...0x3F => warn_unimplemented("sound"),
 
             // LCD Control Register
             0x40 => self.gpu.read_lcd_control(),
@@ -1122,17 +1112,22 @@ impl Cpu {
             // Unmapped
             0x4C...0x7F => 0xFF,
 
-            _ => panic!("unimplemented: read from I/O port 0x{:02X}", port),
+            _ => panic!("unimplemented: read from I/O port FF{:02X}", port),
         }
     }
 
     fn write_io_port(&mut self, port: u8, val: u8) {
+        let warn_unimplemented = |desc| {
+            warn!(
+                "unimplemented: write to {} I/O port FF{:02X}: 0x{2:02X} / 0b{2:08b} / {2}",
+                desc, port, val
+            );
+        };
+
         match port {
             0x00 => self.joypad.write_reg(val),
 
-            0x01 | 0x02 => {
-                warn!("unimplemented: write to serial I/O port 0x{:02X}", port);
-            }
+            0x01 | 0x02 => warn_unimplemented("serial"),
 
             // Unmapped
             0x03 => {}
@@ -1145,30 +1140,22 @@ impl Cpu {
             // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = val,
 
-            0x10...0x14 => {
-                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
-            }
+            0x10...0x14 => warn_unimplemented("sound"),
 
             // Unmapped
             0x15 => {}
 
-            0x16...0x1E => {
-                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
-            }
+            0x16...0x1E => warn_unimplemented("sound"),
 
             // Unmapped
             0x1F => {},
 
-            0x20...0x26 => {
-                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
-            }
+            0x20...0x26 => warn_unimplemented("sound"),
 
             // Unmapped
             0x27...0x2F => {},
 
-            0x30...0x3F => {
-                warn!("unimplemented: write to sound I/O port 0x{:02X}", port);
-            }
+            0x30...0x3F => warn_unimplemented("sound"),
 
             0x40 => self.gpu.write_lcd_control(val),
             0x41 => self.gpu.write_lcd_stat(val),
@@ -1188,14 +1175,12 @@ impl Cpu {
             0x4A => self.gpu.window_y = val,
             0x4B => self.gpu.window_x = val,
 
-            0x47...0x49 => {
-                warn!("unimplemented: write to LCD I/O port 0x{:02X}", port);
-            }
+            0x47...0x49 => warn_unimplemented("LCD"),
 
             // Unmapped
             0x4C...0x7F => {},
 
-            _ => panic!("unimplemented: write to I/O port 0x{:02X}", port),
+            _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }
     }
 }
