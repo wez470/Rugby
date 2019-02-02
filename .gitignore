@@ -1,5 +1,6 @@
-target
-tests
+/pdfs
+/roms
+/target
 .DS_Store
 *.GB
 *.gb
