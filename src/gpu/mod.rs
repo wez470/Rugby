@@ -389,15 +389,12 @@ impl Gpu {
         }
 
         let pixel_y = self.scan_line as usize;
-        for i in (self.window_x as usize)..SCREEN_WIDTH {
-            let mut pixel_x = (i as u8).wrapping_add(self.scan_x);
-            if pixel_x >= self.window_x {
-                pixel_x = (i as u8) - self.window_x;
-            }
+        for i in 0..SCREEN_WIDTH {
+            let pixel_x = (i as u8).wrapping_add(self.window_x) % (SCREEN_WIDTH as u8);
 
             let (y, overflow) = self.scan_line.overflowing_sub(self.window_y);
             if !overflow && (y as usize) < SCREEN_HEIGHT {
-                self.screen_buffer[pixel_y][i] = self.window[y as usize][pixel_x as usize];
+                self.screen_buffer[pixel_y][pixel_x as usize] = self.window[y as usize][pixel_x as usize];
             }
         }
     }
