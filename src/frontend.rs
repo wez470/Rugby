@@ -10,7 +10,7 @@ use std::time::{Instant, Duration};
 const CYCLES_PER_FRAME: usize = 69905;
 const NANOS_PER_FRAME: u32 = 16_666_667;
 
-pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool) {
+pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
     let video_subsystem = sdl.video().expect("Failed to access SDL video subsystem");
     let window = video_subsystem
@@ -22,6 +22,8 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
     let mut event_pump = sdl.event_pump().expect("Failed to get SDL event pump");
     let game_controller_subsytem = sdl.game_controller().expect("Failed to get game controllers");
     let mut controllers = vec![];
+    let mut paused = false;
+    let mut pause_next_frame = false;
     let start_time = Instant::now();
 
     'main: for inst_count in 0.. {
@@ -60,100 +62,102 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>, step_mode: bool)
         canvas.copy(&texture, None, None).unwrap();
         canvas.present();
 
-        'wait: loop {
-            for event in event_pump.poll_iter() {
-                match event {
-                    Event::Quit { .. } => break 'main,
-                    Event::KeyDown { keycode: Some(keycode), keymod, repeat, .. } => {
-                        let modifiers = Mod::LSHIFTMOD | Mod::RSHIFTMOD | Mod::LCTRLMOD |
-                            Mod::RCTRLMOD | Mod::LALTMOD | Mod::RALTMOD | Mod::LGUIMOD |
-                            Mod::RGUIMOD;
-                        if !keymod.intersects(modifiers) {
-                            if repeat {
-                                match keycode {
-                                    Keycode::Space => {
-                                        if step_mode { break 'wait; }
-                                    }
-                                    _ => {}
-                                }
-                            } else {
-                                match keycode {
-                                    Keycode::W => cpu.joypad.dir_key_down(DirKeys::UP),
-                                    Keycode::A => cpu.joypad.dir_key_down(DirKeys::LEFT),
-                                    Keycode::S => cpu.joypad.dir_key_down(DirKeys::DOWN),
-                                    Keycode::D => cpu.joypad.dir_key_down(DirKeys::RIGHT),
-                                    Keycode::Return => cpu.joypad.button_key_down(ButtonKeys::START),
-                                    Keycode::Tab => cpu.joypad.button_key_down(ButtonKeys::SELECT),
-                                    Keycode::K => cpu.joypad.button_key_down(ButtonKeys::A),
-                                    Keycode::J => cpu.joypad.button_key_down(ButtonKeys::B),
-                                    _ => {}
-                                }
-                            }
-                        }
-                    },
-                    Event::KeyUp { keycode: Some(keycode), keymod, .. } => {
-                        let modifiers = Mod::LSHIFTMOD | Mod::RSHIFTMOD | Mod::LCTRLMOD |
-                            Mod::RCTRLMOD | Mod::LALTMOD | Mod::RALTMOD | Mod::LGUIMOD |
-                            Mod::RGUIMOD;
-                        if !keymod.intersects(modifiers) {
-                            match keycode {
-                                Keycode::W => cpu.joypad.dir_key_up(DirKeys::UP),
-                                Keycode::A => cpu.joypad.dir_key_up(DirKeys::LEFT),
-                                Keycode::S => cpu.joypad.dir_key_up(DirKeys::DOWN),
-                                Keycode::D => cpu.joypad.dir_key_up(DirKeys::RIGHT),
-                                Keycode::Return => cpu.joypad.button_key_up(ButtonKeys::START),
-                                Keycode::Tab => cpu.joypad.button_key_up(ButtonKeys::SELECT),
-                                Keycode::K => cpu.joypad.button_key_up(ButtonKeys::A),
-                                Keycode::J => cpu.joypad.button_key_up(ButtonKeys::B),
-                                _ => {}
-                            }
-                        }
-                    },
-                    Event::ControllerDeviceAdded { which, .. } => {
-                        if let Ok(controller) = game_controller_subsytem.open(which) {
-                            info!("Successfully opened new controller with index {}", which);
-                            controllers.push(controller);
-                        } else {
-                            info!("Failed to open new controller with index {}", which);
-                        }
-                    }
-                    Event::ControllerDeviceRemoved { which, .. } => {
-                        controllers.retain(|c| c.instance_id() != which);
-                        info!("Removed controller with index {}", which);
-                    }
-                    Event::ControllerButtonDown { button, .. } => {
-                        match button {
-                            Button::A => cpu.joypad.button_key_down(ButtonKeys::A),
-                            Button::X => cpu.joypad.button_key_down(ButtonKeys::B),
-                            Button::Start => cpu.joypad.button_key_down(ButtonKeys::START),
-                            Button::Back => cpu.joypad.button_key_down(ButtonKeys::SELECT),
-                            Button::DPadLeft => cpu.joypad.dir_key_down(DirKeys::LEFT),
-                            Button::DPadRight => cpu.joypad.dir_key_down(DirKeys::RIGHT),
-                            Button::DPadUp => cpu.joypad.dir_key_down(DirKeys::UP),
-                            Button::DPadDown => cpu.joypad.dir_key_down(DirKeys::DOWN),
-                            _ => {}
-                        }
-                    }
-                    Event::ControllerButtonUp { button, .. } => {
-                        match button {
-                            Button::A => cpu.joypad.button_key_up(ButtonKeys::A),
-                            Button::X => cpu.joypad.button_key_up(ButtonKeys::B),
-                            Button::Start => cpu.joypad.button_key_up(ButtonKeys::START),
-                            Button::Back => cpu.joypad.button_key_up(ButtonKeys::SELECT),
-                            Button::DPadLeft => cpu.joypad.dir_key_up(DirKeys::LEFT),
-                            Button::DPadRight => cpu.joypad.dir_key_up(DirKeys::RIGHT),
-                            Button::DPadUp => cpu.joypad.dir_key_up(DirKeys::UP),
-                            Button::DPadDown => cpu.joypad.dir_key_up(DirKeys::DOWN),
-                            _ => {}
-                        }
-                    }
-                    _ => ()
-                }
-            }
-            if !step_mode { break; }
+        if pause_next_frame {
+            pause_next_frame = false;
+            paused = true;
         }
 
-        cpu.step_cycles(CYCLES_PER_FRAME);
+        for event in event_pump.poll_iter() {
+            match event {
+                Event::Quit { .. } => break 'main,
+                Event::KeyDown { keycode: Some(keycode), keymod, repeat, .. } => {
+                    let modifiers = Mod::LSHIFTMOD | Mod::RSHIFTMOD | Mod::LCTRLMOD |
+                        Mod::RCTRLMOD | Mod::LALTMOD | Mod::RALTMOD | Mod::LGUIMOD |
+                        Mod::RGUIMOD;
+                    if !keymod.intersects(modifiers) {
+                        match keycode {
+                            Keycode::W if !repeat => cpu.joypad.dir_key_down(DirKeys::UP),
+                            Keycode::A if !repeat => cpu.joypad.dir_key_down(DirKeys::LEFT),
+                            Keycode::S if !repeat => cpu.joypad.dir_key_down(DirKeys::DOWN),
+                            Keycode::D if !repeat => cpu.joypad.dir_key_down(DirKeys::RIGHT),
+                            Keycode::Return if !repeat =>
+                                cpu.joypad.button_key_down(ButtonKeys::START),
+                            Keycode::Tab if !repeat =>
+                                cpu.joypad.button_key_down(ButtonKeys::SELECT),
+                            Keycode::K if !repeat => cpu.joypad.button_key_down(ButtonKeys::A),
+                            Keycode::J if !repeat => cpu.joypad.button_key_down(ButtonKeys::B),
+                            Keycode::P if !repeat => paused = !paused,
+                            Keycode::Space => {
+                                paused = false;
+                                pause_next_frame = true;
+                            }
+                            _ => {}
+                        }
+                    }
+                },
+                Event::KeyUp { keycode: Some(keycode), keymod, .. } => {
+                    let modifiers = Mod::LSHIFTMOD | Mod::RSHIFTMOD | Mod::LCTRLMOD |
+                        Mod::RCTRLMOD | Mod::LALTMOD | Mod::RALTMOD | Mod::LGUIMOD |
+                        Mod::RGUIMOD;
+                    if !keymod.intersects(modifiers) {
+                        match keycode {
+                            Keycode::W => cpu.joypad.dir_key_up(DirKeys::UP),
+                            Keycode::A => cpu.joypad.dir_key_up(DirKeys::LEFT),
+                            Keycode::S => cpu.joypad.dir_key_up(DirKeys::DOWN),
+                            Keycode::D => cpu.joypad.dir_key_up(DirKeys::RIGHT),
+                            Keycode::Return => cpu.joypad.button_key_up(ButtonKeys::START),
+                            Keycode::Tab => cpu.joypad.button_key_up(ButtonKeys::SELECT),
+                            Keycode::K => cpu.joypad.button_key_up(ButtonKeys::A),
+                            Keycode::J => cpu.joypad.button_key_up(ButtonKeys::B),
+                            _ => {}
+                        }
+                    }
+                },
+                Event::ControllerDeviceAdded { which, .. } => {
+                    if let Ok(controller) = game_controller_subsytem.open(which) {
+                        info!("Successfully opened new controller with index {}", which);
+                        controllers.push(controller);
+                    } else {
+                        info!("Failed to open new controller with index {}", which);
+                    }
+                }
+                Event::ControllerDeviceRemoved { which, .. } => {
+                    controllers.retain(|c| c.instance_id() != which);
+                    info!("Removed controller with index {}", which);
+                }
+                Event::ControllerButtonDown { button, .. } => {
+                    match button {
+                        Button::A => cpu.joypad.button_key_down(ButtonKeys::A),
+                        Button::X => cpu.joypad.button_key_down(ButtonKeys::B),
+                        Button::Start => cpu.joypad.button_key_down(ButtonKeys::START),
+                        Button::Back => cpu.joypad.button_key_down(ButtonKeys::SELECT),
+                        Button::DPadLeft => cpu.joypad.dir_key_down(DirKeys::LEFT),
+                        Button::DPadRight => cpu.joypad.dir_key_down(DirKeys::RIGHT),
+                        Button::DPadUp => cpu.joypad.dir_key_down(DirKeys::UP),
+                        Button::DPadDown => cpu.joypad.dir_key_down(DirKeys::DOWN),
+                        _ => {}
+                    }
+                }
+                Event::ControllerButtonUp { button, .. } => {
+                    match button {
+                        Button::A => cpu.joypad.button_key_up(ButtonKeys::A),
+                        Button::X => cpu.joypad.button_key_up(ButtonKeys::B),
+                        Button::Start => cpu.joypad.button_key_up(ButtonKeys::START),
+                        Button::Back => cpu.joypad.button_key_up(ButtonKeys::SELECT),
+                        Button::DPadLeft => cpu.joypad.dir_key_up(DirKeys::LEFT),
+                        Button::DPadRight => cpu.joypad.dir_key_up(DirKeys::RIGHT),
+                        Button::DPadUp => cpu.joypad.dir_key_up(DirKeys::UP),
+                        Button::DPadDown => cpu.joypad.dir_key_up(DirKeys::DOWN),
+                        _ => {}
+                    }
+                }
+                _ => ()
+            }
+        }
+
+        if !paused {
+            cpu.step_cycles(CYCLES_PER_FRAME);
+        }
 
         while (Instant::now() - frame_start_time).subsec_nanos() < NANOS_PER_FRAME {
             thread::sleep(Duration::new(0, 1 as u32));

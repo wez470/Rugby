@@ -32,10 +32,6 @@ fn main() {
                 .takes_value(true)
                 .value_name("COUNT")
                 .help("The maximum number of instructions to execute"))
-            .arg(clap::Arg::with_name("step-mode")
-                .short("s")
-                .long("step-mode")
-                .help("Allows step mode where 'space' will execute one frame"))
             .arg(clap::Arg::with_name("random-joypad")
                 .short("j")
                 .long("random-joypad")
@@ -60,7 +56,7 @@ fn main() {
 
             // TODO(solson): Collect CLI options into a single struct.
             cpu.random_joypad = matches.is_present("random-joypad");
-            start_frontend(&mut cpu, inst_limit, matches.is_present("step-mode"));
+            start_frontend(&mut cpu, inst_limit);
         }
 
 
