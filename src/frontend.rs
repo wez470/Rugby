@@ -14,19 +14,37 @@ const SCREEN_HEIGHT: usize = 144;
 
 pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
-    let video_subsystem = sdl.video().expect("Failed to access SDL video subsystem");
-    let window = video_subsystem
+    let video = sdl.video().expect("Failed to access SDL video subsystem");
+    let window = video
         .window("Rustboy", 1024, 1024)
         .resizable()
+        .opengl()
         .build()
         .expect("Failed to create window");
-    let mut canvas = window.into_canvas().build().expect("Failed to get window canvas");
-    let mut event_pump = sdl.event_pump().expect("Failed to get SDL event pump");
+
+    let gl_context = window.gl_create_context().expect("Couldn't create GL context");
+    gl::load_with(|s| video.gl_get_proc_address(s) as _);
+
+    let mut imgui = imgui::ImGui::init();
+    imgui.set_ini_filename(None);
+    let mut imgui_sdl2 = imgui_sdl2::ImguiSdl2::new(&mut imgui);
+    let imgui_renderer = imgui_opengl_renderer::Renderer::new(
+        &mut imgui,
+        |s| video.gl_get_proc_address(s) as _,
+    );
+
+    let mut canvas = window
+        .into_canvas()
+        .present_vsync()
+        .build()
+        .expect("Failed to get window canvas");
+
     let game_controller_subsytem = sdl.game_controller().expect("Failed to get game controllers");
     let mut controllers = vec![];
+
     let mut paused = false;
     let mut pause_next_frame = false;
-    let start_time = Instant::now();
+    let mut event_pump = sdl.event_pump().expect("Failed to get SDL event pump");
 
     'main: for inst_count in 0.. {
         let frame_start_time = Instant::now();
@@ -62,6 +80,18 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
         let texture = texture_creator.create_texture_from_surface(&surface).unwrap();
 
         canvas.copy(&texture, None, None).unwrap();
+
+        {
+            let ui = imgui_sdl2.frame(canvas.window(), &mut imgui, &event_pump.mouse_state());
+            ui.show_demo_window(&mut true);
+
+            // FIXME(solson): Avoid using SDL Canvas so we don't need this hack (which is from
+            // https://github.com/michaelfairley/rust-imgui-sdl2/issues/2#issuecomment-390321178).
+            canvas.window_mut().gl_make_current(&gl_context).unwrap();
+            imgui_renderer.render(ui);
+            unsafe { gl::Flush(); }
+        }
+
         canvas.present();
 
         if pause_next_frame {
@@ -70,6 +100,9 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
         }
 
         for event in event_pump.poll_iter() {
+            imgui_sdl2.handle_event(&mut imgui, &event);
+            if imgui_sdl2.ignore_event(&event) { continue; }
+
             match event {
                 Event::Quit { .. } => break 'main,
                 Event::KeyDown { keycode: Some(keycode), keymod, repeat, .. } => {
@@ -165,10 +198,6 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
             thread::sleep(Duration::new(0, 1 as u32));
         }
     }
-    let end_time = Instant::now();
-    let total_duration = end_time - start_time;
-    let total_time = total_duration.as_secs() as f64 + (total_duration.subsec_nanos() as f64) / 1e9;
-    println!("Total time: {}", total_time);
 }
 
 /// The four colors of the original Game Boy screen, from lightest to darkest, in RGB.
