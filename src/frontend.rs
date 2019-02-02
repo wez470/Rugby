@@ -9,6 +9,8 @@ use std::time::{Instant, Duration};
 
 const CYCLES_PER_FRAME: usize = 69905;
 const NANOS_PER_FRAME: u32 = 16_666_667;
+const SCREEN_WIDTH: usize = 160;
+const SCREEN_HEIGHT: usize = 144;
 
 pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
@@ -36,11 +38,11 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
         }
 
         const BYTES_PER_PIXEL: usize = 4;
-        let mut image = [0u8; 160 * 144 * BYTES_PER_PIXEL];
+        let mut image = [0u8; SCREEN_WIDTH * SCREEN_HEIGHT * BYTES_PER_PIXEL];
 
-        for tile_row in 0..144 {
-            for tile_col in 0..160 {
-                let pixel_i = (tile_row * 160 + tile_col) * 4;
+        for tile_row in 0..SCREEN_HEIGHT {
+            for tile_col in 0..SCREEN_WIDTH {
+                let pixel_i = (tile_row * SCREEN_WIDTH + tile_col) * 4;
                 let color_i = cpu.gpu.screen_buffer[tile_row][tile_col] as usize;
                 let color = GAMEBOY_COLORS[color_i].rgb();
                 image[pixel_i + 2] = color.0;
@@ -51,9 +53,9 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
 
         let surface = sdl2::surface::Surface::from_data(
             &mut image[..],
-            160 as u32,
-            144 as u32,
-            (160 * BYTES_PER_PIXEL) as u32,
+            SCREEN_WIDTH as u32,
+            SCREEN_HEIGHT as u32,
+            (SCREEN_WIDTH * BYTES_PER_PIXEL) as u32,
             sdl2::pixels::PixelFormatEnum::RGB888,
         ).unwrap();
         let texture_creator = canvas.texture_creator();
