@@ -17,5 +17,4 @@ down    = s
 right   = d
 ```
 
-![Rustboy Gameplay](https://imgur.com/fWwDyZL "Rustboy Gameplay")
-
+<img src="https://i.imgur.com/YkgtiOI.png" alt="Rustboy Gameplay" width="200"/>
