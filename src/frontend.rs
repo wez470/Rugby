@@ -16,7 +16,7 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
     let video_subsystem = sdl.video().expect("Failed to access SDL video subsystem");
     let window = video_subsystem
-        .window("Rustboy", 1024, 1024)
+        .window("Rustboy", 640, 576)
         .resizable()
         .build()
         .expect("Failed to create window");
