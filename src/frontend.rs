@@ -13,6 +13,7 @@ const SCREEN_WIDTH: usize = 160;
 const SCREEN_HEIGHT: usize = 144;
 
 pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
+    let mut speed_multiplier: f32 = 1.0;
     let sdl = sdl2::init().expect("Failed to initialize SDL");
     let video_subsystem = sdl.video().expect("Failed to access SDL video subsystem");
     let window = video_subsystem
@@ -111,6 +112,8 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
                             Keycode::Tab => cpu.joypad.button_key_up(ButtonKeys::SELECT),
                             Keycode::K => cpu.joypad.button_key_up(ButtonKeys::A),
                             Keycode::J => cpu.joypad.button_key_up(ButtonKeys::B),
+                            Keycode::RightBracket => speed_multiplier = (speed_multiplier * 2.0).min(4.0),
+                            Keycode::LeftBracket => speed_multiplier = (speed_multiplier / 2.0).max(0.25),
                             _ => {}
                         }
                     }
@@ -150,6 +153,8 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
                         Button::DPadRight => cpu.joypad.dir_key_up(DirKeys::RIGHT),
                         Button::DPadUp => cpu.joypad.dir_key_up(DirKeys::UP),
                         Button::DPadDown => cpu.joypad.dir_key_up(DirKeys::DOWN),
+                        Button::RightShoulder => speed_multiplier = (speed_multiplier * 2.0).min(4.0),
+                        Button::LeftShoulder => speed_multiplier = (speed_multiplier / 2.0).max(0.25),
                         _ => {}
                     }
                 }
@@ -158,7 +163,7 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
         }
 
         if !paused {
-            cpu.step_cycles(CYCLES_PER_FRAME);
+            cpu.step_cycles((CYCLES_PER_FRAME as f32 * speed_multiplier) as usize);
         }
 
         while (Instant::now() - frame_start_time).subsec_nanos() < NANOS_PER_FRAME {
