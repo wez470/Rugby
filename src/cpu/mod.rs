@@ -1103,9 +1103,9 @@ impl Cpu {
             0x44 => self.gpu.scan_line,
             0x45 => self.gpu.scan_line_compare,
             0x46 => 0, // Cannot read from DMA transfer register
-            0x47 => 0x47, // Return default color palette for now
-            0x48 => 0x47, // Return default color palette for now
-            0x49 => 0x47, // Return default color palette for now
+            0x47 => self.gpu.background_palette,
+            0x48 => self.gpu.obj_palette_0,
+            0x49 => self.gpu.obj_palette_1,
             0x4A => self.gpu.window_y,
             0x4B => self.gpu.window_x.wrapping_add(7),
 
@@ -1172,10 +1172,11 @@ impl Cpu {
                     self.write_mem(0xFE00 + i, self.read_mem(start_addr + i))
                 }
             }
+            0x47 => self.gpu.background_palette = val,
+            0x48 => self.gpu.obj_palette_0 = val,
+            0x49 => self.gpu.obj_palette_1 = val,
             0x4A => self.gpu.window_y = val,
             0x4B => self.gpu.window_x = val.wrapping_sub(7),
-
-            0x47...0x49 => warn_unimplemented("LCD"),
 
             // Unmapped
             0x4C...0x7F => {},

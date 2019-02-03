@@ -160,6 +160,15 @@ pub struct Gpu {
 
     /// The size of the objects (sprites). 8x8 or 8x16
     obj_size: ObjSize,
+
+    /// background palette register
+    pub background_palette: u8,
+
+    /// first sprite palette register
+    pub obj_palette_0: u8,
+
+    /// second sprite palette register
+    pub obj_palette_1: u8,
 }
 
 impl Gpu {
@@ -194,6 +203,9 @@ impl Gpu {
             background_and_window_location: BackgroundAndWindowLocation::X8000,
             background_tile_map: TileMapLocation::X9800,
             obj_size: ObjSize::EightByEight,
+            background_palette: 0,
+            obj_palette_0: 0,
+            obj_palette_1: 1,
         };
         for i in 0..TOTAL_SPRITES {
             gpu.sprites[i].index = i;
@@ -363,7 +375,8 @@ impl Gpu {
         for i in 0..SCREEN_WIDTH {
             let pixel_x = (self.scan_x as usize + i) % 256;
             let pixel_y = (self.scan_line as usize + self.scan_y as usize) % 256;
-            self.screen_buffer[self.scan_line as usize][i] = self.background[pixel_y][pixel_x];
+            let color = get_palette_color(self.background[pixel_y][pixel_x], self.background_palette);
+            self.screen_buffer[self.scan_line as usize][i] = color;
         }
     }
 
@@ -393,7 +406,8 @@ impl Gpu {
         for screen_x in (self.window_x as usize)..SCREEN_WIDTH {
             let (y, overflow) = self.scan_line.overflowing_sub(self.window_y);
             if !overflow && (y as usize) < SCREEN_HEIGHT {
-                self.screen_buffer[self.scan_line as usize][screen_x] = self.window[y as usize][screen_x - (self.window_x as usize)];
+                let color = get_palette_color(self.window[y as usize][screen_x - (self.window_x as usize)], self.background_palette);
+                self.screen_buffer[self.scan_line as usize][screen_x] = color;
             }
         }
     }
@@ -437,8 +451,15 @@ impl Gpu {
                 } as usize;
                 let target_x = s.x.wrapping_add(x);
                 if target_x < SCREEN_WIDTH as u8 {
-                    if tile[line as usize][tile_x] > 0 && (s.above_background || (!s.above_background && self.screen_buffer[self.scan_line as usize][target_x as usize] == 0)) {
-                        self.screen_buffer[self.scan_line as usize][target_x as usize] = tile[line as usize][tile_x];
+                    if tile[line as usize][tile_x] > 0
+                        && (s.above_background || (!s.above_background && self.screen_buffer[self.scan_line as usize][target_x as usize] == 0)) {
+                        let palette = if s.palette_num == 0 {
+                            self.obj_palette_0
+                        } else {
+                            self.obj_palette_1
+                        };
+                        let color = get_palette_color(tile[line as usize][tile_x], palette);
+                        self.screen_buffer[self.scan_line as usize][target_x as usize] = color;
                     }
                 }
             }
@@ -490,4 +511,8 @@ impl Gpu {
         self.vertical_blank_interrupt = (val >> 4) & 1 == 1;
         self.horizontal_blank_interrupt = (val >> 3) & 1 == 1;
     }
+}
+
+fn get_palette_color(color_num: u8, palette: u8) -> u8 {
+    (palette >> (2 * color_num)) & 3
 }

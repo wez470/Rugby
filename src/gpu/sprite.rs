@@ -17,7 +17,7 @@ pub struct Sprite {
     pub flip_y: bool,
 
     /// Palette number of the sprite
-    palette_num: u8,
+    pub palette_num: u8,
 
     /// The index of sprite in memory. Used to determine sprite priority
     pub index: usize,
