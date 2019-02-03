@@ -83,25 +83,25 @@ fn init_tile() -> Tile {
 #[derive(Clone)]
 pub struct Gpu {
     /// Current screen
-    pub screen_buffer: [[u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
+    pub screen_buffer: Box<[[u8; SCREEN_WIDTH]; SCREEN_HEIGHT]>,
 
     /// The current background
-    background: [[u8; 256]; 256],
+    background: Box<[[u8; 256]; 256]>,
 
     /// The current window
-    window: [[u8; 256]; 256],
+    window: Box<[[u8; 256]; 256]>,
 
     /// Video RAM internal to the Gameboy.
     pub video_ram: Box<[u8]>,
 
     /// The current tiles in video ram.
-    tile_set: [Tile; TOTAL_TILES],
+    tile_set: Box<[Tile]>,
 
     /// Sprite RAM internal to the Game Boy, also known as OAM.
     pub sprite_ram: Box<[u8]>,
 
     /// The current sprites in sprite ram
-    sprites: [sprite::Sprite; TOTAL_SPRITES],
+    sprites: Box<[sprite::Sprite]>,
 
     /// The current scan line. (LY at 0xFF44)
     pub scan_line: u8,
@@ -165,13 +165,15 @@ pub struct Gpu {
 impl Gpu {
     pub fn new() -> Gpu {
         let mut gpu = Gpu {
-            screen_buffer: [[0u8; SCREEN_WIDTH]; SCREEN_HEIGHT],
-            background: [[0u8; 256]; 256],
-            window: [[0u8; 256]; 256],
+            // TODO(solson): Figure out a clean way to allocate 2D arrays like these directly on
+            // the heap (without giving up the `arr[i][j]` multidimensional indexing).
+            screen_buffer: Box::new([[0u8; SCREEN_WIDTH]; SCREEN_HEIGHT]),
+            background: Box::new([[0u8; 256]; 256]),
+            window: Box::new([[0u8; 256]; 256]),
             video_ram: vec![0; VIDEO_RAM_SIZE].into_boxed_slice(),
-            tile_set: [init_tile(); TOTAL_TILES],
+            tile_set: vec![init_tile(); TOTAL_TILES].into_boxed_slice(),
             sprite_ram: vec![0; SPRITE_RAM_SIZE].into_boxed_slice(),
-            sprites: [sprite::Sprite::new(); TOTAL_SPRITES],
+            sprites: vec![sprite::Sprite::new(); TOTAL_SPRITES].into_boxed_slice(),
             cycles: 0,
             scan_line: 0,
             scan_line_compare: 0,
