@@ -1184,6 +1184,10 @@ impl Cpu {
             _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }
     }
+
+    pub fn dump_memory(&self) -> &Box<[u8]> {
+        self.cart.dump_ram()
+    }
 }
 
 /// Returns true if `left + right` should set the half-carry flag, i.e. it requires a carry

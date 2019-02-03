@@ -1,3 +1,6 @@
+use std::fs;
+use log::info;
+
 use crate::cart_header::{CartHeader, MbcType};
 
 const ROM_BANK_SIZE: usize = 0x4000;
@@ -13,9 +16,17 @@ pub struct Cart {
 
 impl Cart {
     pub fn new(rom: Box<[u8]>, cart_header: &CartHeader) -> Cart {
+        let ram = fs::read("game.save");
+        let ram = match ram {
+            Ok(r) => {
+                info!("Initialized cart RAM from file");
+                r.into_boxed_slice()
+            }
+            Err(_) => vec![0; cart_header.ram_size].into_boxed_slice(),
+        };
         Cart {
             rom,
-            ram: vec![0; cart_header.ram_size].into_boxed_slice(),
+            ram,
             mbc: Mbc::new(cart_header.cart_type.mbc),
         }
     }
@@ -34,6 +45,10 @@ impl Cart {
             Mbc::Mbc1(ref mut mbc1) => mbc1.write(&mut self.ram, addr, val),
             Mbc::Mbc3(ref mut mbc3) => mbc3.write(&mut self.ram, addr, val),
         }
+    }
+
+    pub fn dump_ram(&self) -> &Box<[u8]> {
+        &self.ram
     }
 }
 

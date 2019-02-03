@@ -1,11 +1,12 @@
-use crate::cpu::Cpu;
-use crate::joypad::{ButtonKeys, DirKeys};
+use std::fs;
+use std::thread;
+use std::time::{Instant, Duration};
 use log::info;
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::keyboard::{Keycode, Mod};
-use std::thread;
-use std::time::{Instant, Duration};
+use crate::cpu::Cpu;
+use crate::joypad::{ButtonKeys, DirKeys};
 
 const CYCLES_PER_FRAME: usize = 69905;
 const NANOS_PER_FRAME: u32 = 16_666_667;
@@ -72,7 +73,15 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
 
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit { .. } => break 'main,
+                Event::Quit { .. } => {
+                    let mem = cpu.dump_memory();
+                    let res = fs::write("game.save", mem);
+                    match res {
+                        Ok(_) => info!("Wrote cart RAM to file"),
+                        Err(_) => return,
+                    }
+                    break 'main
+                }
                 Event::KeyDown { keycode: Some(keycode), keymod, repeat, .. } => {
                     let modifiers = Mod::LSHIFTMOD | Mod::RSHIFTMOD | Mod::LCTRLMOD |
                         Mod::RCTRLMOD | Mod::LALTMOD | Mod::RALTMOD | Mod::LGUIMOD |
