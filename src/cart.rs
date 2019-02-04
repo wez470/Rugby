@@ -307,7 +307,7 @@ impl Mbc3 {
 
             // Latch clock data
             0x6000...0x7FFF => {
-                warn!("unimplemented: write to Mbc3 RTC latch register");
+                warn!("unimplemented: write to MBC3 RTC latch register");
             }
 
             // Switchable RAM bank
@@ -320,7 +320,7 @@ impl Mbc3 {
                 match bank {
                     // Write to RTC values
                     0x8...0xC => {
-                        warn!("unimplemented: write to Mbc3 RTC data");
+                        warn!("unimplemented: write to MBC3 RTC data");
                     }
 
                     // Write to RAM bank
