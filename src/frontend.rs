@@ -5,7 +5,6 @@ use log::info;
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::keyboard::{Keycode, Mod};
-use std::fs;
 
 const CYCLES_PER_FRAME: usize = 69905;
 const WINDOW_SCALE: usize = 4;
@@ -70,11 +69,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
 
         for event in sdl_events.poll_iter() {
             match event {
-                Event::Quit { .. } => {
-                    let res = fs::write("game.save", cpu.cart.ram());
-                    info!("Wrote cart RAM to file: {:?}", res);
-                    break 'main;
-                }
+                Event::Quit { .. } => break 'main,
 
                 Event::KeyDown { keycode: Some(keycode), keymod, repeat, .. } => {
                     let modifiers = Mod::LSHIFTMOD | Mod::RSHIFTMOD | Mod::LCTRLMOD |

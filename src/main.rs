@@ -1,10 +1,7 @@
-use clap;
-use std::fs::File;
-use std::io::Read;
-use std::path::Path;
-use crate::cpu::Cpu;
 use crate::cart::Cart;
+use crate::cpu::Cpu;
 use crate::frontend::start_frontend;
+use log::info;
 
 mod cart;
 mod cart_header;
@@ -29,7 +26,12 @@ fn main() {
             .arg(clap::Arg::with_name("random-joypad")
                 .short("j")
                 .long("random-joypad")
-                .help("Randomly trigger joypad interrupts (to get past intro screens while we don't have input implemented)")))
+                .help("Randomly trigger joypad interrupts (to get past intro screens while we don't have input implemented)"))
+            .arg(clap::Arg::with_name("SAVE")
+                .short("s")
+                .long("save-file")
+                .takes_value(true)
+                .help("Load and save cartridge RAM to this file")))
         .subcommand(clap::SubCommand::with_name("info")
             .arg(clap::Arg::with_name("ROM")
                 .required(true)
@@ -39,21 +41,37 @@ fn main() {
     match app_matches.subcommand() {
         ("run", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
-            let rom = read_rom_file(rom_path);
+            let rom = std::fs::read(rom_path).expect("Failed to read ROM file").into_boxed_slice();
             let cart_header = cart_header::CartHeader::from_rom(&rom)
-                .expect("Couldn't parse cartridge header");
-            let cart = Cart::new(rom, &cart_header);
+                .expect("Failed to parse cartridge header");
+
+            // TODO(solson): Include some kind of game-identifying information in the save file to
+            // prevent loading a save file with the wrong game.
+            let save_path_opt = matches.value_of_os("SAVE");
+            let ram = save_path_opt
+                .and_then(|path| std::fs::read(path).ok())
+                .map(|r| r.into_boxed_slice());
+            if ram.is_some() {
+                info!("Initialized cartridge RAM from file");
+            }
+
+            let cart = Cart::new(rom, ram, &cart_header).expect("Failed to initialize cartridge");
             let mut cpu = Cpu::new(cart);
 
             // TODO(solson): Collect CLI options into a single struct.
             cpu.random_joypad = matches.is_present("random-joypad");
             start_frontend(&mut cpu);
+
+            if let Some(path) = save_path_opt {
+                let res = std::fs::write(path, cpu.cart.ram());
+                info!("Wrote cartridge RAM to file: {:?}", res);
+            }
         }
 
 
         ("info", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
-            let rom = read_rom_file(rom_path);
+            let rom = std::fs::read(rom_path).expect("Failed to read ROM file").into_boxed_slice();
             let cart_header = cart_header::CartHeader::from_rom(&rom)
                 .expect("Couldn't parse cartridge header");
             println!("{:#?}", cart_header);
@@ -61,11 +79,4 @@ fn main() {
 
         _ => unreachable!(),
     }
-}
-
-fn read_rom_file<P: AsRef<Path>>(path: P) -> Box<[u8]> {
-    let mut file = File::open(path).expect("Couldn't open rom file");
-    let mut file_buf = Vec::new();
-    file.read_to_end(&mut file_buf).expect("Couldn't read rom");
-    file_buf.into_boxed_slice()
 }

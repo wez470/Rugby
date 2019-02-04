@@ -1,6 +1,3 @@
-use std::fs;
-use log::info;
-
 use crate::cart_header::{CartHeader, MbcType};
 
 const ROM_BANK_SIZE: usize = 0x4000;
@@ -14,21 +11,33 @@ pub struct Cart {
     mbc: Mbc,
 }
 
+#[derive(Clone, Debug)]
+pub enum CartError {
+    ProvidedRamWrongSize {
+        expected: usize,
+        actual: usize,
+    }
+}
+
 impl Cart {
-    pub fn new(rom: Box<[u8]>, cart_header: &CartHeader) -> Cart {
-        let ram = fs::read("game.save");
-        let ram = match ram {
-            Ok(r) => {
-                info!("Initialized cart RAM from file");
-                r.into_boxed_slice()
+    pub fn new(
+        rom: Box<[u8]>,
+        ram_opt: Option<Box<[u8]>>,
+        cart_header: &CartHeader,
+    ) -> Result<Cart, CartError> {
+        if let Some(ref ram) = ram_opt {
+            if ram.len() != cart_header.ram_size {
+                return Err(CartError::ProvidedRamWrongSize {
+                    expected: cart_header.ram_size,
+                    actual: ram.len(),
+                });
             }
-            Err(_) => vec![0; cart_header.ram_size].into_boxed_slice(),
-        };
-        Cart {
-            rom,
-            ram,
-            mbc: Mbc::new(cart_header.cart_type.mbc),
         }
+        Ok(Cart {
+            rom,
+            ram: ram_opt.unwrap_or_else(|| vec![0; cart_header.ram_size].into_boxed_slice()),
+            mbc: Mbc::new(cart_header.cart_type.mbc)
+        })
     }
 
     pub fn read(&self, addr: u16) -> u8 {
