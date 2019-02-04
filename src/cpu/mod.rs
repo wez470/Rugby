@@ -1279,8 +1279,8 @@ mod tests {
             diff_hex(&name, actual_cell, expected_cell, &mut err);
         }
 
-        let actual_rom = actual.cart.rom.iter();
-        let expected_rom = expected.cart.rom.iter();
+        let actual_rom = actual.cart.rom().iter();
+        let expected_rom = expected.cart.rom().iter();
         for (i, (actual_cell, expected_cell)) in actual_rom.zip(expected_rom).enumerate() {
             let name = format!("ROM location 0x{:02X}", i);
             diff_hex(&name, actual_cell, expected_cell, &mut err);
