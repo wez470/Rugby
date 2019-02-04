@@ -1235,7 +1235,7 @@ mod tests {
             rom_version: 0,
         };
 
-        let mut actual = Cpu::new(Cart::new(rom.into_boxed_slice(), &cart_header));
+        let mut actual = Cpu::new(Cart::new(rom.into_boxed_slice(), None, &cart_header).unwrap());
         let mut expected = actual.clone();
         actual.reg_pc.set(0);
         expected.reg_pc.set(rom_size as u16);
