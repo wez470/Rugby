@@ -10,7 +10,7 @@ use std::fs;
 const CYCLES_PER_FRAME: usize = 69905;
 const WINDOW_SCALE: usize = 4;
 
-pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
+pub fn start_frontend(cpu: &mut Cpu) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
 
     let sdl_video = sdl.video().expect("Failed to access SDL video subsystem");
@@ -35,13 +35,7 @@ pub fn start_frontend(cpu: &mut Cpu, inst_limit: Option<usize>) {
     let mut paused = false;
     let mut pause_next_frame = false;
 
-    'main: for inst_count in 0.. {
-        if let Some(max) = inst_limit {
-            if inst_count >= max {
-                 break;
-            }
-        }
-
+    'main: loop {
         const BYTES_PER_PIXEL: usize = 4;
         let mut image = [0u8; SCREEN_WIDTH * SCREEN_HEIGHT * BYTES_PER_PIXEL];
 

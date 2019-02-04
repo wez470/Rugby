@@ -26,12 +26,6 @@ fn main() {
             .arg(clap::Arg::with_name("ROM")
                 .required(true)
                 .help("The game rom"))
-            .arg(clap::Arg::with_name("inst-limit")
-                .short("i")
-                .long("inst-limit")
-                .takes_value(true)
-                .value_name("COUNT")
-                .help("The maximum number of instructions to execute"))
             .arg(clap::Arg::with_name("random-joypad")
                 .short("j")
                 .long("random-joypad")
@@ -46,9 +40,6 @@ fn main() {
         ("run", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
             let rom = read_rom_file(rom_path);
-            let inst_limit: Option<usize> = matches
-                .value_of("inst-limit")
-                .map(|s| s.parse().expect("Couldn't parse instruction count"));
             let cart_header = cart_header::CartHeader::from_rom(&rom)
                 .expect("Couldn't parse cartridge header");
             let cart = Cart::new(rom, &cart_header);
@@ -56,7 +47,7 @@ fn main() {
 
             // TODO(solson): Collect CLI options into a single struct.
             cpu.random_joypad = matches.is_present("random-joypad");
-            start_frontend(&mut cpu, inst_limit);
+            start_frontend(&mut cpu);
         }
 
 
