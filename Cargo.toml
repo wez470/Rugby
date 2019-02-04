@@ -7,10 +7,13 @@ edition = "2018"
 [dependencies]
 bitflags = "1.0.4"
 clap = "2.32.0"
-rand = "0.6.4"
-sdl2 = "0.32.1"
-log = "0.4.6"
 env_logger = "0.6.0"
+log = "0.4.6"
+rand = "0.6.4"
+
+[dependencies.sdl2]
+version = "0.32.1"
+features = ["gfx"]
 
 [dev-dependencies]
 quickcheck = "0.8.0"

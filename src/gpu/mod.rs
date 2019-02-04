@@ -15,8 +15,8 @@ const TILE_MAP_0_START: usize = 0x1800; // The starting address of tile map 0
 const SPRITE_RAM_SIZE: usize = 160; // For the address range 0xFE00-0xFE9F (inclusive).
 const TOTAL_SPRITES: usize = 40; // The number of sprites in sprite ram
 const BYTES_PER_SPRITE: usize = 4;
-const SCREEN_WIDTH: usize = 160;
-const SCREEN_HEIGHT: usize = 144;
+pub const SCREEN_WIDTH: usize = 160;
+pub const SCREEN_HEIGHT: usize = 144;
 
 #[derive(Clone, Copy)]
 pub enum Mode {

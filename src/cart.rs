@@ -47,9 +47,7 @@ impl Cart {
         }
     }
 
-    pub fn dump_ram(&self) -> &Box<[u8]> {
-        &self.ram
-    }
+    pub fn ram(&self) -> &[u8] { &self.ram }
 }
 
 #[derive(Clone, Debug)]

@@ -84,7 +84,7 @@ pub struct Cpu {
     pub joypad: Joypad,
 
     /// Game cartridge.
-    cart: Cart,
+    pub cart: Cart,
 
     /// The opcode of the currently-executing instruction.
     current_opcode: u8,
@@ -1183,10 +1183,6 @@ impl Cpu {
 
             _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }
-    }
-
-    pub fn dump_memory(&self) -> &Box<[u8]> {
-        self.cart.dump_ram()
     }
 }
 
