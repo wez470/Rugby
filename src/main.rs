@@ -23,10 +23,6 @@ fn main() {
             .arg(clap::Arg::with_name("ROM")
                 .required(true)
                 .help("The game rom"))
-            .arg(clap::Arg::with_name("random-joypad")
-                .short("j")
-                .long("random-joypad")
-                .help("Randomly trigger joypad interrupts (to get past intro screens while we don't have input implemented)"))
             .arg(clap::Arg::with_name("SAVE")
                 .short("s")
                 .long("save-file")
@@ -57,9 +53,6 @@ fn main() {
 
             let cart = Cart::new(rom, ram, &cart_header).expect("Failed to initialize cartridge");
             let mut cpu = Cpu::new(cart);
-
-            // TODO(solson): Collect CLI options into a single struct.
-            cpu.random_joypad = matches.is_present("random-joypad");
             start_frontend(&mut cpu);
 
             if let Some(path) = save_path_opt {

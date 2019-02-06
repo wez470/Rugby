@@ -114,11 +114,6 @@ pub struct Cpu {
 
     /// If the cpu is stopped
     stopped: bool,
-
-    /// Whether to randomly trigger Joypad interrupts (from the `j` CLI option).
-    // TODO(solson): Read this flag from a common CLI options struct instead of duplicating it in
-    // the `Cpu`.
-    pub random_joypad: bool,
 }
 
 impl Cpu {
@@ -145,7 +140,6 @@ impl Cpu {
             interrupt_enable_register: 0,
             halted: false,
             stopped: false,
-            random_joypad: false,
         };
         cpu.reset();
         cpu
@@ -161,22 +155,27 @@ impl Cpu {
         self.reg_sp.set(0xFFFE);
     }
 
+    /// Keep executing instructions until more than the given number of cycles have passed.
     pub fn step_cycles(&mut self, cycles: usize) {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
             let step_cycles = self.step();
-            let gpu_interrupts = self.gpu.step(step_cycles);
-            for inter in gpu_interrupts {
+            for inter in self.gpu.step(step_cycles) {
                 self.request_interrupt(inter)
             }
-            let timer_interrupt = self.timer.step(step_cycles);
-            if let Some(inter) = timer_interrupt {
+            if let Some(inter) = self.timer.step(step_cycles) {
                 self.request_interrupt(inter)
+            }
+            if let Some(inter) = self.joypad.step() {
+                self.request_interrupt(inter);
             }
             curr_cycles += step_cycles;
         }
     }
 
+    /// Execute a single instruction. Returns how many cycles it took.
+    // TODO(solson): Should calling this directly be avoided, since only `step_cycles` checks for
+    // GPU, Timer, and Joypad interurpts?
     pub fn step(&mut self) -> usize {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
@@ -232,7 +231,10 @@ impl Cpu {
         self.check_interrupt(Interrupt::LCD);
         self.check_interrupt(Interrupt::Timer);
         self.check_interrupt(Interrupt::Serial);
-        self.check_joypad();
+        if self.interrupt_pending(Interrupt::Joypad) {
+            self.stopped = false;
+        }
+        self.check_interrupt(Interrupt::Joypad);
     }
 
     fn check_interrupt(&mut self, i: Interrupt) {
@@ -244,23 +246,6 @@ impl Cpu {
             self.push_stack(self.get_reg_16(Reg16::PC));
             self.set_reg_16(Reg16::PC, i.handler_addr());
             self.reset_interrupt(i);
-        }
-    }
-
-    fn check_joypad(&mut self) {
-        if self.interrupt_pending(Interrupt::Joypad) {
-            self.halted = false;
-            self.stopped = false;
-        }
-        if self.random_joypad && rand::random::<u8>() < 20 {
-            self.request_interrupt(Interrupt::Joypad)
-        }
-        if self.interrupts_enabled && self.interrupt_pending(Interrupt::Joypad) && self.interrupt_enabled(Interrupt::Joypad) {
-            debug!("Handling interrupt Joypad");
-            let pc = self.get_reg_16(Reg16::PC);
-            self.push_stack(pc);
-            self.set_reg_16(Reg16::PC, 0x0060);
-            self.reset_interrupt(Interrupt::Joypad);
         }
     }
 

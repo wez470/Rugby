@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use crate::interrupts::Interrupt;
 
 bitflags! {
     pub struct ButtonKeys: u8 {
@@ -31,6 +32,9 @@ pub struct Joypad {
 
     /// Bit flags of which direction keys are currently held down.
     dir_keys_pressed: DirKeys,
+
+    /// Whether to request a Joypad interrupt on the next CPU step.
+    should_interrupt: bool,
 }
 
 impl Joypad {
@@ -40,11 +44,16 @@ impl Joypad {
             select_dir_keys: true,
             button_keys_pressed: ButtonKeys::empty(),
             dir_keys_pressed: DirKeys::empty(),
+            should_interrupt: false,
         }
     }
 
     pub fn button_key_down(&mut self, button: ButtonKeys) {
+        let before = self.read_reg();
         self.button_keys_pressed.insert(button);
+        let after = self.read_reg();
+        // Request an interrupt if a 1 bit in `before` became a 0 bit in `after`.
+        self.should_interrupt = before & !after != 0;
     }
 
     pub fn button_key_up(&mut self, button: ButtonKeys) {
@@ -52,7 +61,11 @@ impl Joypad {
     }
 
     pub fn dir_key_down(&mut self, dir: DirKeys) {
+        let before = self.read_reg();
         self.dir_keys_pressed.insert(dir);
+        let after = self.read_reg();
+        // Request an interrupt if a 1 bit in `before` became a 0 bit in `after`.
+        self.should_interrupt = before & !after != 0;
     }
 
     pub fn dir_key_up(&mut self, dir: DirKeys) {
@@ -83,5 +96,16 @@ impl Joypad {
         // Also, the meaning of these bits is negated (0 means `true`).
         self.select_button_keys = bits >> 5 & 1 == 0;
         self.select_dir_keys = bits >> 4 & 1 == 0;
+    }
+
+    /// Called by the CPU when executing an instruction. Returns whether to request a Joypad
+    /// interrupt.
+    pub fn step(&mut self) -> Option<Interrupt> {
+        if self.should_interrupt {
+            self.should_interrupt = false;
+            Some(Interrupt::Joypad)
+        } else {
+            None
+        }
     }
 }

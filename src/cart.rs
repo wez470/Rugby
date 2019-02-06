@@ -147,6 +147,7 @@ impl Mbc1 {
         Self { rom, ram, mode: Mbc1Mode::Rom, ram_enabled: false, bank_reg1: 1, bank_reg2: 0 }
     }
 
+    // TODO(solson): Combine with ram_index.
     fn rom_index(&self, bank: u8, addr: u16) -> usize {
         let bank_base = bank as usize * ROM_BANK_SIZE;
         let addr_in_bank = addr as usize & (ROM_BANK_SIZE - 1);
