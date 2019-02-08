@@ -312,9 +312,11 @@ dependencies = [
  "bitflags 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "quickcheck 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "regex 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "sdl2 0.32.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
