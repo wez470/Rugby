@@ -84,28 +84,28 @@ enum Section {
 
 lazy_static! {
     static ref SECTION_REGEX: Regex =
-        Regex::new(r"\[(.+)\]").unwrap();
+        Regex::new(r"^\[(.+)\]$").unwrap();
 
     static ref LABEL_REGEX: Regex =
-        Regex::new(r"([[:xdigit:]]{2}):([[:xdigit:]]{4}) (.*)").unwrap();
+        Regex::new(r"^([[:xdigit:]]{2}):([[:xdigit:]]{4}) (.*)$").unwrap();
 
     static ref SYMBOL_REGEX: Regex =
-        Regex::new(r"([[:xdigit:]]{2}):([[:xdigit:]]{4}) (.*)").unwrap();
+        Regex::new(r"^([[:xdigit:]]{2}):([[:xdigit:]]{4}) (.*)$").unwrap();
 
     static ref BREAKPOINT_REGEX: Regex =
-        Regex::new(r"([[:xdigit:]]{2}):([[:xdigit:]]{4})").unwrap();
+        Regex::new(r"^([[:xdigit:]]{2}):([[:xdigit:]]{4})$").unwrap();
 
     static ref DEFINITION_REGEX: Regex =
-        Regex::new(r"([[:xdigit:]]{8}) (.*)").unwrap();
+        Regex::new(r"^([[:xdigit:]]{8}) (.*)$").unwrap();
 
     static ref SOURCE_FILE_REGEX: Regex =
-        Regex::new(r"([[:xdigit:]]{4}) ([[:xdigit:]]{8}) (.*)").unwrap();
+        Regex::new(r"^([[:xdigit:]]{4}) ([[:xdigit:]]{8}) (.*)$").unwrap();
 
     static ref ROM_CHECKSUM_REGEX: Regex =
-        Regex::new(r"([[:xdigit:]]{8})").unwrap();
+        Regex::new(r"^([[:xdigit:]]{8})$").unwrap();
 
     static ref ADDR_LINE_MAPPING_REGEX: Regex =
-        Regex::new(r"([[:xdigit:]]{2}):([[:xdigit:]]{4}) ([[:xdigit:]]{4}):([[:xdigit:]]{8})")
+        Regex::new(r"^([[:xdigit:]]{2}):([[:xdigit:]]{4}) ([[:xdigit:]]{4}):([[:xdigit:]]{8})$")
             .unwrap();
 }
 
