@@ -63,8 +63,7 @@ fn main() {
                 info!("Initialized cartridge RAM from file");
             }
 
-            // TODO(solson): Store this data somewhere useful and add richer debug output.
-            let _symbols = matches.value_of_os("SYMBOLS").map(|path| {
+            let symbols = matches.value_of_os("SYMBOLS").map(|path| {
                 let file = File::open(path).expect("Failed to open symbol file");
                 WlaSymbols::parse(BufReader::new(file))
                     .expect("Failed to parse WLA DX symbol file")
@@ -72,6 +71,7 @@ fn main() {
 
             let cart = Cart::new(rom, ram, &cart_header).expect("Failed to initialize cartridge");
             let mut cpu = Cpu::new(cart);
+            cpu.debug_symbols = symbols;
             start_frontend(&mut cpu);
 
             if let Some(path) = save_path_opt {

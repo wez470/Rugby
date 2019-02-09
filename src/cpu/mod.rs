@@ -1,4 +1,4 @@
-use log::{debug, info, trace, warn};
+use log::{debug, info, log_enabled, trace, warn};
 use crate::cart::Cart;
 use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
@@ -114,6 +114,10 @@ pub struct Cpu {
 
     /// If the cpu is stopped
     stopped: bool,
+
+    /// Symbolic information for more detailed debug output.
+    // TODO(solson): Should we find another place to store this?
+    pub debug_symbols: Option<crate::wla_symbols::WlaSymbols>,
 }
 
 impl Cpu {
@@ -140,6 +144,7 @@ impl Cpu {
             interrupt_enable_register: 0,
             halted: false,
             stopped: false,
+            debug_symbols: None,
         };
         cpu.reset();
         cpu
@@ -374,6 +379,18 @@ impl Cpu {
     /// Call a subroutine if the condition is met.
     fn call(&mut self, fn_addr: u16, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
+            if log_enabled!(log::Level::Trace) {
+                if let Some(symbols) = &self.debug_symbols {
+                    // TODO(solson): Fix this harded bank number. (It's not exactly clear to me how
+                    // to interpret the WLA DX symbol file bank numbers yet.)
+                    let rom_addr = crate::wla_symbols::RomAddr { bank: 1, addr: fn_addr };
+                    match symbols.labels.get(&rom_addr) {
+                        Some(name) => trace!("calling function {} at 0x{:04X}", name, fn_addr),
+                        None => trace!("calling unknown function at 0x{:04X}", fn_addr)
+                    }
+                }
+            }
+
             // The return address is the address of the instruction after the call.
             let return_addr = self.reg_pc.get();
             self.push_stack(return_addr);
