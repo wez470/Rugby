@@ -69,13 +69,11 @@ pub enum WlaSymbolsError {
     MultipleRomChecksums,
 
     #[fail(display = "IO error: {}", _0)]
-    Io(#[fail(cause)] std::io::Error),
+    Io(#[cause] std::io::Error),
 }
 
 impl std::convert::From<std::io::Error> for WlaSymbolsError {
-    fn from(e: std::io::Error) -> Self {
-        WlaSymbolsError::Io(e)
-    }
+    fn from(e: std::io::Error) -> Self { WlaSymbolsError::Io(e) }
 }
 
 enum Section {
