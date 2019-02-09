@@ -19,7 +19,9 @@ mod wla_symbols;
 
 fn main() {
     let env = env_logger::Env::new().filter("RUSTBOY_LOG").write_style("RUSTBOY_LOG_STYLE");
-    env_logger::init_from_env(env);
+    env_logger::Builder::from_env(env)
+        .default_format_timestamp(false)
+        .init();
 
     let app_matches = clap::App::new("Rustboy")
         .about("A Game Boy emulator")
