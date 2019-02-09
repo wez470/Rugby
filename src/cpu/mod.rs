@@ -248,6 +248,7 @@ impl Cpu {
         }
         if self.interrupts_enabled && self.interrupt_pending(i) && self.interrupt_enabled(i) {
             debug!("Handling interrupt {:?}", i);
+            // TODO(solson): Use `call` or `call_restart`?
             self.push_stack(self.get_reg_16(Reg16::PC));
             self.set_reg_16(Reg16::PC, i.handler_addr());
             self.reset_interrupt(i);
@@ -402,6 +403,7 @@ impl Cpu {
     ///
     /// Call the "restart" function at the given address.
     fn call_restart(&mut self, addr: u8) {
+        // TODO(solson): Use `call` function?
         let return_addr = self.reg_pc.get();
         self.push_stack(return_addr);
         self.reg_pc.set(addr as u16);
