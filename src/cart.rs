@@ -1,4 +1,5 @@
 use crate::cart_header::{CartHeader, MbcType};
+use failure_derive::Fail;
 use log::warn;
 
 const ROM_BANK_SIZE: usize = 0x4000;
@@ -11,8 +12,9 @@ pub enum Cart {
     Mbc3(Mbc3),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Fail)]
 pub enum CartError {
+    #[fail(display = "provided RAM is {} bytes but the cartridge requires {}", actual, expected)]
     ProvidedRamWrongSize {
         expected: usize,
         actual: usize,

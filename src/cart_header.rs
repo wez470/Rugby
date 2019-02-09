@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use failure_derive::Fail;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CartHeader {
@@ -110,13 +111,24 @@ pub enum DestinationCode {
     International,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Fail, PartialEq)]
 pub enum HeaderParseError {
+    #[fail(display = "invalid cartridge type: {}", _0)]
     InvalidCartType(u8),
+
+    #[fail(display = "invalid destination code: {}", _0)]
     InvalidDestinationCode(u8),
+
+    #[fail(display = "manufacturer code was not valid UTF-8: {:?}", _0)]
     InvalidManufacturerCodeUtf8(Vec<u8>),
+
+    #[fail(display = "invalid RAM size: {}", _0)]
     InvalidRamSize(u8),
+
+    #[fail(display = "invalid ROM size: {}", _0)]
     InvalidRomSize(u8),
+
+    #[fail(display = "cartridge ROM has length {} which is too short to contain a header", _0)]
     RomTooShort(usize),
 }
 
@@ -244,25 +256,5 @@ impl CartType {
         };
 
         Ok(CartType { mbc, hardware })
-    }
-}
-
-impl std::fmt::Display for HeaderParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        use self::HeaderParseError::*;
-        match *self {
-            InvalidCartType(b) =>
-                writeln!(f, "invalid \"cartridge type\" specification: {}", b),
-            InvalidDestinationCode(b) =>
-                writeln!(f, "invalid \"destination code\" specification: {}", b),
-            InvalidRamSize(b) =>
-                writeln!(f, "invalid \"RAM size\" specification: {}", b),
-            InvalidRomSize(b) =>
-                writeln!(f, "invalid \"ROM size\" specification: {}", b),
-            InvalidManufacturerCodeUtf8(ref bytes) =>
-                writeln!(f, "manufacturer code was not valid UTF-8: {:?}", bytes),
-            RomTooShort(len) =>
-                writeln!(f, "cartridge had length {} which is too short to contain a header", len),
-        }
     }
 }

@@ -3,6 +3,7 @@
 //! See [the WLA DX documentation](https://wla-dx.readthedocs.io/en/latest/symbols.html) for
 //! details on the format this module parses.
 
+use failure_derive::Fail;
 use lazy_static::lazy_static;
 use log::warn;
 use regex::Regex;
@@ -53,15 +54,22 @@ pub struct SourceLine {
     pub line: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Fail)]
 pub enum WlaSymbolsError {
+    #[fail(display = "unexpected line before first section: '{}'", _0)]
     TextBeforeFirstSection(String),
+
+    #[fail(display = "invalid syntax: '{}' (should match /{}/)", actual, expected_regex)]
     NonmatchingLine {
         actual: String,
         expected_regex: String,
     },
+
+    #[fail(display = "more than one line in the [rom checksum] section")]
     MultipleRomChecksums,
-    Io(std::io::Error),
+
+    #[fail(display = "IO error: {}", _0)]
+    Io(#[fail(cause)] std::io::Error),
 }
 
 impl std::convert::From<std::io::Error> for WlaSymbolsError {
