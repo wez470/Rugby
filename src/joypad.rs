@@ -96,6 +96,9 @@ impl Joypad {
         // Also, the meaning of these bits is negated (0 means `true`).
         self.select_button_keys = bits >> 5 & 1 == 0;
         self.select_dir_keys = bits >> 4 & 1 == 0;
+        // TODO(solson): Enabling these bits can trigger the Joypad interrupt if some keys were
+        // already being held, so we should handle interrupts here, too. (Or, more likely, in a way
+        // that lets us do the check in a single place.)
     }
 
     /// Called by the CPU when executing an instruction. Returns whether to request a Joypad
