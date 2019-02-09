@@ -362,6 +362,17 @@ impl Cpu {
     fn jump(&mut self, addr: Operand16, cond: Cond) {
         let addr_val = self.get_operand_16(addr);
         if self.check_cond_and_update_cycles(cond) {
+            // TODO(solson): Deduplicate this code with the block in `call`.
+            if log_enabled!(log::Level::Trace) {
+                if let Some(symbols) = &self.debug_symbols {
+                    let rom_addr = crate::wla_symbols::RomAddr { bank: 1, addr: addr_val };
+                    match symbols.labels.get(&rom_addr) {
+                        Some(name) => trace!("tailcalling function {} at 0x{:04X}", name, addr_val),
+                        None => trace!("tailcalling unknown function at 0x{:04X}", addr_val)
+                    }
+                }
+            }
+
             self.reg_pc.set(addr_val);
         }
     }
