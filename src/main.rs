@@ -84,10 +84,29 @@ fn main() {
 
         ("info", Some(matches)) => {
             let rom_path = matches.value_of("ROM").unwrap();
-            let rom = std::fs::read(rom_path).expect("Failed to read ROM file").into_boxed_slice();
-            let cart_header = cart_header::CartHeader::from_rom(&rom)
+            let rom = std::fs::read(rom_path).expect("Failed to read ROM file");
+            let cart = cart_header::CartHeader::from_rom(&rom)
                 .expect("Couldn't parse cartridge header");
-            println!("{:#?}", cart_header);
+
+            let mut out = tabwriter::TabWriter::new(std::io::stdout());
+
+            use std::io::Write;
+            match std::str::from_utf8(&cart.title) {
+                Ok(title) => { writeln!(out, "Title:\t{}", title).unwrap(); }
+                Err(_) => { writeln!(out, "Title:\t{:x?}", cart.title).unwrap(); }
+            }
+            writeln!(out, "Version:\t{}", cart.rom_version).unwrap();
+            writeln!(out, "MBC type:\t{:?}", cart.cart_type.mbc).unwrap();
+            writeln!(out, "Hardware:\t{:?}", cart.cart_type.hardware).unwrap();
+            writeln!(out, "ROM size:\t{:?} KiB", cart.rom_size / 1024).unwrap();
+            writeln!(out, "RAM size:\t{:?} KiB", cart.ram_size / 1024).unwrap();
+            writeln!(out, "GBC support:\t{:?}", cart.gbc_flag).unwrap();
+            writeln!(out, "SGB support:\t{:?}", cart.sgb_flag).unwrap();
+            writeln!(out, "Manufacturer code:\t{:?}", cart.manufacturer_code).unwrap();
+            writeln!(out, "Licensee code:\t{:?}", cart.licensee_code).unwrap();
+            writeln!(out, "Destination code:\t{:?}", cart.destination_code).unwrap();
+
+            out.flush().unwrap();
         }
 
         _ => unreachable!(),
