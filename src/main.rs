@@ -26,7 +26,7 @@ enum Opts {
     #[structopt(name = "run", about = "Runs the given Game Boy ROM file")]
     Run(RunOpts),
 
-    #[structopt(name = "info", about = "Prints information about the given Game Boy ROM")]
+    #[structopt(name = "info", about = "Prints information about the given Game Boy ROMs")]
     Info(InfoOpts),
 }
 
@@ -47,9 +47,9 @@ struct RunOpts {
 
 #[derive(Debug, StructOpt)]
 struct InfoOpts {
-    /// The game ROM file path
-    #[structopt(name = "ROM", parse(from_os_str))]
-    rom_path: PathBuf,
+    /// The game ROM file paths
+    #[structopt(name = "ROM", parse(from_os_str), required = true)]
+    rom_path: Vec<PathBuf>,
 }
 
 fn main() -> Result<(), failure::Error> {
@@ -101,27 +101,30 @@ fn run(opts: &RunOpts) -> Result<(), failure::Error> {
 }
 
 fn info(opts: &InfoOpts) -> Result<(), failure::Error> {
-    let rom = std::fs::read(&opts.rom_path).context("Failed to read ROM file")?;
-    let cart = cart_header::CartHeader::from_rom(&rom)
-        .context("Couldn't parse cartridge header")?;
+    for path in &opts.rom_path {
+        let rom = std::fs::read(path).context("Failed to read ROM file")?;
+        let cart = cart_header::CartHeader::from_rom(&rom)
+            .context("Couldn't parse cartridge header")?;
 
-    let mut out = tabwriter::TabWriter::new(std::io::stdout());
+        let mut out = tabwriter::TabWriter::new(std::io::stdout());
 
-    match std::str::from_utf8(&cart.title) {
-        Ok(title) => writeln!(out, "Title:\t{}", title)?,
-        Err(_) => writeln!(out, "Title:\t{:x?}", cart.title)?,
+        match std::str::from_utf8(&cart.title) {
+            Ok(title) => writeln!(out, "Title:\t{}", title)?,
+            Err(_) => writeln!(out, "Title:\t{:x?}", cart.title)?,
+        }
+        writeln!(out, "Version:\t{}", cart.rom_version)?;
+        writeln!(out, "MBC type:\t{:?}", cart.cart_type.mbc)?;
+        writeln!(out, "Hardware:\t{:?}", cart.cart_type.hardware)?;
+        writeln!(out, "ROM size:\t{:?} KiB", cart.rom_size / 1024)?;
+        writeln!(out, "RAM size:\t{:?} KiB", cart.ram_size / 1024)?;
+        writeln!(out, "GBC support:\t{:?}", cart.gbc_flag)?;
+        writeln!(out, "SGB support:\t{:?}", cart.sgb_flag)?;
+        writeln!(out, "Manufacturer code:\t{:?}", cart.manufacturer_code)?;
+        writeln!(out, "Licensee code:\t{:?}", cart.licensee_code)?;
+        writeln!(out, "Destination code:\t{:?}", cart.destination_code)?;
+        writeln!(out, "")?;
+
+        out.flush()?;
     }
-    writeln!(out, "Version:\t{}", cart.rom_version)?;
-    writeln!(out, "MBC type:\t{:?}", cart.cart_type.mbc)?;
-    writeln!(out, "Hardware:\t{:?}", cart.cart_type.hardware)?;
-    writeln!(out, "ROM size:\t{:?} KiB", cart.rom_size / 1024)?;
-    writeln!(out, "RAM size:\t{:?} KiB", cart.ram_size / 1024)?;
-    writeln!(out, "GBC support:\t{:?}", cart.gbc_flag)?;
-    writeln!(out, "SGB support:\t{:?}", cart.sgb_flag)?;
-    writeln!(out, "Manufacturer code:\t{:?}", cart.manufacturer_code)?;
-    writeln!(out, "Licensee code:\t{:?}", cart.licensee_code)?;
-    writeln!(out, "Destination code:\t{:?}", cart.destination_code)?;
-
-    out.flush()?;
     Ok(())
 }
