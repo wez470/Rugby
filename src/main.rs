@@ -5,6 +5,8 @@ use crate::wla_symbols::WlaSymbols;
 use log::info;
 use std::fs::File;
 use std::io::BufReader;
+use std::path::PathBuf;
+use structopt::StructOpt;
 
 mod cart;
 mod cart_header;
@@ -17,55 +19,65 @@ mod reg_16;
 mod timer;
 mod wla_symbols;
 
+#[derive(Debug, StructOpt)]
+#[structopt(name = "Rustboy", about = "A Game Boy emulator")]
+enum Opts {
+    #[structopt(name = "run", about = "Runs the given Game Boy ROM file")]
+    Run(RunOpts),
+
+    #[structopt(name = "info", about = "Prints information about the given Game Boy ROM")]
+    Info(InfoOpts),
+}
+
+#[derive(Debug, StructOpt)]
+struct RunOpts {
+    /// The game ROM file path
+    #[structopt(name = "ROM", parse(from_os_str))]
+    rom_path: PathBuf,
+
+    /// Load and save cartridge RAM to this file
+    #[structopt(short = "s", long = "save-file", name = "SAVE", parse(from_os_str))]
+    save_path: Option<PathBuf>,
+
+    /// Load symbol file for debugging (in the WLA DX assembler's format
+    #[structopt(short = "S", long = "symbol-file", name = "SYMBOLS", parse(from_os_str))]
+    symbols_path: Option<PathBuf>,
+}
+
+#[derive(Debug, StructOpt)]
+struct InfoOpts {
+    /// The game ROM file path
+    #[structopt(name = "ROM", parse(from_os_str))]
+    rom_path: PathBuf,
+}
+
 fn main() {
     let env = env_logger::Env::new().filter("RUSTBOY_LOG").write_style("RUSTBOY_LOG_STYLE");
     env_logger::Builder::from_env(env)
         .default_format_timestamp(false)
         .init();
 
-    let app_matches = clap::App::new("Rustboy")
-        .about("A Game Boy emulator")
-        .setting(clap::AppSettings::ArgRequiredElseHelp)
-        .subcommand(clap::SubCommand::with_name("run")
-            .about("Runs the given Game Boy ROM file")
-            .arg(clap::Arg::with_name("ROM")
-                .required(true)
-                .help("The game rom"))
-            .arg(clap::Arg::with_name("SAVE")
-                .short("s")
-                .long("save-file")
-                .takes_value(true)
-                .help("Load and save cartridge RAM to this file"))
-            .arg(clap::Arg::with_name("SYMBOLS")
-                .short("S")
-                .long("symbol-file")
-                .takes_value(true)
-                .help("Load symbol file for debugging (in the WLA DX assembler's format)")))
-        .subcommand(clap::SubCommand::with_name("info")
-            .about("Prints information about the given Game Boy ROM")
-            .arg(clap::Arg::with_name("ROM")
-                .required(true)
-                .help("The game rom")))
-        .get_matches();
+    let opts = Opts::from_args();
 
-    match app_matches.subcommand() {
-        ("run", Some(matches)) => {
-            let rom_path = matches.value_of("ROM").unwrap();
-            let rom = std::fs::read(rom_path).expect("Failed to read ROM file").into_boxed_slice();
+    match &opts {
+        Opts::Run(run_opts) => {
+            let rom = std::fs::read(&run_opts.rom_path)
+                .expect("Failed to read ROM file")
+                .into_boxed_slice();
             let cart_header = cart_header::CartHeader::from_rom(&rom)
                 .expect("Failed to parse cartridge header");
 
             // TODO(solson): Include some kind of game-identifying information in the save file to
             // prevent loading a save file with the wrong game.
-            let save_path_opt = matches.value_of_os("SAVE");
-            let ram = save_path_opt
+            let ram = run_opts.save_path
+                .as_ref()
                 .and_then(|path| std::fs::read(path).ok())
                 .map(|r| r.into_boxed_slice());
             if ram.is_some() {
                 info!("Initialized cartridge RAM from file");
             }
 
-            let symbols = matches.value_of_os("SYMBOLS").map(|path| {
+            let symbols = run_opts.symbols_path.as_ref().map(|path| {
                 let file = File::open(path).expect("Failed to open symbol file");
                 WlaSymbols::parse(BufReader::new(file))
                     .expect("Failed to parse WLA DX symbol file")
@@ -76,15 +88,14 @@ fn main() {
             cpu.debug_symbols = symbols;
             start_frontend(&mut cpu);
 
-            if let Some(path) = save_path_opt {
+            if let Some(path) = &run_opts.symbols_path {
                 let res = std::fs::write(path, cpu.cart.ram());
                 info!("Wrote cartridge RAM to file: {:?}", res);
             }
         }
 
-        ("info", Some(matches)) => {
-            let rom_path = matches.value_of("ROM").unwrap();
-            let rom = std::fs::read(rom_path).expect("Failed to read ROM file");
+        Opts::Info(info_opts) => {
+            let rom = std::fs::read(&info_opts.rom_path).expect("Failed to read ROM file");
             let cart = cart_header::CartHeader::from_rom(&rom)
                 .expect("Couldn't parse cartridge header");
 
@@ -108,7 +119,5 @@ fn main() {
 
             out.flush().unwrap();
         }
-
-        _ => unreachable!(),
     }
 }
