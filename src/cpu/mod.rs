@@ -1230,27 +1230,11 @@ mod tests {
     use super::*;
 
     fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
-        use crate::cart::Cart;
-        use crate::cart_header::*;
-
+        use crate::cart::{Cart, CartConfig};
+        use crate::cart_header::MbcType;
         let rom_size = rom.len();
-        let cart_header = CartHeader {
-            title: b"TEST".to_vec(),
-            cart_type: CartType {
-                mbc: MbcType::NoMbc,
-                hardware: CartHardware::empty(),
-            },
-            rom_size,
-            ram_size: 0,
-            gbc_flag: GbcFlag::Unsupported,
-            sgb_flag: SgbFlag::Unsupported,
-            manufacturer_code: None,
-            licensee_code: LicenseeCode::Old(0),
-            destination_code: DestinationCode::Japan,
-            rom_version: 0,
-        };
-
-        let mut actual = Cpu::new(Cart::new(rom.into_boxed_slice(), None, &cart_header).unwrap());
+        let cart_config = CartConfig { mbc_type: MbcType::NoMbc, rom_size, ram_size: 0 };
+        let mut actual = Cpu::new(Cart::new(rom.into_boxed_slice(), None, &cart_config).unwrap());
         let mut expected = actual.clone();
         actual.reg_pc.set(0);
         expected.reg_pc.set(rom_size as u16);

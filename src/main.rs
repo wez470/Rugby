@@ -1,4 +1,5 @@
-use crate::cart::Cart;
+use crate::cart::{Cart, CartConfig};
+use crate::cart_header::CartHeader;
 use crate::cpu::Cpu;
 use crate::frontend::start_frontend;
 use crate::wla_symbols::WlaSymbols;
@@ -50,6 +51,10 @@ struct InfoOpts {
     /// The game ROM file paths
     #[structopt(name = "ROM", parse(from_os_str), required = true)]
     rom_path: Vec<PathBuf>,
+
+    /// Show results in a table
+    #[structopt(short = "t", long = "table")]
+    table: bool,
 }
 
 fn main() -> Result<(), failure::Error> {
@@ -68,8 +73,8 @@ fn run(opts: &RunOpts) -> Result<(), failure::Error> {
     let rom = std::fs::read(&opts.rom_path)
         .context("Failed to read ROM file")?
         .into_boxed_slice();
-    let cart_header = cart_header::CartHeader::from_rom(&rom)
-        .context("Failed to parse cartridge header")?;
+    let cart_header = CartHeader::from_rom(&rom).context("Failed to parse cartridge header")?;
+    let cart_config = CartConfig::from_cart_header(&cart_header)?;
 
     // TODO(solson): Include some kind of game-identifying information in the save file to
     // prevent loading a save file with the wrong game.
@@ -81,7 +86,7 @@ fn run(opts: &RunOpts) -> Result<(), failure::Error> {
         info!("Initialized cartridge RAM from file");
     }
 
-    let cart = Cart::new(rom, ram, &cart_header).context("Failed to initialize cartridge")?;
+    let cart = Cart::new(rom, ram, &cart_config).context("Failed to initialize cartridge")?;
     let mut cpu = Cpu::new(cart);
 
     if let Some(path) = &opts.symbols_path {
@@ -101,10 +106,52 @@ fn run(opts: &RunOpts) -> Result<(), failure::Error> {
 }
 
 fn info(opts: &InfoOpts) -> Result<(), failure::Error> {
+    if opts.table {
+        info_table(opts)
+    } else {
+        info_records(opts)
+    }
+}
+
+/// Print the ROM info in a table with one ROM per row
+fn info_table(opts: &InfoOpts) -> Result<(), failure::Error> {
+    let mut out = tabwriter::TabWriter::new(std::io::stdout());
+    writeln!(out, "Title\tVersion\tType\tHardware\tROM size\tRAM size\tGBC\tSGB\tLicensee\tDestination\tManufacturer")?;
+
     for path in &opts.rom_path {
-        let rom = std::fs::read(path).context("Failed to read ROM file")?;
+        let rom = std::fs::read(path)
+            .with_context(|_| format!("Failed to read ROM file: {}", path.display()))?;
         let cart = cart_header::CartHeader::from_rom(&rom)
-            .context("Couldn't parse cartridge header")?;
+            .with_context(|_| format!("Failed to parse cartridge header: {}", path.display()))?;
+
+        match std::str::from_utf8(&cart.title) {
+            Ok(title) => write!(out, "{}\t", title)?,
+            Err(_) => write!(out, "{:x?}\t", cart.title)?,
+        }
+        write!(out, "{}\t", cart.rom_version)?;
+        write!(out, "{:?}\t", cart.cart_type.mbc)?;
+        write!(out, "{:?}\t", cart.cart_type.hardware)?;
+        write!(out, "{}\t", cart.rom_size)?;
+        write!(out, "{}\t", cart.ram_size)?;
+        write!(out, "{}\t", cart.gbc_flag)?;
+        write!(out, "{}\t", cart.sgb_flag)?;
+        write!(out, "{:?}\t", cart.licensee_code)?;
+        write!(out, "{:?}\t", cart.destination_code)?;
+        write!(out, "{:?}", cart.manufacturer_code)?;
+        writeln!(out, "")?;
+    }
+
+    out.flush()?;
+    Ok(())
+}
+
+/// Print the ROM info in the style of a list of separate key-value records.
+fn info_records(opts: &InfoOpts) -> Result<(), failure::Error> {
+    for path in &opts.rom_path {
+        let rom = std::fs::read(path)
+            .with_context(|_| format!("Failed to read ROM file: {}", path.display()))?;
+        let cart = cart_header::CartHeader::from_rom(&rom)
+            .with_context(|_| format!("Failed to parse cartridge header: {}", path.display()))?;
 
         let mut out = tabwriter::TabWriter::new(std::io::stdout());
 
@@ -115,10 +162,10 @@ fn info(opts: &InfoOpts) -> Result<(), failure::Error> {
         writeln!(out, "Version:\t{}", cart.rom_version)?;
         writeln!(out, "MBC type:\t{:?}", cart.cart_type.mbc)?;
         writeln!(out, "Hardware:\t{:?}", cart.cart_type.hardware)?;
-        writeln!(out, "ROM size:\t{:?} KiB", cart.rom_size / 1024)?;
-        writeln!(out, "RAM size:\t{:?} KiB", cart.ram_size / 1024)?;
-        writeln!(out, "GBC support:\t{:?}", cart.gbc_flag)?;
-        writeln!(out, "SGB support:\t{:?}", cart.sgb_flag)?;
+        writeln!(out, "ROM size:\t{}", cart.rom_size)?;
+        writeln!(out, "RAM size:\t{}", cart.ram_size)?;
+        writeln!(out, "GBC support:\t{}", cart.gbc_flag)?;
+        writeln!(out, "SGB support:\t{}", cart.sgb_flag)?;
         writeln!(out, "Manufacturer code:\t{:?}", cart.manufacturer_code)?;
         writeln!(out, "Licensee code:\t{:?}", cart.licensee_code)?;
         writeln!(out, "Destination code:\t{:?}", cart.destination_code)?;

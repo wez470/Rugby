@@ -1,9 +1,31 @@
-use crate::cart_header::{CartHeader, MbcType};
+use crate::cart_header::{CartHeader, MbcType, MemSize};
 use failure_derive::Fail;
 use log::warn;
 
 const ROM_BANK_SIZE: usize = 0x4000;
 const RAM_BANK_SIZE: usize = 0x2000;
+
+#[derive(Clone, Debug)]
+pub struct CartConfig {
+    pub mbc_type: MbcType,
+    pub rom_size: usize,
+    pub ram_size: usize,
+}
+
+impl CartConfig {
+    pub fn from_cart_header(cart_header: &CartHeader) -> Result<Self, CartError> {
+        let mbc_type = cart_header.cart_type.mbc;
+        let rom_size = match cart_header.rom_size {
+            MemSize::Bytes(b) => b,
+            MemSize::Unknown(_) => return Err(CartError::RomSizeUnknown),
+        };
+        let ram_size = match cart_header.rom_size {
+            MemSize::Bytes(b) => b,
+            MemSize::Unknown(_) => return Err(CartError::RamSizeUnknown),
+        };
+        Ok(CartConfig { mbc_type, rom_size, ram_size })
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum Cart {
@@ -18,29 +40,35 @@ pub enum CartError {
     ProvidedRamWrongSize {
         expected: usize,
         actual: usize,
-    }
+    },
+
+    #[fail(display = "ROM size unknown in cartridge header")]
+    RomSizeUnknown,
+
+    #[fail(display = "RAM size unknown in cartridge header")]
+    RamSizeUnknown,
 }
 
 impl Cart {
     pub fn new(
         rom: Box<[u8]>,
         ram_opt: Option<Box<[u8]>>,
-        cart_header: &CartHeader,
+        config: &CartConfig,
     ) -> Result<Cart, CartError> {
         let ram = match ram_opt {
             Some(ram) => {
-                if ram.len() != cart_header.ram_size {
+                if ram.len() != config.ram_size {
                     return Err(CartError::ProvidedRamWrongSize {
-                        expected: cart_header.ram_size,
+                        expected: config.ram_size,
                         actual: ram.len(),
                     });
                 }
                 ram
             }
-            None => vec![0; cart_header.ram_size].into_boxed_slice(),
+            None => vec![0; config.ram_size].into_boxed_slice(),
         };
 
-        Ok(match cart_header.cart_type.mbc {
+        Ok(match config.mbc_type {
             MbcType::NoMbc => Cart::NoMbc(NoMbc::new(rom, ram)),
             MbcType::Mbc1 => Cart::Mbc1(Mbc1::new(rom, ram)),
             MbcType::Mbc3 => Cart::Mbc3(Mbc3::new(rom, ram)),

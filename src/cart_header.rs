@@ -1,4 +1,5 @@
 use bitflags::bitflags;
+use display_derive::Display;
 use failure_derive::Fail;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -11,10 +12,10 @@ pub struct CartHeader {
     pub cart_type: CartType,
 
     /// The size in bytes of the ROM in the cartridge.
-    pub rom_size: usize,
+    pub rom_size: MemSize,
 
     /// The size in bytes of the RAM in the cartridge.
-    pub ram_size: usize,
+    pub ram_size: MemSize,
 
     /// The level of Game Boy Color support the game has or requires.
     pub gbc_flag: GbcFlag,
@@ -56,6 +57,7 @@ pub enum MbcType {
     HuC3,
     PocketCamera,
     BandaiTama5,
+    Unknown(u8),
 }
 
 bitflags! {
@@ -68,26 +70,91 @@ bitflags! {
     }
 }
 
-/// Represents the level of Game Boy Color support the game supports or requires.
+impl From<u8> for CartType {
+    fn from(byte: u8) -> Self {
+        use self::MbcType::*;
+        let (mbc, hardware) = match byte {
+            0x00 => (NoMbc, CartHardware::empty()),
+            0x01 => (Mbc1, CartHardware::empty()),
+            0x02 => (Mbc1, CartHardware::RAM),
+            0x03 => (Mbc1, CartHardware::RAM | CartHardware::BATTERY),
+            0x05 => (Mbc2, CartHardware::empty()),
+            0x06 => (Mbc2, CartHardware::RAM | CartHardware::BATTERY),
+            0x08 => (NoMbc, CartHardware::RAM),
+            0x09 => (NoMbc, CartHardware::RAM | CartHardware::BATTERY),
+            0x0B => (Mmm01, CartHardware::empty()),
+            0x0C => (Mmm01, CartHardware::RAM),
+            0x0D => (Mmm01, CartHardware::RAM | CartHardware::BATTERY),
+            0x0F => (Mbc3, CartHardware::TIMER | CartHardware::BATTERY),
+            0x10 => (Mbc3, CartHardware::RAM | CartHardware::TIMER | CartHardware::BATTERY),
+            0x11 => (Mbc3, CartHardware::empty()),
+            0x12 => (Mbc3, CartHardware::RAM),
+            0x13 => (Mbc3, CartHardware::RAM | CartHardware::BATTERY),
+            0x19 => (Mbc5, CartHardware::empty()),
+            0x1A => (Mbc5, CartHardware::RAM),
+            0x1B => (Mbc5, CartHardware::RAM | CartHardware::BATTERY),
+            0x1C => (Mbc5, CartHardware::RUMBLE),
+            0x1D => (Mbc5, CartHardware::RAM | CartHardware::RUMBLE),
+            0x1E => (Mbc5, CartHardware::RAM | CartHardware::BATTERY | CartHardware::RUMBLE),
+            0x20 => (Mbc6, CartHardware::RAM | CartHardware::BATTERY),
+            0x22 => (Mbc7, CartHardware::RAM | CartHardware::BATTERY | CartHardware::ACCELEROMETER),
+            0xFC => (PocketCamera, CartHardware::empty()),
+            0xFD => (BandaiTama5, CartHardware::empty()),
+            0xFE => (HuC3, CartHardware::empty()),
+            0xFF => (HuC1, CartHardware::RAM | CartHardware::BATTERY),
+            n => (Unknown(n), CartHardware::empty()),
+        };
+        CartType { mbc, hardware }
+    }
+}
+
+/// Represents RAM or ROM size, which are parsed from a single byte in the header according to an
+/// arbitrary mapping. We use the `Unknown` variant for values not covered by the mapping.
 #[derive(Clone, Copy, Debug, PartialEq)]
+pub enum MemSize {
+    /// A size in bytes.
+    Bytes(usize),
+
+    /// An unrecognized RAM or ROM size byte from a cartridge header.
+    Unknown(u8),
+}
+
+impl std::fmt::Display for MemSize {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            MemSize::Bytes(b) =>
+                if b % 1024 == 0 { write!(f, "{} KiB", b / 1024) } else { write!(f, "{} B", b) },
+            MemSize::Unknown(n) =>
+                write!(f, "unknown (0x{:02X})", n),
+        }
+    }
+}
+
+/// Represents the level of Game Boy Color support the game supports or requires.
+#[derive(Clone, Copy, Debug, Display, PartialEq)]
 pub enum GbcFlag {
     /// A GB game with no GBC support.
+    #[display(fmt = "no")]
     Unsupported,
 
     /// The game has GBC-specific features, but they are optional so it can run in GB mode.
+    #[display(fmt = "yes")]
     Supported,
 
     /// The game requires GBC hardware and does not run in GB mode.
+    #[display(fmt = "required")]
     Required,
 }
 
 /// Represents the level of Super Game Boy support the game supports.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Display, PartialEq)]
 pub enum SgbFlag {
     /// A GB or GBC game with no SGB support.
+    #[display(fmt = "no")]
     Unsupported,
 
     /// The game supports SGB features.
+    #[display(fmt = "yes")]
     Supported,
 }
 
@@ -109,24 +176,13 @@ pub enum LicenseeCode {
 pub enum DestinationCode {
     Japan,
     International,
+    Invalid(u8),
 }
 
 #[derive(Clone, Debug, Fail, PartialEq)]
 pub enum HeaderParseError {
-    #[fail(display = "invalid cartridge type: {}", _0)]
-    InvalidCartType(u8),
-
-    #[fail(display = "invalid destination code: {}", _0)]
-    InvalidDestinationCode(u8),
-
     #[fail(display = "manufacturer code was not valid UTF-8: {:?}", _0)]
     InvalidManufacturerCodeUtf8(Vec<u8>),
-
-    #[fail(display = "invalid RAM size: {}", _0)]
-    InvalidRamSize(u8),
-
-    #[fail(display = "invalid ROM size: {}", _0)]
-    InvalidRomSize(u8),
 
     #[fail(display = "cartridge ROM has length {} which is too short to contain a header", _0)]
     RomTooShort(usize),
@@ -176,30 +232,27 @@ impl CartHeader {
             LicenseeCode::New([bytes[0x44], bytes[0x45]])
         };
 
-        let cart_type = CartType::from_header_byte(bytes[0x47])?;
+        let cart_type = CartType::from(bytes[0x47]);
 
         let rom_size = match bytes[0x48] {
-            n @ 0x00...0x08 => (32 * 1024) << n, // 32 KB << n
-            n => return Err(HeaderParseError::InvalidRomSize(n)),
+            n @ 0x00...0x08 => MemSize::Bytes((32 * 1024) << n),
+            n => MemSize::Unknown(n),
         };
 
-        // RAM size in KB.
-        let ram_size_kb = match bytes[0x49] {
-            0x00 => 0,
-            0x01 => 2,
-            0x02 => 8,
-            0x03 => 32,
-            0x04 => 128,
-            0x05 => 64,
-            n => return Err(HeaderParseError::InvalidRamSize(n)),
+        let ram_size = match bytes[0x49] {
+            0x00 => MemSize::Bytes(0),
+            0x01 => MemSize::Bytes(2 * 1024),
+            0x02 => MemSize::Bytes(8 * 1024),
+            0x03 => MemSize::Bytes(32 * 1024),
+            0x04 => MemSize::Bytes(128 * 1024),
+            0x05 => MemSize::Bytes(64 * 1024),
+            n => MemSize::Unknown(n),
         };
-
-        let ram_size = ram_size_kb * 1024;
 
         let destination_code = match bytes[0x4A] {
             0x00 => DestinationCode::Japan,
             0x01 => DestinationCode::International,
-            n => return Err(HeaderParseError::InvalidDestinationCode(n)),
+            n => DestinationCode::Invalid(n),
         };
 
         let rom_version = bytes[0x4C];
@@ -216,45 +269,5 @@ impl CartHeader {
             destination_code,
             rom_version,
         })
-    }
-}
-
-impl CartType {
-    fn from_header_byte(b: u8) -> Result<Self, HeaderParseError> {
-        use self::MbcType::*;
-
-        let (mbc, hardware) = match b {
-            0x00 => (NoMbc, CartHardware::empty()),
-            0x01 => (Mbc1, CartHardware::empty()),
-            0x02 => (Mbc1, CartHardware::RAM),
-            0x03 => (Mbc1, CartHardware::RAM | CartHardware::BATTERY),
-            0x05 => (Mbc2, CartHardware::empty()),
-            0x06 => (Mbc2, CartHardware::RAM | CartHardware::BATTERY),
-            0x08 => (NoMbc, CartHardware::RAM),
-            0x09 => (NoMbc, CartHardware::RAM | CartHardware::BATTERY),
-            0x0B => (Mmm01, CartHardware::empty()),
-            0x0C => (Mmm01, CartHardware::RAM),
-            0x0D => (Mmm01, CartHardware::RAM | CartHardware::BATTERY),
-            0x0F => (Mbc3, CartHardware::TIMER | CartHardware::BATTERY),
-            0x10 => (Mbc3, CartHardware::RAM | CartHardware::TIMER | CartHardware::BATTERY),
-            0x11 => (Mbc3, CartHardware::empty()),
-            0x12 => (Mbc3, CartHardware::RAM),
-            0x13 => (Mbc3, CartHardware::RAM | CartHardware::BATTERY),
-            0x19 => (Mbc5, CartHardware::empty()),
-            0x1A => (Mbc5, CartHardware::RAM),
-            0x1B => (Mbc5, CartHardware::RAM | CartHardware::BATTERY),
-            0x1C => (Mbc5, CartHardware::RUMBLE),
-            0x1D => (Mbc5, CartHardware::RAM | CartHardware::RUMBLE),
-            0x1E => (Mbc5, CartHardware::RAM | CartHardware::BATTERY | CartHardware::RUMBLE),
-            0x20 => (Mbc6, CartHardware::RAM | CartHardware::BATTERY),
-            0x22 => (Mbc7, CartHardware::RAM | CartHardware::BATTERY | CartHardware::ACCELEROMETER),
-            0xFC => (PocketCamera, CartHardware::empty()),
-            0xFD => (BandaiTama5, CartHardware::empty()),
-            0xFE => (HuC3, CartHardware::empty()),
-            0xFF => (HuC1, CartHardware::RAM | CartHardware::BATTERY),
-            _ => return Err(HeaderParseError::InvalidCartType(b)),
-        };
-
-        Ok(CartType { mbc, hardware })
     }
 }
