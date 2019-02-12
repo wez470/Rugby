@@ -102,7 +102,7 @@ impl Timer {
         BitFlags::empty()
     }
 
-    pub fn read_mem(&self, addr: u8) -> u8 {
+    pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
             0x04 => self.divider,
             0x05 => self.counter,
@@ -113,7 +113,7 @@ impl Timer {
         }
     }
 
-    pub fn write_mem(&mut self, addr: u8, val: u8) {
+    pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
             0x04 => {
                 self.div_cycle_counter = 0;
@@ -125,7 +125,7 @@ impl Timer {
                 self.counter_speed = CounterSpeed::from(val & 3);
                 self.counter_running = ((val >> 2) & 1) == 1;
             },
-            _ => panic!("Invalid read address for timer")
+            _ => panic!("Invalid write address for timer")
         }
     }
 }

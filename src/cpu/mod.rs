@@ -1070,7 +1070,7 @@ impl Cpu {
             // Unmapped
             0x03 => 0xFF,
 
-            0x04...0x07 => self.timer.read_mem(port),
+            0x04...0x07 => self.timer.read_reg(port),
 
             // Unmapped
             0x08...0x0E => 0xFF,
@@ -1133,7 +1133,7 @@ impl Cpu {
             // Unmapped
             0x03 => {}
 
-            0x04...0x07 => self.timer.write_mem(port, val),
+            0x04...0x07 => self.timer.write_reg(port, val),
 
             // Unmapped
             0x08...0x0E => {}
