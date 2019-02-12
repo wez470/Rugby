@@ -171,16 +171,12 @@ impl Cpu {
     pub fn step_cycles(&mut self, cycles: usize) {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
+            let mut interrupts = BitFlags::empty();
             let step_cycles = self.step();
-            for inter in self.gpu.step(step_cycles).iter() {
-                self.request_interrupt(inter)
-            }
-            if let Some(inter) = self.timer.step(step_cycles) {
-                self.request_interrupt(inter)
-            }
-            if let Some(inter) = self.joypad.step() {
-                self.request_interrupt(inter);
-            }
+            interrupts |= self.gpu.step(step_cycles);
+            interrupts |= self.timer.step(step_cycles);
+            interrupts |= self.joypad.step();
+            self.request_interrupts(interrupts);
             curr_cycles += step_cycles;
         }
     }
@@ -193,7 +189,6 @@ impl Cpu {
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
         self.pending_disable_interrupts = false;
-
         self.handle_interrupts();
 
         if self.halted {
@@ -239,44 +234,35 @@ impl Cpu {
     }
 
     fn handle_interrupts(&mut self) {
-        self.check_interrupt(Interrupt::VBlank);
-        self.check_interrupt(Interrupt::Lcd);
-        self.check_interrupt(Interrupt::Timer);
-        self.check_interrupt(Interrupt::Serial);
-        if self.interrupt_pending(Interrupt::Joypad) {
+        use Interrupt::*;
+        for &i in &[VBlank, Lcd, Timer, Serial, Joypad] {
+            self.check_interrupt(i);
+        }
+        if self.interrupt_flags_register.contains(Joypad) {
             self.stopped = false;
         }
-        self.check_interrupt(Interrupt::Joypad);
     }
 
     fn check_interrupt(&mut self, i: Interrupt) {
-        if self.interrupt_pending(i) {
-            self.halted = false;
-        }
-        if self.interrupts_enabled && self.interrupt_pending(i) && self.interrupt_enabled(i) {
+        let flagged = self.interrupt_flags_register.contains(i);
+        let enabled = self.interrupt_enable_register.contains(i);
+        if flagged { self.halted = false; }
+        if self.interrupts_enabled && enabled && flagged {
             debug!("Handling interrupt {:?}", i);
             // TODO(solson): Use `call` or `call_restart`?
             self.push_stack(self.get_reg_16(Reg16::PC));
             self.set_reg_16(Reg16::PC, i.handler_addr());
-            self.reset_interrupt(i);
+            self.interrupt_flags_register.remove(i);
         }
     }
 
-    fn interrupt_pending(&self, i: Interrupt) -> bool {
-        self.interrupt_flags_register.contains(i)
-    }
-
-    fn interrupt_enabled(&self, i: Interrupt) -> bool {
-        self.interrupt_enable_register.contains(i)
-    }
-
-    pub fn request_interrupt(&mut self, i: Interrupt) {
-        debug!("Requesting interrupt: {:?}", i);
-        self.interrupt_flags_register.insert(i);
-    }
-
-    fn reset_interrupt(&mut self, i: Interrupt) {
-        self.interrupt_flags_register.remove(i);
+    pub fn request_interrupts(&mut self, interrupts: BitFlags<Interrupt>) {
+        if log_enabled!(log::Level::Debug) {
+            for i in interrupts.iter() {
+                debug!("Requesting interrupt {:?}", i);
+            }
+        }
+        self.interrupt_flags_register |= interrupts;
     }
 
     fn execute(&mut self, inst: Inst) {

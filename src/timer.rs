@@ -1,4 +1,5 @@
 use crate::interrupts::Interrupt;
+use enumflags2::BitFlags;
 
 const CYCLES_PER_DIVIDE_INC: usize = 256; // The number of cycles between increments of the divide register
 
@@ -70,7 +71,7 @@ impl Timer {
         }
     }
 
-    pub fn step(&mut self, cycles: usize) -> Option<Interrupt> {
+    pub fn step(&mut self, cycles: usize) -> BitFlags<Interrupt> {
         self.update_divider(cycles);
         self.update_counter(cycles)
     }
@@ -83,9 +84,9 @@ impl Timer {
         }
     }
 
-    fn update_counter(&mut self, cycles: usize) -> Option<Interrupt> {
+    fn update_counter(&mut self, cycles: usize) -> BitFlags<Interrupt> {
         if !self.counter_running {
-            return None;
+            return BitFlags::empty();
         }
         self.counter_cycle_counter += cycles;
         if self.counter_cycle_counter >= usize::from(self.counter_speed) {
@@ -93,12 +94,12 @@ impl Timer {
             let (new_counter, overflow) = self.counter.overflowing_add(1);
             if overflow {
                 self.counter = self.modulo;
-                return Some(Interrupt::Timer);
+                return BitFlags::from(Interrupt::Timer);
             } else {
                 self.counter = new_counter;
             }
         }
-        None
+        BitFlags::empty()
     }
 
     pub fn read_mem(&self, addr: u8) -> u8 {

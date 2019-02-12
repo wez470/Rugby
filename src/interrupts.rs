@@ -1,6 +1,6 @@
 use enumflags2_derive::EnumFlags;
 
-#[derive(Copy, Clone, Debug, EnumFlags)]
+#[derive(Copy, Clone, Debug, EnumFlags, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Interrupt {
     VBlank = 1 << 0,

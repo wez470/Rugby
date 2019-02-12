@@ -104,12 +104,12 @@ impl Joypad {
 
     /// Called by the CPU when executing an instruction. Returns whether to request a Joypad
     /// interrupt.
-    pub fn step(&mut self) -> Option<Interrupt> {
+    pub fn step(&mut self) -> BitFlags<Interrupt> {
         if self.should_interrupt {
             self.should_interrupt = false;
-            Some(Interrupt::Joypad)
+            BitFlags::from(Interrupt::Joypad)
         } else {
-            None
+            BitFlags::empty()
         }
     }
 }
