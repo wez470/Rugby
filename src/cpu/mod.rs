@@ -1,10 +1,11 @@
-use log::{debug, info, log_enabled, trace, warn};
 use crate::cart::Cart;
+use crate::gpu::Gpu;
 use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
 use crate::reg_16::Register;
 use crate::timer::Timer;
-use crate::gpu::Gpu;
+use enumflags2::BitFlags;
+use log::{debug, info, log_enabled, trace, warn};
 use self::inst::{Cond, Inst, Operand16, Operand8};
 
 mod inst;
@@ -104,10 +105,15 @@ pub struct Cpu {
     pending_enable_interrupts: bool,
 
     /// The `IF` Interrupt Flags register accessed via I/O port 0xFF0F.
-    interrupt_flags_register: u8,
+    interrupt_flags_register: BitFlags<Interrupt>,
 
     /// The `IE` Interrupt Enable register accessed via I/O port 0xFFFF.
-    interrupt_enable_register: u8,
+    interrupt_enable_register: BitFlags<Interrupt>,
+
+    /// Contains the 3 unused bits of the IE register, which nonetheless are read/write-able on the
+    /// Game Boy.
+    // TODO(solson): Refactor to combine this with the `interrupt_enable_register` field.
+    interrupt_enable_unused_bits: u8,
 
     /// If the cpu is halted
     halted: bool,
@@ -140,8 +146,9 @@ impl Cpu {
             interrupts_enabled: false,
             pending_disable_interrupts: false,
             pending_enable_interrupts: false,
-            interrupt_flags_register: 1,
-            interrupt_enable_register: 0,
+            interrupt_flags_register: BitFlags::from(Interrupt::VBlank),
+            interrupt_enable_register: BitFlags::empty(),
+            interrupt_enable_unused_bits: 0,
             halted: false,
             stopped: false,
             debug_symbols: None,
@@ -165,7 +172,7 @@ impl Cpu {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
             let step_cycles = self.step();
-            for inter in self.gpu.step(step_cycles) {
+            for inter in self.gpu.step(step_cycles).iter() {
                 self.request_interrupt(inter)
             }
             if let Some(inter) = self.timer.step(step_cycles) {
@@ -232,8 +239,8 @@ impl Cpu {
     }
 
     fn handle_interrupts(&mut self) {
-        self.check_interrupt(Interrupt::VerticalBlank);
-        self.check_interrupt(Interrupt::LCD);
+        self.check_interrupt(Interrupt::VBlank);
+        self.check_interrupt(Interrupt::Lcd);
         self.check_interrupt(Interrupt::Timer);
         self.check_interrupt(Interrupt::Serial);
         if self.interrupt_pending(Interrupt::Joypad) {
@@ -256,34 +263,20 @@ impl Cpu {
     }
 
     fn interrupt_pending(&self, i: Interrupt) -> bool {
-        self.is_bit_set_at_location(i as i32, 0xFF0F)
+        self.interrupt_flags_register.contains(i)
     }
 
     fn interrupt_enabled(&self, i: Interrupt) -> bool {
-        self.is_bit_set_at_location(i as i32, 0xFFFF)
+        self.interrupt_enable_register.contains(i)
     }
 
     pub fn request_interrupt(&mut self, i: Interrupt) {
         debug!("Requesting interrupt: {:?}", i);
-        self.set_bit_at_location(i as i32, 0xFF0F);
-    }
-
-    fn is_bit_set_at_location(&self, bit: i32, addr: u16) -> bool {
-        let val = self.read_mem(addr);
-        val >> bit & 1 != 0
-    }
-
-    fn set_bit_at_location(&mut self, bit: i32, addr: u16) {
-        let mut val = self.read_mem(addr);
-        val |= 1 << bit;
-        self.write_mem(addr, val);
+        self.interrupt_flags_register.insert(i);
     }
 
     fn reset_interrupt(&mut self, i: Interrupt) {
-        let addr = 0xFF0F;
-        let val = self.read_mem(addr);
-        let new_val = val & !(1 << (i as i32));
-        self.write_mem(addr, new_val);
+        self.interrupt_flags_register.remove(i);
     }
 
     fn execute(&mut self, inst: Inst) {
@@ -993,7 +986,11 @@ impl Cpu {
             }
 
             // Interrupt Enable Register
-            0xFFFF => self.interrupt_enable_register,
+            // The top 3 bits are unused and always 1.
+            0xFFFF => {
+                (self.interrupt_enable_unused_bits & 0b1110_0000) |
+                    self.interrupt_enable_register.bits()
+            }
 
             // This match is exhaustive but rustc doesn't check that for integer matches.
             _ => unreachable!(),
@@ -1051,7 +1048,10 @@ impl Cpu {
             }
 
             // Interrupt Enable Register
-            0xFFFF => self.interrupt_enable_register = val,
+            0xFFFF => {
+                self.interrupt_enable_register = BitFlags::from_bits_truncate(val);
+                self.interrupt_enable_unused_bits = val & 0b1110_0000;
+            }
 
             // This match is exhaustive but rustc doesn't check that for integer matches.
             _ => unreachable!(),
@@ -1091,7 +1091,7 @@ impl Cpu {
 
             // IF - Interrupt Flag register
             // The top 3 bits are unused and always 1.
-            0x0F => 0b1110_0000 | self.interrupt_flags_register,
+            0x0F => 0b1110_0000 | self.interrupt_flags_register.bits(),
 
             0x10...0x14 => warn_unimplemented("sound"),
 
@@ -1153,7 +1153,7 @@ impl Cpu {
             0x08...0x0E => {}
 
             // IF - Interrupt Flag register
-            0x0F => self.interrupt_flags_register = val,
+            0x0F => self.interrupt_flags_register = BitFlags::from_bits_truncate(val),
 
             0x10...0x14 => warn_unimplemented("sound"),
 

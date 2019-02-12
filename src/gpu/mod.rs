@@ -1,3 +1,4 @@
+use enumflags2::BitFlags;
 use std::collections::BinaryHeap;
 use crate::interrupts::Interrupt;
 
@@ -270,11 +271,9 @@ impl Gpu {
     /// `Mode::OamRead` -> `Mode::VRamRead` -> `Mode::HorizontalBlank` on each line.
     /// For lines 144-153, we stay in `Mode::VerticalBlank` for the whole line, after which
     /// we go back to line 0
-    pub fn step(&mut self, cycles: usize) -> Vec<Interrupt> {
-        let mut interrupts = Vec::new();
-        if !self.lcd_enabled {
-            return interrupts
-        }
+    pub fn step(&mut self, cycles: usize) -> BitFlags<Interrupt> {
+        let mut interrupts = BitFlags::empty();
+        if !self.lcd_enabled { return interrupts; }
         self.cycles += cycles;
 
         match self.mode {
@@ -286,18 +285,19 @@ impl Gpu {
                     if self.scan_line >= VERTICAL_BLANK_START_LINE {
                         self.mode = Mode::VerticalBlank;
                         if self.vertical_blank_interrupt {
-                            interrupts.push(Interrupt::LCD)
+                            interrupts.insert(Interrupt::Lcd)
                         }
-                        interrupts.push(Interrupt::VerticalBlank);
+                        interrupts.insert(Interrupt::VBlank);
                     } else {
                         self.mode = Mode::OamRead;
                     }
 
                     if self.coincidence_interrupt && self.scan_line == self.scan_line_compare {
-                        interrupts.push(Interrupt::LCD)
+                        interrupts.insert(Interrupt::Lcd)
                     }
                 }
-            },
+            }
+
             Mode::VerticalBlank => {
                 if self.cycles > SCAN_LINE_CYCLES {
                     self.cycles %= SCAN_LINE_CYCLES;
@@ -307,21 +307,23 @@ impl Gpu {
                         self.scan_line = 0;
                         self.mode = Mode::OamRead;
                         if self.oam_interrupt {
-                            interrupts.push(Interrupt::LCD);
+                            interrupts.insert(Interrupt::Lcd);
                         }
                     }
 
                     if self.coincidence_interrupt && self.scan_line == self.scan_line_compare {
-                        interrupts.push(Interrupt::LCD)
+                        interrupts.insert(Interrupt::Lcd)
                     }
                 }
-            },
+            }
+
             Mode::OamRead => {
                 if self.cycles > OAM_READ_CYCLES {
                     self.cycles %= OAM_READ_CYCLES;
                     self.mode = Mode::VRamRead;
                 }
-            },
+            }
+
             Mode::VRamRead => {
                 if self.cycles > VRAM_READ_CYCLES {
                     self.cycles %= VRAM_READ_CYCLES;
@@ -329,11 +331,12 @@ impl Gpu {
                     self.render_scan_line();
 
                     if self.horizontal_blank_interrupt {
-                        interrupts.push(Interrupt::LCD)
+                        interrupts.insert(Interrupt::Lcd)
                     }
                 }
-            },
+            }
         }
+
         interrupts
     }
 
