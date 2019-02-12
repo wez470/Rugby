@@ -1062,48 +1062,20 @@ impl Cpu {
         };
 
         match port {
-            // P1/JOYP - Joypad
             0x00 => self.joypad.read_reg(),
-
-            0x01 | 0x02 => warn_unimplemented("serial"),
-
-            // Unmapped
-            0x03 => 0xFF,
-
+            0x01...0x02 => warn_unimplemented("serial"),
             0x04...0x07 => self.timer.read_reg(port),
-
-            // Unmapped
-            0x08...0x0E => 0xFF,
-
-            // IF - Interrupt Flag register
             // The top 3 bits are unused and always 1.
             0x0F => 0b1110_0000 | self.interrupt_flags_register.bits(),
-
-            0x10...0x14 => warn_unimplemented("sound"),
-
-            // Unmapped
-            0x15 => 0xFF,
-
-            0x16...0x1E => warn_unimplemented("sound"),
-
-            // Unmapped
-            0x1F => 0xFF,
-
-            0x20...0x26 => warn_unimplemented("sound"),
-
-            // Unmapped
-            0x27...0x2F => 0xFF,
-
-            0x30...0x3F => warn_unimplemented("sound"),
+            0x10...0x14 | 0x16...0x1E | 0x20...0x26 | 0x30...0x3F => warn_unimplemented("sound"),
+            0x40...0x45 | 0x47...0x4B => self.gpu.read_reg(port),
 
             // Cannot read from DMA transfer register.
             // TODO(solson): Should it return 0xFF like most other inaccessible registers?
             0x46 => 0,
 
-            0x40...0x45 | 0x47...0x4B => self.gpu.read_reg(port),
-
-            // Unmapped
-            0x4C...0x7F => 0xFF,
+            // Unmapped I/O ports always return all bits high.
+            0x03 | 0x08...0x0E | 0x15 | 0x1F | 0x27...0x2F | 0x4C...0x7F => 0xFF,
 
             _ => panic!("unimplemented: read from I/O port FF{:02X}", port),
         }
@@ -1119,36 +1091,11 @@ impl Cpu {
 
         match port {
             0x00 => self.joypad.write_reg(val),
-
-            0x01 | 0x02 => warn_unimplemented("serial"),
-
-            // Unmapped
-            0x03 => {}
-
+            0x01...0x02 => warn_unimplemented("serial"),
             0x04...0x07 => self.timer.write_reg(port, val),
-
-            // Unmapped
-            0x08...0x0E => {}
-
-            // IF - Interrupt Flag register
             0x0F => self.interrupt_flags_register = BitFlags::from_bits_truncate(val),
-
-            0x10...0x14 => warn_unimplemented("sound"),
-
-            // Unmapped
-            0x15 => {}
-
-            0x16...0x1E => warn_unimplemented("sound"),
-
-            // Unmapped
-            0x1F => {},
-
-            0x20...0x26 => warn_unimplemented("sound"),
-
-            // Unmapped
-            0x27...0x2F => {},
-
-            0x30...0x3F => warn_unimplemented("sound"),
+            0x10...0x14 | 0x16...0x1E | 0x20...0x26 | 0x30...0x3F => warn_unimplemented("sound"),
+            0x40...0x45 | 0x47...0x4B => self.gpu.write_reg(port, val),
 
             // DMA Transfer - Takes 160 microseconds to complete. During this time, only HRAM can
             // be accessed.
@@ -1162,10 +1109,8 @@ impl Cpu {
                 }
             }
 
-            0x40...0x45 | 0x47...0x4B => self.gpu.write_reg(port, val),
-
-            // Unmapped
-            0x4C...0x7F => {},
+            // Unmapped I/O ports always ignore writes.
+            0x03 | 0x08...0x0E | 0x15 | 0x1F | 0x27...0x2F | 0x4C...0x7F => {}
 
             _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }
