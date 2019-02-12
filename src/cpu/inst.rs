@@ -420,7 +420,7 @@ impl Inst {
                 // the manual. I think I read that it has slightly different behaviour if it is
                 // not zero. More investigation needed.
                 if bytes[1] != 0 {
-                    warn!("STOP's second byte was 0x{:02X} instead of 0x00", bytes[0]);
+                    warn!("STOP's second byte was 0x{:02X} instead of 0x00", bytes[1]);
                 }
                 Stop
             }
