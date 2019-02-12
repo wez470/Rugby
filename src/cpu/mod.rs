@@ -1096,19 +1096,11 @@ impl Cpu {
 
             0x30...0x3F => warn_unimplemented("sound"),
 
-            // LCD Control Register
-            0x40 => self.gpu.read_lcd_control(),
-            0x41 => self.gpu.read_lcd_stat(),
-            0x42 => self.gpu.scan_y,
-            0x43 => self.gpu.scan_x,
-            0x44 => self.gpu.scan_line,
-            0x45 => self.gpu.scan_line_compare,
-            0x46 => 0, // Cannot read from DMA transfer register
-            0x47 => self.gpu.background_palette,
-            0x48 => self.gpu.obj_palette_0,
-            0x49 => self.gpu.obj_palette_1,
-            0x4A => self.gpu.window_y,
-            0x4B => self.gpu.window_x.wrapping_add(7),
+            // Cannot read from DMA transfer register.
+            // TODO(solson): Should it return 0xFF like most other inaccessible registers?
+            0x46 => 0,
+
+            0x40...0x45 | 0x47...0x4B => self.gpu.read_reg(port),
 
             // Unmapped
             0x4C...0x7F => 0xFF,
@@ -1158,14 +1150,10 @@ impl Cpu {
 
             0x30...0x3F => warn_unimplemented("sound"),
 
-            0x40 => self.gpu.write_lcd_control(val),
-            0x41 => self.gpu.write_lcd_stat(val),
-            0x42 => self.gpu.scan_y = val,
-            0x43 => self.gpu.scan_x = val,
-            0x44 => self.gpu.scan_line = 0,
-            0x45 => self.gpu.scan_line_compare = val,
             // DMA Transfer - Takes 160 microseconds to complete. During this time, only HRAM can
             // be accessed.
+            // TODO(solson): Actually implement the HRAM memory restriction, and make OAM happen
+            // over time rather than in a single instant.
             0x46 => {
                 info!("DMA TRANSFER START");
                 let start_addr: u16 = val as u16 * 0x100; // Addresses are from 0xXX00 - 0xXX9F
@@ -1173,11 +1161,8 @@ impl Cpu {
                     self.write_mem(0xFE00 + i, self.read_mem(start_addr + i))
                 }
             }
-            0x47 => self.gpu.background_palette = val,
-            0x48 => self.gpu.obj_palette_0 = val,
-            0x49 => self.gpu.obj_palette_1 = val,
-            0x4A => self.gpu.window_y = val,
-            0x4B => self.gpu.window_x = val.wrapping_sub(7),
+
+            0x40...0x45 | 0x47...0x4B => self.gpu.write_reg(port, val),
 
             // Unmapped
             0x4C...0x7F => {},

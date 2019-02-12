@@ -20,7 +20,7 @@ pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 
 #[derive(Clone, Copy)]
-pub enum Mode {
+enum Mode {
     HorizontalBlank = 0,
     VerticalBlank = 1,
     OamRead = 2,
@@ -28,7 +28,7 @@ pub enum Mode {
 }
 
 #[derive(Clone, Copy)]
-pub enum TileMapLocation {
+enum TileMapLocation {
     X9800 = 0,
     X9C00 = 1,
 }
@@ -44,7 +44,7 @@ impl std::convert::From<u8> for TileMapLocation {
 }
 
 #[derive(Clone, Copy)]
-pub enum BackgroundAndWindowLocation {
+enum BackgroundAndWindowLocation {
     X8800 = 0,
     X8000 = 1,
 }
@@ -60,7 +60,7 @@ impl std::convert::From<u8> for BackgroundAndWindowLocation {
 }
 
 #[derive(Clone, Copy)]
-pub enum ObjSize {
+enum ObjSize {
     EightByEight = 0,
     EightBySixteen = 1,
 }
@@ -93,23 +93,23 @@ pub struct Gpu {
     window: Box<[[u8; 256]; 256]>,
 
     /// Video RAM internal to the Gameboy.
-    pub video_ram: Box<[u8]>,
+    video_ram: Box<[u8]>,
 
     /// The current tiles in video ram.
     tile_set: Box<[Tile]>,
 
     /// Sprite RAM internal to the Game Boy, also known as OAM.
-    pub sprite_ram: Box<[u8]>,
+    sprite_ram: Box<[u8]>,
 
     /// The current sprites in sprite ram
     sprites: Box<[sprite::Sprite]>,
 
     /// The current scan line. (LY at 0xFF44)
-    pub scan_line: u8,
+    scan_line: u8,
 
-    /// The scan line compare register. (LYC at 0xFF45). An interrupt will occur (if enabled)
-    /// if the scan line equals the scan line compare
-    pub scan_line_compare: u8,
+    /// The scan line compare register. (LYC at 0xFF45). An interrupt will occur (if enabled) if
+    /// the scan line equals the scan line compare
+    scan_line_compare: u8,
 
     /// Where we are at currently in the lcd cycle counter
     cycles: usize,
@@ -118,7 +118,7 @@ pub struct Gpu {
     lcd_enabled: bool,
 
     /// The current LCD mode
-    pub mode: Mode,
+    mode: Mode,
 
     /// Setting to False will clear the background
     background_enabled: bool,
@@ -141,14 +141,14 @@ pub struct Gpu {
     /// True if the Horizontal Blank interrupt is enabled. (Bit 3 in 0xFF41)
     horizontal_blank_interrupt: bool,
 
-    /// X and Y positions in the 256x256 pixel background map to start at the top left
-    /// of the LCD screen.
-    pub scan_x: u8,
-    pub scan_y: u8,
+    /// X and Y positions in the 256x256 pixel background map to start at the top left of the LCD
+    /// screen.
+    scan_x: u8,
+    scan_y: u8,
 
     /// Window X and Y positions
-    pub window_x: u8,
-    pub window_y: u8,
+    window_x: u8,
+    window_y: u8,
 
     /// The address which the window tile map starts
     window_tile_map: TileMapLocation,
@@ -162,14 +162,14 @@ pub struct Gpu {
     /// The size of the objects (sprites). 8x8 or 8x16
     obj_size: ObjSize,
 
-    /// background palette register
-    pub background_palette: u8,
+    /// Background palette register
+    background_palette: u8,
 
-    /// first sprite palette register
-    pub obj_palette_0: u8,
+    /// First sprite palette register
+    obj_palette_0: u8,
 
-    /// second sprite palette register
-    pub obj_palette_1: u8,
+    /// Second sprite palette register
+    obj_palette_1: u8,
 }
 
 impl Gpu {
@@ -469,7 +469,43 @@ impl Gpu {
         }
     }
 
-    pub fn read_lcd_control(&self) -> u8 {
+    pub fn read_reg(&self, addr: u8) -> u8 {
+        match addr {
+            0x40 => self.read_lcd_control(),
+            0x41 => self.read_lcd_stat(),
+            0x42 => self.scan_y,
+            0x43 => self.scan_x,
+            0x44 => self.scan_line,
+            0x45 => self.scan_line_compare,
+            // 0x46 is handled in the CPU.
+            0x47 => self.background_palette,
+            0x48 => self.obj_palette_0,
+            0x49 => self.obj_palette_1,
+            0x4A => self.window_y,
+            0x4B => self.window_x.wrapping_add(7),
+            _ => panic!("Invalid read address for GPU"),
+        }
+    }
+
+    pub fn write_reg(&mut self, addr: u8, val: u8) {
+        match addr {
+            0x40 => self.write_lcd_control(val),
+            0x41 => self.write_lcd_stat(val),
+            0x42 => self.scan_y = val,
+            0x43 => self.scan_x = val,
+            0x44 => self.scan_line = 0,
+            0x45 => self.scan_line_compare = val,
+            // 0x46 is handled in the CPU.
+            0x47 => self.background_palette = val,
+            0x48 => self.obj_palette_0 = val,
+            0x49 => self.obj_palette_1 = val,
+            0x4A => self.window_y = val,
+            0x4B => self.window_x = val.wrapping_sub(7),
+            _ => panic!("Invalid write address for GPU"),
+        }
+    }
+
+    fn read_lcd_control(&self) -> u8 {
         let mut lcd_control = 0;
         lcd_control |= (self.lcd_enabled as u8) << 7;
         lcd_control |= (self.window_tile_map as u8) << 6;
@@ -482,7 +518,7 @@ impl Gpu {
         lcd_control
     }
 
-    pub fn write_lcd_control(&mut self, val: u8) {
+    fn write_lcd_control(&mut self, val: u8) {
         self.lcd_enabled = (val >> 7) == 1;
         self.window_tile_map = TileMapLocation::from((val >> 6) & 1);
         self.window_enabled = ((val >> 5) & 1) == 1;
@@ -494,7 +530,7 @@ impl Gpu {
         self.background_enabled = (val & 1) == 1;
     }
 
-    pub fn read_lcd_stat(&self) -> u8 {
+    fn read_lcd_stat(&self) -> u8 {
         let mut lcd_stat = 0x80; // bit 7 is always 1
         lcd_stat |= (self.coincidence_interrupt as u8) << 6;
         lcd_stat |= (self.oam_interrupt as u8) << 5;
@@ -508,7 +544,7 @@ impl Gpu {
     /// Write the LCD stat register 0xFF41
     ///
     /// Bits 0-2 are read only
-    pub fn write_lcd_stat(&mut self, val: u8) {
+    fn write_lcd_stat(&mut self, val: u8) {
         self.coincidence_interrupt = (val >> 6) & 1 == 1;
         self.oam_interrupt = (val >> 5) & 1 == 1;
         self.vertical_blank_interrupt = (val >> 4) & 1 == 1;
