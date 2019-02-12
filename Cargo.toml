@@ -17,6 +17,8 @@ tabwriter = "1.1.0"
 structopt = "0.2.14"
 enumflags2 = "0.5.0"
 enumflags2_derive = "0.5.0"
+packed_struct = "0.3.0"
+packed_struct_codegen = "0.3.0"
 
 [dependencies.sdl2]
 version = "0.32.1"

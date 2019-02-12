@@ -1,6 +1,8 @@
-use enumflags2::BitFlags;
-use std::collections::BinaryHeap;
 use crate::interrupts::Interrupt;
+use enumflags2::BitFlags;
+use packed_struct::PackedStruct;
+use packed_struct_codegen::{PackedStruct, PrimitiveEnum_u8};
+use std::collections::BinaryHeap;
 
 mod sprite;
 
@@ -19,7 +21,7 @@ const BYTES_PER_SPRITE: usize = 4;
 pub const SCREEN_WIDTH: usize = 160;
 pub const SCREEN_HEIGHT: usize = 144;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PrimitiveEnum_u8)]
 pub enum Mode {
     HorizontalBlank = 0,
     VerticalBlank = 1,
@@ -27,50 +29,63 @@ pub enum Mode {
     VRamRead = 3,
 }
 
-#[derive(Clone, Copy)]
-pub enum TileMapLocation {
+#[derive(Clone, Copy, Debug, PrimitiveEnum_u8)]
+pub enum TileMapAddr {
     X9800 = 0,
     X9C00 = 1,
 }
 
-impl std::convert::From<u8> for TileMapLocation {
-    fn from(value: u8) -> TileMapLocation {
-        match value {
-            0 => TileMapLocation::X9800,
-            1 => TileMapLocation::X9C00,
-            _ => panic!("Invalid number for TileMapLocation"),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
-pub enum BackgroundAndWindowLocation {
+#[derive(Clone, Copy, Debug, PrimitiveEnum_u8)]
+pub enum BackgroundAndWindowAddr {
     X8800 = 0,
     X8000 = 1,
 }
 
-impl std::convert::From<u8> for BackgroundAndWindowLocation {
-    fn from(value: u8) -> BackgroundAndWindowLocation {
-        match value {
-            0 => BackgroundAndWindowLocation::X8800,
-            1 => BackgroundAndWindowLocation::X8000,
-            _ => panic!("Invalid number for BackgroundAndWindowTileDataLocation"),
-        }
-    }
-}
-
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PrimitiveEnum_u8)]
 pub enum ObjSize {
     EightByEight = 0,
     EightBySixteen = 1,
 }
 
-impl std::convert::From<u8> for ObjSize {
-    fn from(value: u8) -> ObjSize {
-        match value {
-            0 => ObjSize::EightByEight,
-            1 => ObjSize::EightBySixteen,
-            _ => panic!("Invalid number for ObjSize"),
+#[derive(Clone, Copy, Debug, PackedStruct)]
+#[packed_struct(bit_numbering = "lsb0", size_bytes = "1")]
+pub struct LcdControlRegister {
+    #[packed_field(bits = "7")]
+    lcd_enabled: bool,
+
+    #[packed_field(bits = "6", ty = "enum")]
+    window_tile_map: TileMapAddr,
+
+    #[packed_field(bits = "5")]
+    window_enabled: bool,
+
+    #[packed_field(bits = "4", ty = "enum")]
+    background_and_window_addr: BackgroundAndWindowAddr,
+
+    #[packed_field(bits = "3", ty = "enum")]
+    background_tile_map: TileMapAddr,
+
+    #[packed_field(bits = "2", ty = "enum")]
+    obj_size: ObjSize,
+
+    #[packed_field(bits = "1")]
+    obj_display_enabled: bool,
+
+    #[packed_field(bits = "0")]
+    background_enabled: bool,
+}
+
+impl LcdControlRegister {
+    fn new() -> Self {
+        Self {
+            lcd_enabled: true,
+            window_tile_map: TileMapAddr::X9800,
+            window_enabled: false,
+            background_and_window_addr: BackgroundAndWindowAddr::X8000,
+            background_tile_map: TileMapAddr::X9800,
+            obj_size: ObjSize::EightByEight,
+            obj_display_enabled: false,
+            background_enabled: true,
         }
     }
 }
@@ -114,20 +129,8 @@ pub struct Gpu {
     /// Where we are at currently in the lcd cycle counter
     cycles: usize,
 
-    /// True if the display is enabled
-    lcd_enabled: bool,
-
     /// The current LCD mode
     pub mode: Mode,
-
-    /// Setting to False will clear the background
-    background_enabled: bool,
-
-    /// True if the window is enabled
-    window_enabled: bool,
-
-    /// True if sprite display is enabled
-    obj_display_enabled: bool,
 
     /// True if the coincidence interrupt is enabled (Bit 6 in 0xFF41)
     coincidence_interrupt: bool,
@@ -150,18 +153,6 @@ pub struct Gpu {
     pub window_x: u8,
     pub window_y: u8,
 
-    /// The address which the window tile map starts
-    window_tile_map: TileMapLocation,
-
-    /// The address which the background and window tile data start
-    background_and_window_location: BackgroundAndWindowLocation,
-
-    /// The address which the background tile map starts
-    background_tile_map: TileMapLocation,
-
-    /// The size of the objects (sprites). 8x8 or 8x16
-    obj_size: ObjSize,
-
     /// background palette register
     pub background_palette: u8,
 
@@ -170,6 +161,8 @@ pub struct Gpu {
 
     /// second sprite palette register
     pub obj_palette_1: u8,
+
+    lcd_control: LcdControlRegister,
 }
 
 impl Gpu {
@@ -187,11 +180,7 @@ impl Gpu {
             cycles: 0,
             scan_line: 0,
             scan_line_compare: 0,
-            lcd_enabled: true,
             mode: Mode::OamRead,
-            window_enabled: false,
-            obj_display_enabled: false,
-            background_enabled: true,
             coincidence_interrupt: false,
             oam_interrupt: false,
             vertical_blank_interrupt: false,
@@ -200,13 +189,10 @@ impl Gpu {
             scan_y: 0,
             window_x: 0,
             window_y: 0,
-            window_tile_map: TileMapLocation::X9800,
-            background_and_window_location: BackgroundAndWindowLocation::X8000,
-            background_tile_map: TileMapLocation::X9800,
-            obj_size: ObjSize::EightByEight,
             background_palette: 0,
             obj_palette_0: 0,
             obj_palette_1: 1,
+            lcd_control: LcdControlRegister::new(),
         };
         for i in 0..TOTAL_SPRITES {
             gpu.sprites[i].index = i;
@@ -273,7 +259,7 @@ impl Gpu {
     /// we go back to line 0
     pub fn step(&mut self, cycles: usize) -> BitFlags<Interrupt> {
         let mut interrupts = BitFlags::empty();
-        if !self.lcd_enabled { return interrupts; }
+        if !self.lcd_control.lcd_enabled { return interrupts; }
         self.cycles += cycles;
 
         match self.mode {
@@ -341,28 +327,28 @@ impl Gpu {
     }
 
     fn render_scan_line(&mut self) {
-        if self.background_enabled {
+        if self.lcd_control.background_enabled {
             self.render_background_line();
         }
-        if self.window_enabled {
+        if self.lcd_control.window_enabled {
             self.render_window_line();
         }
-        if self.obj_display_enabled {
+        if self.lcd_control.obj_display_enabled {
             self.render_sprite_line();
         }
     }
 
     fn render_background_line(&mut self) {
-        let background_map = match self.background_tile_map {
-            TileMapLocation::X9800 => &self.video_ram[0x1800..0x1C00],
-            TileMapLocation::X9C00 => &self.video_ram[0x1C00..0x2000],
+        let background_map = match self.lcd_control.background_tile_map {
+            TileMapAddr::X9800 => &self.video_ram[0x1800..0x1C00],
+            TileMapAddr::X9C00 => &self.video_ram[0x1C00..0x2000],
         };
 
         for i in 0..0x400 {
             let curr_tile_index: u8 = background_map[i];
-            let curr_tile = match self.background_and_window_location {
-                BackgroundAndWindowLocation::X8000 => self.tile_set[curr_tile_index as usize],
-                BackgroundAndWindowLocation::X8800 => self.tile_set[(256 + ((curr_tile_index as i8) as i16)) as usize]
+            let curr_tile = match self.lcd_control.background_and_window_addr {
+                BackgroundAndWindowAddr::X8000 => self.tile_set[curr_tile_index as usize],
+                BackgroundAndWindowAddr::X8800 => self.tile_set[(256 + ((curr_tile_index as i8) as i16)) as usize]
             };
 
             let curr_tile_row = i / 32;
@@ -384,16 +370,16 @@ impl Gpu {
     }
 
     fn render_window_line(&mut self) {
-        let window_map = match self.window_tile_map {
-            TileMapLocation::X9800 => &self.video_ram[0x1800..0x1C00],
-            TileMapLocation::X9C00 => &self.video_ram[0x1C00..0x2000],
+        let window_map = match self.lcd_control.window_tile_map {
+            TileMapAddr::X9800 => &self.video_ram[0x1800..0x1C00],
+            TileMapAddr::X9C00 => &self.video_ram[0x1C00..0x2000],
         };
 
         for i in 0..0x400 {
             let curr_tile_index: u8 = window_map[i];
-            let curr_tile = match self.background_and_window_location {
-                BackgroundAndWindowLocation::X8000 => self.tile_set[curr_tile_index as usize],
-                BackgroundAndWindowLocation::X8800 => self.tile_set[(256 + ((curr_tile_index as i8) as i16)) as usize]
+            let curr_tile = match self.lcd_control.background_and_window_addr {
+                BackgroundAndWindowAddr::X8000 => self.tile_set[curr_tile_index as usize],
+                BackgroundAndWindowAddr::X8800 => self.tile_set[(256 + ((curr_tile_index as i8) as i16)) as usize]
             };
 
             let curr_tile_row = i / 32;
@@ -416,7 +402,7 @@ impl Gpu {
     }
 
     fn render_sprite_line(&mut self) {
-        let height = match self.obj_size {
+        let height = match self.lcd_control.obj_size {
             ObjSize::EightBySixteen => 16,
             ObjSize::EightByEight => 8,
         };
@@ -470,28 +456,11 @@ impl Gpu {
     }
 
     pub fn read_lcd_control(&self) -> u8 {
-        let mut lcd_control = 0;
-        lcd_control |= (self.lcd_enabled as u8) << 7;
-        lcd_control |= (self.window_tile_map as u8) << 6;
-        lcd_control |= (self.window_enabled as u8) << 5;
-        lcd_control |= (self.background_and_window_location as u8) << 4;
-        lcd_control |= (self.background_tile_map as u8) << 3;
-        lcd_control |= (self.obj_size as u8) << 2;
-        lcd_control |= (self.obj_display_enabled as u8) << 1;
-        lcd_control |= self.background_enabled as u8;
-        lcd_control
+        self.lcd_control.pack()[0]
     }
 
     pub fn write_lcd_control(&mut self, val: u8) {
-        self.lcd_enabled = (val >> 7) == 1;
-        self.window_tile_map = TileMapLocation::from((val >> 6) & 1);
-        self.window_enabled = ((val >> 5) & 1) == 1;
-        self.background_and_window_location =
-            BackgroundAndWindowLocation::from((val >> 4) & 1);
-        self.background_tile_map = TileMapLocation::from((val >> 3) & 1);
-        self.obj_size = ObjSize::from((val >> 2) & 1);
-        self.obj_display_enabled = ((val >> 1) & 1) == 1;
-        self.background_enabled = (val & 1) == 1;
+        self.lcd_control = LcdControlRegister::unpack(&[val]).unwrap();
     }
 
     pub fn read_lcd_stat(&self) -> u8 {
