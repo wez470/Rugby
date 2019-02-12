@@ -1,5 +1,4 @@
 use bitflags::bitflags;
-use display_derive::Display;
 use failure_derive::Fail;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -131,31 +130,45 @@ impl std::fmt::Display for MemSize {
 }
 
 /// Represents the level of Game Boy Color support the game supports or requires.
-#[derive(Clone, Copy, Debug, Display, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GbcFlag {
     /// A GB game with no GBC support.
-    #[display(fmt = "no")]
     Unsupported,
 
     /// The game has GBC-specific features, but they are optional so it can run in GB mode.
-    #[display(fmt = "yes")]
     Supported,
 
     /// The game requires GBC hardware and does not run in GB mode.
-    #[display(fmt = "required")]
     Required,
 }
 
+impl std::fmt::Display for GbcFlag {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            GbcFlag::Unsupported => "no",
+            GbcFlag::Supported => "yes",
+            GbcFlag::Required => "required",
+        })
+    }
+}
+
 /// Represents the level of Super Game Boy support the game supports.
-#[derive(Clone, Copy, Debug, Display, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SgbFlag {
     /// A GB or GBC game with no SGB support.
-    #[display(fmt = "no")]
     Unsupported,
 
     /// The game supports SGB features.
-    #[display(fmt = "yes")]
     Supported,
+}
+
+impl std::fmt::Display for SgbFlag {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", match self {
+            SgbFlag::Unsupported => "no",
+            SgbFlag::Supported => "yes",
+        })
+    }
 }
 
 /// Indicates the company or publisher of the game.
