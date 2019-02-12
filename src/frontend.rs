@@ -1,6 +1,6 @@
 use crate::cpu::Cpu;
 use crate::gpu::{SCREEN_HEIGHT, SCREEN_WIDTH};
-use crate::joypad::{ButtonKeys, DirKeys};
+use crate::joypad::{ButtonKey, DirKey};
 use log::info;
 use sdl2::controller::Button;
 use sdl2::event::Event;
@@ -77,16 +77,16 @@ pub fn start_frontend(cpu: &mut Cpu) {
                         Mod::RGUIMOD;
                     if !keymod.intersects(modifiers) {
                         match keycode {
-                            Keycode::W if !repeat => cpu.joypad.dir_key_down(DirKeys::UP),
-                            Keycode::A if !repeat => cpu.joypad.dir_key_down(DirKeys::LEFT),
-                            Keycode::S if !repeat => cpu.joypad.dir_key_down(DirKeys::DOWN),
-                            Keycode::D if !repeat => cpu.joypad.dir_key_down(DirKeys::RIGHT),
+                            Keycode::W if !repeat => cpu.joypad.dir_key_down(DirKey::Up),
+                            Keycode::A if !repeat => cpu.joypad.dir_key_down(DirKey::Left),
+                            Keycode::S if !repeat => cpu.joypad.dir_key_down(DirKey::Down),
+                            Keycode::D if !repeat => cpu.joypad.dir_key_down(DirKey::Right),
                             Keycode::Return if !repeat =>
-                                cpu.joypad.button_key_down(ButtonKeys::START),
+                                cpu.joypad.button_key_down(ButtonKey::Start),
                             Keycode::Tab if !repeat =>
-                                cpu.joypad.button_key_down(ButtonKeys::SELECT),
-                            Keycode::K if !repeat => cpu.joypad.button_key_down(ButtonKeys::A),
-                            Keycode::J if !repeat => cpu.joypad.button_key_down(ButtonKeys::B),
+                                cpu.joypad.button_key_down(ButtonKey::Select),
+                            Keycode::K if !repeat => cpu.joypad.button_key_down(ButtonKey::A),
+                            Keycode::J if !repeat => cpu.joypad.button_key_down(ButtonKey::B),
                             Keycode::P if !repeat => paused = !paused,
                             Keycode::Space => {
                                 paused = false;
@@ -103,14 +103,14 @@ pub fn start_frontend(cpu: &mut Cpu) {
                         Mod::RGUIMOD;
                     if !keymod.intersects(modifiers) {
                         match keycode {
-                            Keycode::W => cpu.joypad.dir_key_up(DirKeys::UP),
-                            Keycode::A => cpu.joypad.dir_key_up(DirKeys::LEFT),
-                            Keycode::S => cpu.joypad.dir_key_up(DirKeys::DOWN),
-                            Keycode::D => cpu.joypad.dir_key_up(DirKeys::RIGHT),
-                            Keycode::Return => cpu.joypad.button_key_up(ButtonKeys::START),
-                            Keycode::Tab => cpu.joypad.button_key_up(ButtonKeys::SELECT),
-                            Keycode::K => cpu.joypad.button_key_up(ButtonKeys::A),
-                            Keycode::J => cpu.joypad.button_key_up(ButtonKeys::B),
+                            Keycode::W => cpu.joypad.dir_key_up(DirKey::Up),
+                            Keycode::A => cpu.joypad.dir_key_up(DirKey::Left),
+                            Keycode::S => cpu.joypad.dir_key_up(DirKey::Down),
+                            Keycode::D => cpu.joypad.dir_key_up(DirKey::Right),
+                            Keycode::Return => cpu.joypad.button_key_up(ButtonKey::Start),
+                            Keycode::Tab => cpu.joypad.button_key_up(ButtonKey::Select),
+                            Keycode::K => cpu.joypad.button_key_up(ButtonKey::A),
+                            Keycode::J => cpu.joypad.button_key_up(ButtonKey::B),
                             Keycode::RightBracket =>
                                 speed_multiplier = (speed_multiplier * 2.0).min(4.0),
                             Keycode::LeftBracket =>
@@ -136,28 +136,28 @@ pub fn start_frontend(cpu: &mut Cpu) {
 
                 Event::ControllerButtonDown { button, .. } => {
                     match button {
-                        Button::A => cpu.joypad.button_key_down(ButtonKeys::A),
-                        Button::X => cpu.joypad.button_key_down(ButtonKeys::B),
-                        Button::Start => cpu.joypad.button_key_down(ButtonKeys::START),
-                        Button::Back => cpu.joypad.button_key_down(ButtonKeys::SELECT),
-                        Button::DPadLeft => cpu.joypad.dir_key_down(DirKeys::LEFT),
-                        Button::DPadRight => cpu.joypad.dir_key_down(DirKeys::RIGHT),
-                        Button::DPadUp => cpu.joypad.dir_key_down(DirKeys::UP),
-                        Button::DPadDown => cpu.joypad.dir_key_down(DirKeys::DOWN),
+                        Button::A => cpu.joypad.button_key_down(ButtonKey::A),
+                        Button::X => cpu.joypad.button_key_down(ButtonKey::B),
+                        Button::Start => cpu.joypad.button_key_down(ButtonKey::Start),
+                        Button::Back => cpu.joypad.button_key_down(ButtonKey::Select),
+                        Button::DPadLeft => cpu.joypad.dir_key_down(DirKey::Left),
+                        Button::DPadRight => cpu.joypad.dir_key_down(DirKey::Right),
+                        Button::DPadUp => cpu.joypad.dir_key_down(DirKey::Up),
+                        Button::DPadDown => cpu.joypad.dir_key_down(DirKey::Down),
                         _ => {}
                     }
                 }
 
                 Event::ControllerButtonUp { button, .. } => {
                     match button {
-                        Button::A => cpu.joypad.button_key_up(ButtonKeys::A),
-                        Button::X => cpu.joypad.button_key_up(ButtonKeys::B),
-                        Button::Start => cpu.joypad.button_key_up(ButtonKeys::START),
-                        Button::Back => cpu.joypad.button_key_up(ButtonKeys::SELECT),
-                        Button::DPadLeft => cpu.joypad.dir_key_up(DirKeys::LEFT),
-                        Button::DPadRight => cpu.joypad.dir_key_up(DirKeys::RIGHT),
-                        Button::DPadUp => cpu.joypad.dir_key_up(DirKeys::UP),
-                        Button::DPadDown => cpu.joypad.dir_key_up(DirKeys::DOWN),
+                        Button::A => cpu.joypad.button_key_up(ButtonKey::A),
+                        Button::X => cpu.joypad.button_key_up(ButtonKey::B),
+                        Button::Start => cpu.joypad.button_key_up(ButtonKey::Start),
+                        Button::Back => cpu.joypad.button_key_up(ButtonKey::Select),
+                        Button::DPadLeft => cpu.joypad.dir_key_up(DirKey::Left),
+                        Button::DPadRight => cpu.joypad.dir_key_up(DirKey::Right),
+                        Button::DPadUp => cpu.joypad.dir_key_up(DirKey::Up),
+                        Button::DPadDown => cpu.joypad.dir_key_up(DirKey::Down),
                         Button::RightShoulder =>
                             speed_multiplier = (speed_multiplier * 2.0).min(4.0),
                         Button::LeftShoulder =>

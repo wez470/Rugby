@@ -1,5 +1,5 @@
 use crate::cart::{Cart, CartConfig};
-use crate::cart_header::CartHeader;
+use crate::cart_header::{CartHardware, CartHeader};
 use crate::cpu::Cpu;
 use crate::frontend::start_frontend;
 use crate::wla_symbols::WlaSymbols;
@@ -129,8 +129,8 @@ fn info_table(opts: &InfoOpts) -> Result<(), failure::Error> {
             Err(_) => write!(out, "{:x?}\t", cart.title)?,
         }
         write!(out, "{}\t", cart.rom_version)?;
-        write!(out, "{:?}\t", cart.cart_type.mbc)?;
-        write!(out, "{:?}\t", cart.cart_type.hardware)?;
+        write!(out, "{:?}\t", cart.cart_type)?;
+        write!(out, "{}\t", CartHardware::flags_to_string(cart.hardware))?;
         write!(out, "{}\t", cart.rom_size)?;
         write!(out, "{}\t", cart.ram_size)?;
         write!(out, "{}\t", cart.gbc_flag)?;
@@ -152,7 +152,6 @@ fn info_records(opts: &InfoOpts) -> Result<(), failure::Error> {
             .with_context(|_| format!("Failed to read ROM file: {}", path.display()))?;
         let cart = cart_header::CartHeader::from_rom(&rom)
             .with_context(|_| format!("Failed to parse cartridge header: {}", path.display()))?;
-
         let mut out = tabwriter::TabWriter::new(std::io::stdout());
 
         match std::str::from_utf8(&cart.title) {
@@ -160,8 +159,8 @@ fn info_records(opts: &InfoOpts) -> Result<(), failure::Error> {
             Err(_) => writeln!(out, "Title:\t{:x?}", cart.title)?,
         }
         writeln!(out, "Version:\t{}", cart.rom_version)?;
-        writeln!(out, "MBC type:\t{:?}", cart.cart_type.mbc)?;
-        writeln!(out, "Hardware:\t{:?}", cart.cart_type.hardware)?;
+        writeln!(out, "MBC type:\t{:?}", cart.cart_type)?;
+        writeln!(out, "Hardware:\t{}", CartHardware::flags_to_string(cart.hardware))?;
         writeln!(out, "ROM size:\t{}", cart.rom_size)?;
         writeln!(out, "RAM size:\t{}", cart.ram_size)?;
         writeln!(out, "GBC support:\t{}", cart.gbc_flag)?;

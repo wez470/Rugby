@@ -1,22 +1,23 @@
-use bitflags::bitflags;
+use enumflags2::BitFlags;
+use enumflags2_derive::EnumFlags;
 use crate::interrupts::Interrupt;
 
-bitflags! {
-    pub struct ButtonKeys: u8 {
-        const A = 1 << 0;
-        const B = 1 << 1;
-        const SELECT = 1 << 2;
-        const START = 1 << 3;
-    }
+#[derive(Copy, Clone, Debug, EnumFlags)]
+#[repr(u8)]
+pub enum ButtonKey {
+    A      = 1 << 0,
+    B      = 1 << 1,
+    Select = 1 << 2,
+    Start  = 1 << 3,
 }
 
-bitflags! {
-    pub struct DirKeys: u8 {
-        const RIGHT = 1 << 0;
-        const LEFT = 1 << 1;
-        const UP = 1 << 2;
-        const DOWN = 1 << 3;
-    }
+#[derive(Copy, Clone, Debug, EnumFlags)]
+#[repr(u8)]
+pub enum DirKey {
+    Right = 1 << 0,
+    Left  = 1 << 1,
+    Up    = 1 << 2,
+    Down  = 1 << 3,
 }
 
 #[derive(Clone, Debug)]
@@ -28,10 +29,10 @@ pub struct Joypad {
     select_dir_keys: bool,
 
     /// Bit flags of which button keys are currently held down.
-    button_keys_pressed: ButtonKeys,
+    button_keys_pressed: BitFlags<ButtonKey>,
 
     /// Bit flags of which direction keys are currently held down.
-    dir_keys_pressed: DirKeys,
+    dir_keys_pressed: BitFlags<DirKey>,
 
     /// Whether to request a Joypad interrupt on the next CPU step.
     should_interrupt: bool,
@@ -42,13 +43,13 @@ impl Joypad {
         Joypad {
             select_button_keys: true,
             select_dir_keys: true,
-            button_keys_pressed: ButtonKeys::empty(),
-            dir_keys_pressed: DirKeys::empty(),
+            button_keys_pressed: BitFlags::empty(),
+            dir_keys_pressed: BitFlags::empty(),
             should_interrupt: false,
         }
     }
 
-    pub fn button_key_down(&mut self, button: ButtonKeys) {
+    pub fn button_key_down(&mut self, button: ButtonKey) {
         let before = self.read_reg();
         self.button_keys_pressed.insert(button);
         let after = self.read_reg();
@@ -56,11 +57,11 @@ impl Joypad {
         self.should_interrupt = before & !after != 0;
     }
 
-    pub fn button_key_up(&mut self, button: ButtonKeys) {
+    pub fn button_key_up(&mut self, button: ButtonKey) {
         self.button_keys_pressed.remove(button);
     }
 
-    pub fn dir_key_down(&mut self, dir: DirKeys) {
+    pub fn dir_key_down(&mut self, dir: DirKey) {
         let before = self.read_reg();
         self.dir_keys_pressed.insert(dir);
         let after = self.read_reg();
@@ -68,7 +69,7 @@ impl Joypad {
         self.should_interrupt = before & !after != 0;
     }
 
-    pub fn dir_key_up(&mut self, dir: DirKeys) {
+    pub fn dir_key_up(&mut self, dir: DirKey) {
         self.dir_keys_pressed.remove(dir);
     }
 

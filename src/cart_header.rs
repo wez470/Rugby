@@ -1,4 +1,5 @@
-use bitflags::bitflags;
+use enumflags2::BitFlags;
+use enumflags2_derive::EnumFlags;
 use failure_derive::Fail;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -6,9 +7,12 @@ pub struct CartHeader {
     /// The title of the game. At most 16 bytes.
     pub title: Vec<u8>,
 
-    /// Specifies what kind of hardware is inside the cartridge, including memory bank controllers
-    /// (MBC), RAM, etc.
+    /// Specifies what kind of physical cartridge this ROM comes with, e.g. a cartridge with a
+    /// memory bank controller.
     pub cart_type: CartType,
+
+    /// Specifies what extra hardware is present in the cartridge.
+    pub hardware: BitFlags<CartHardware>,
 
     /// The size in bytes of the ROM in the cartridge.
     pub rom_size: MemSize,
@@ -36,14 +40,7 @@ pub struct CartHeader {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct CartType {
-    pub mbc: MbcType,
-    pub hardware: CartHardware,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum MbcType {
-    /// Plain ROM without an MBC.
+pub enum CartType {
     NoMbc,
     Mbc1,
     Mbc2,
@@ -59,51 +56,20 @@ pub enum MbcType {
     Unknown(u8),
 }
 
-bitflags! {
-    pub struct CartHardware: u8 {
-        const RAM           = 1 << 0;
-        const TIMER         = 1 << 1;
-        const BATTERY       = 1 << 2;
-        const RUMBLE        = 1 << 3;
-        const ACCELEROMETER = 1 << 4;
-    }
+#[derive(Copy, Clone, Debug, EnumFlags)]
+#[repr(u8)]
+pub enum CartHardware {
+    Ram           = 1 << 0,
+    Timer         = 1 << 1,
+    Battery       = 1 << 2,
+    Rumble        = 1 << 3,
+    Accelerometer = 1 << 4,
 }
 
-impl From<u8> for CartType {
-    fn from(byte: u8) -> Self {
-        use self::MbcType::*;
-        let (mbc, hardware) = match byte {
-            0x00 => (NoMbc, CartHardware::empty()),
-            0x01 => (Mbc1, CartHardware::empty()),
-            0x02 => (Mbc1, CartHardware::RAM),
-            0x03 => (Mbc1, CartHardware::RAM | CartHardware::BATTERY),
-            0x05 => (Mbc2, CartHardware::empty()),
-            0x06 => (Mbc2, CartHardware::RAM | CartHardware::BATTERY),
-            0x08 => (NoMbc, CartHardware::RAM),
-            0x09 => (NoMbc, CartHardware::RAM | CartHardware::BATTERY),
-            0x0B => (Mmm01, CartHardware::empty()),
-            0x0C => (Mmm01, CartHardware::RAM),
-            0x0D => (Mmm01, CartHardware::RAM | CartHardware::BATTERY),
-            0x0F => (Mbc3, CartHardware::TIMER | CartHardware::BATTERY),
-            0x10 => (Mbc3, CartHardware::RAM | CartHardware::TIMER | CartHardware::BATTERY),
-            0x11 => (Mbc3, CartHardware::empty()),
-            0x12 => (Mbc3, CartHardware::RAM),
-            0x13 => (Mbc3, CartHardware::RAM | CartHardware::BATTERY),
-            0x19 => (Mbc5, CartHardware::empty()),
-            0x1A => (Mbc5, CartHardware::RAM),
-            0x1B => (Mbc5, CartHardware::RAM | CartHardware::BATTERY),
-            0x1C => (Mbc5, CartHardware::RUMBLE),
-            0x1D => (Mbc5, CartHardware::RAM | CartHardware::RUMBLE),
-            0x1E => (Mbc5, CartHardware::RAM | CartHardware::BATTERY | CartHardware::RUMBLE),
-            0x20 => (Mbc6, CartHardware::RAM | CartHardware::BATTERY),
-            0x22 => (Mbc7, CartHardware::RAM | CartHardware::BATTERY | CartHardware::ACCELEROMETER),
-            0xFC => (PocketCamera, CartHardware::empty()),
-            0xFD => (BandaiTama5, CartHardware::empty()),
-            0xFE => (HuC3, CartHardware::empty()),
-            0xFF => (HuC1, CartHardware::RAM | CartHardware::BATTERY),
-            n => (Unknown(n), CartHardware::empty()),
-        };
-        CartType { mbc, hardware }
+impl CartHardware {
+    pub fn flags_to_string(flags: BitFlags<CartHardware>) -> String {
+        let hardware: Vec<String> = flags.iter().map(|h| format!("{:?}", h)).collect();
+        if hardware.is_empty() { String::from("none") } else { hardware.join("+") }
     }
 }
 
@@ -245,7 +211,35 @@ impl CartHeader {
             LicenseeCode::New([bytes[0x44], bytes[0x45]])
         };
 
-        let cart_type = CartType::from(bytes[0x47]);
+        let cart_type = match bytes[0x47] {
+            0x00 | 0x08...0x09 => CartType::NoMbc,
+            0x01...0x03 => CartType::Mbc1,
+            0x05...0x06 => CartType::Mbc2,
+            0x0B...0x0D => CartType::Mmm01,
+            0x0F...0x13 => CartType::Mbc3,
+            0x19...0x1E => CartType::Mbc5,
+            0x20 => CartType::Mbc6,
+            0x22 => CartType::Mbc7,
+            0xFC => CartType::PocketCamera,
+            0xFD => CartType::BandaiTama5,
+            0xFE => CartType::HuC3,
+            0xFF => CartType::HuC1,
+            n => CartType::Unknown(n),
+        };
+
+        use self::CartHardware::*;
+        let mut hardware = BitFlags::empty();
+        match bytes[0x47] {
+            0x02 | 0x08 | 0x0C | 0x12 | 0x1A => hardware |= Ram,
+            0x03 | 0x06 | 0x09 | 0x0D | 0x13 | 0x1B | 0x20 | 0xFF => hardware |= Ram | Battery,
+            0x0F => hardware |= Timer | Battery,
+            0x10 => hardware |= Ram | Timer | Battery,
+            0x1C => hardware |= Rumble,
+            0x1D => hardware |= Ram | Rumble,
+            0x1E => hardware |= Ram | Battery | Rumble,
+            0x22 => hardware |= Ram | Battery | Accelerometer,
+            _ => {}
+        };
 
         let rom_size = match bytes[0x48] {
             n @ 0x00...0x08 => MemSize::Bytes((32 * 1024) << n),
@@ -273,6 +267,7 @@ impl CartHeader {
         Ok(CartHeader {
             title,
             cart_type,
+            hardware,
             rom_size,
             ram_size,
             gbc_flag,

@@ -1231,9 +1231,9 @@ mod tests {
 
     fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
         use crate::cart::{Cart, CartConfig};
-        use crate::cart_header::MbcType;
+        use crate::cart_header::CartType;
         let rom_size = rom.len();
-        let cart_config = CartConfig { mbc_type: MbcType::NoMbc, rom_size, ram_size: 0 };
+        let cart_config = CartConfig { cart_type: CartType::NoMbc, rom_size, ram_size: 0 };
         let mut actual = Cpu::new(Cart::new(rom.into_boxed_slice(), None, &cart_config).unwrap());
         let mut expected = actual.clone();
         actual.reg_pc.set(0);

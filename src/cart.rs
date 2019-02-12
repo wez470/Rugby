@@ -1,4 +1,4 @@
-use crate::cart_header::{CartHeader, MbcType, MemSize};
+use crate::cart_header::{CartHeader, CartType, MemSize};
 use failure_derive::Fail;
 use log::warn;
 
@@ -7,23 +7,24 @@ const RAM_BANK_SIZE: usize = 0x2000;
 
 #[derive(Clone, Debug)]
 pub struct CartConfig {
-    pub mbc_type: MbcType,
+    pub cart_type: CartType,
     pub rom_size: usize,
     pub ram_size: usize,
 }
 
 impl CartConfig {
     pub fn from_cart_header(cart_header: &CartHeader) -> Result<Self, CartError> {
-        let mbc_type = cart_header.cart_type.mbc;
-        let rom_size = match cart_header.rom_size {
-            MemSize::Bytes(b) => b,
-            MemSize::Unknown(_) => return Err(CartError::RomSizeUnknown),
-        };
-        let ram_size = match cart_header.rom_size {
-            MemSize::Bytes(b) => b,
-            MemSize::Unknown(_) => return Err(CartError::RamSizeUnknown),
-        };
-        Ok(CartConfig { mbc_type, rom_size, ram_size })
+        Ok(CartConfig {
+            cart_type: cart_header.cart_type,
+            rom_size: match cart_header.rom_size {
+                MemSize::Bytes(b) => b,
+                MemSize::Unknown(_) => return Err(CartError::RomSizeUnknown),
+            },
+            ram_size: match cart_header.rom_size {
+                MemSize::Bytes(b) => b,
+                MemSize::Unknown(_) => return Err(CartError::RamSizeUnknown),
+            },
+        })
     }
 }
 
@@ -68,10 +69,10 @@ impl Cart {
             None => vec![0; config.ram_size].into_boxed_slice(),
         };
 
-        Ok(match config.mbc_type {
-            MbcType::NoMbc => Cart::NoMbc(NoMbc::new(rom, ram)),
-            MbcType::Mbc1 => Cart::Mbc1(Mbc1::new(rom, ram)),
-            MbcType::Mbc3 => Cart::Mbc3(Mbc3::new(rom, ram)),
+        Ok(match config.cart_type {
+            CartType::NoMbc => Cart::NoMbc(NoMbc::new(rom, ram)),
+            CartType::Mbc1 => Cart::Mbc1(Mbc1::new(rom, ram)),
+            CartType::Mbc3 => Cart::Mbc3(Mbc3::new(rom, ram)),
             _ => panic!("Unimplemented Mbc Type!"),
         })
     }
