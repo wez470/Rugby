@@ -10,8 +10,8 @@ fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
     let cart_config = CartConfig { cart_type: CartType::NoMbc, rom_size, ram_size: 0 };
     let mut actual = Cpu::new(Cart::new(rom.into_boxed_slice(), None, &cart_config).unwrap());
     let mut expected = actual.clone();
-    actual.reg_pc.set(0);
-    expected.reg_pc.set(rom_size as u16);
+    actual.regs.pc.set(0);
+    expected.regs.pc.set(rom_size as u16);
     (actual, expected)
 }
 
@@ -20,12 +20,12 @@ fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
 fn check_diff(actual: &Cpu, expected: &Cpu) -> TestResult {
     let mut err = String::new();
 
-    diff_hex("AF register", &actual.reg_af.get(), &expected.reg_af.get(), &mut err);
-    diff_hex("BC register", &actual.reg_bc.get(), &expected.reg_bc.get(), &mut err);
-    diff_hex("DE register", &actual.reg_de.get(), &expected.reg_de.get(), &mut err);
-    diff_hex("HL register", &actual.reg_hl.get(), &expected.reg_hl.get(), &mut err);
-    diff_hex("SP register", &actual.reg_sp.get(), &expected.reg_sp.get(), &mut err);
-    diff_hex("PC register", &actual.reg_pc.get(), &expected.reg_pc.get(), &mut err);
+    diff_hex("AF register", &actual.regs.af.get(), &expected.regs.af.get(), &mut err);
+    diff_hex("BC register", &actual.regs.bc.get(), &expected.regs.bc.get(), &mut err);
+    diff_hex("DE register", &actual.regs.de.get(), &expected.regs.de.get(), &mut err);
+    diff_hex("HL register", &actual.regs.hl.get(), &expected.regs.hl.get(), &mut err);
+    diff_hex("SP register", &actual.regs.sp.get(), &expected.regs.sp.get(), &mut err);
+    diff_hex("PC register", &actual.regs.pc.get(), &expected.regs.pc.get(), &mut err);
     diff(
         "interrupts_enabled",
         &actual.interrupts_enabled,
@@ -97,8 +97,8 @@ macro_rules! setup_cpu {
             $( reg16 { $( $reg16:ident = $reg16val:expr ),* $(,)* } )*
         }
     ) => ({
-        $( $( $cpu.set_reg_8(Reg8::$reg8, $reg8val); )* )*
-        $( $( $cpu.set_reg_16(Reg16::$reg16, $reg16val); )* )*
+        $( $( $cpu.regs.set_8(Reg8::$reg8, $reg8val); )* )*
+        $( $( $cpu.regs.set_16(Reg16::$reg16, $reg16val); )* )*
     })
 }
 
@@ -166,7 +166,7 @@ macro_rules! cpu_tests {
                     let (mut actual, mut expected) = setup(rom);
                     $( setup_cpu!(actual, $setup); )*
                     $( setup_cpu!(expected, $expect); )*
-                    while actual.reg_pc.get() as usize != rom_size {
+                    while actual.regs.pc.get() as usize != rom_size {
                         actual.step();
                     }
                     check_diff(&actual, &expected)

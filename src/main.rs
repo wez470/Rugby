@@ -17,7 +17,6 @@ mod frontend;
 mod gpu;
 mod interrupts;
 mod joypad;
-mod reg_16;
 mod timer;
 mod wla_symbols;
 
