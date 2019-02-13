@@ -1,6 +1,6 @@
 [package]
 authors = ["Weston Carlson <wez470@gmail.com>"]
-name = "rustboy"
+name = "rugby"
 version = "0.1.0"
 edition = "2018"
 
