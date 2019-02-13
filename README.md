@@ -2,7 +2,7 @@
 [![Build Status](https://travis-ci.org/wez470/Rugby.svg?branch=master)](https://travis-ci.org/wez470/Rugby)
 
 # Building / Running
-1. Install SDL2 Dev library.
+1. Install SDL2 Dev dependencies.
 1. `cargo run --release run <ROM>`
 
 # Controls
