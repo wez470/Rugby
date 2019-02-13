@@ -22,7 +22,7 @@ mod timer;
 mod wla_symbols;
 
 #[derive(Debug, StructOpt)]
-#[structopt(name = "Rustboy", about = "A Game Boy emulator")]
+#[structopt(name = "Rugby", about = "Rust Game Boy? Yes!")]
 enum Opts {
     #[structopt(name = "run", about = "Runs the given Game Boy ROM file")]
     Run(RunOpts),
@@ -58,7 +58,7 @@ struct InfoOpts {
 }
 
 fn main() -> Result<(), failure::Error> {
-    let env = env_logger::Env::new().filter("RUSTBOY_LOG").write_style("RUSTBOY_LOG_STYLE");
+    let env = env_logger::Env::new().filter("RUGBY_LOG").write_style("RUGBY_LOG_STYLE");
     env_logger::Builder::from_env(env)
         .default_format_timestamp(false)
         .init();

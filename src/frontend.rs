@@ -15,7 +15,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
     let sdl_video = sdl.video().expect("Failed to access SDL video subsystem");
     let window = sdl_video
         .window(
-            "Rustboy",
+            "Rugby",
             (SCREEN_WIDTH * WINDOW_SCALE) as u32,
             (SCREEN_HEIGHT * WINDOW_SCALE) as u32,
         )
