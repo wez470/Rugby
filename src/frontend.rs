@@ -42,7 +42,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
             for tile_col in 0..SCREEN_WIDTH {
                 let pixel_i = (tile_row * SCREEN_WIDTH + tile_col) * 4;
                 let color_i = cpu.gpu.screen_buffer[tile_row][tile_col] as usize;
-                let color = GAMEBOY_COLORS[color_i].rgb();
+                let color = GAME_BOY_COLORS[color_i].rgb();
                 image[pixel_i + 2] = color.0;
                 image[pixel_i + 1] = color.1;
                 image[pixel_i + 0] = color.2;
@@ -179,7 +179,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
 }
 
 /// The four colors of the original Game Boy screen, from lightest to darkest, in RGB.
-const GAMEBOY_COLORS: [sdl2::pixels::Color; 4] = [
+const GAME_BOY_COLORS: [sdl2::pixels::Color; 4] = [
     sdl2::pixels::Color { r: 155, g: 188, b: 15, a: 0xFF },
     sdl2::pixels::Color { r: 139, g: 172, b: 15, a: 0xFF },
     sdl2::pixels::Color { r: 48,  g: 98,  b: 48, a: 0xFF },

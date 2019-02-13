@@ -92,7 +92,7 @@ pub struct Gpu {
     /// The current window
     window: Box<[[u8; 256]; 256]>,
 
-    /// Video RAM internal to the Gameboy.
+    /// Video RAM internal to the Game Boy.
     video_ram: Box<[u8]>,
 
     /// The current tiles in video ram.

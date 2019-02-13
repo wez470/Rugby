@@ -68,14 +68,14 @@ pub struct Cpu {
     /// The 16-bit `PC` register, which contains the program counter.
     reg_pc: Register,
 
-    /// Work RAM internal to the Gameboy, as opposed to external cartridge RAM. Limited to 8 KB in
-    /// the original Gameboy.
+    /// Work RAM internal to the Game Boy, as opposed to external cartridge RAM. Limited to 8 KB in
+    /// the original Game Boy.
     work_ram: Box<[u8]>,
 
-    /// High RAM internal to the Gameboy. This is a small range of 127 bytes at 0xFF80-0xFFFE.
+    /// High RAM internal to the Game Boy. This is a small range of 127 bytes at 0xFF80-0xFFFE.
     high_ram: Box<[u8]>,
 
-    /// The Gameboy timing registers
+    /// The Game Boy timing registers
     timer: Timer,
 
     /// The graphics procession unit.
@@ -862,7 +862,7 @@ impl Cpu {
         match src {
             Operand16::Imm16(val) => val,
             Operand16::Reg16(reg) => self.get_reg_16(reg),
-            Operand16::MemImm16(_) => panic!("no gameboy CPU instruction actually uses this"),
+            Operand16::MemImm16(_) => panic!("no Game Boy CPU instruction actually uses this"),
         }
     }
 
@@ -959,7 +959,7 @@ impl Cpu {
             // Not Usable
             //
             // This part of the address space is not connected to any hardware, but some games do
-            // reads here. The result is 0xFF, the default value for the Gameboy data bus.
+            // reads here. The result is 0xFF, the default value for the Game Boy data bus.
             0xFEA0...0xFEFF => 0xFF,
 
             // I/O Ports

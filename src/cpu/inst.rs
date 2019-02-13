@@ -173,7 +173,7 @@ pub enum Inst {
     /// `STOP`: Halt CPU & LCD display until button pressed.
     Stop,
 
-    /// `HALT`: Power down CPU until an interrupt occurs. The Gameboy uses this to save power.
+    /// `HALT`: Power down CPU until an interrupt occurs. The Game Boy uses this to save power.
     Halt,
 
     /// `DI`: Disable interrupts.
@@ -377,12 +377,12 @@ pub enum Inst {
 
     /// An invalid opcode the CPU does not understand, Instruction decoding will generate these for
     /// bad opcodes and executing them will halt emulation and report an error. On the physical
-    /// Gameboy, they supposedly cause it to "lock up".
+    /// Game Boy, they supposedly cause it to "lock up".
     Invalid(u8),
 }
 
 impl Inst {
-    /// Decode a Gameboy instruction from the given bytes.
+    /// Decode a Game Boy instruction from the given bytes.
     ///
     /// Panics if the slice is empty or if it isn't long enough for the instruction specified by its
     /// first byte (the opcode).
