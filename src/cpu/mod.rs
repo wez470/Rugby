@@ -937,12 +937,13 @@ impl Cpu {
     fn read_mem_16(&mut self, addr: u16) -> u16 {
         let low = self.read_mem(addr);
         let high = self.read_mem(addr.wrapping_add(1));
-        ((high as u16) << 8) | low as u16
+        u16::from_le_bytes([low, high])
     }
 
     fn write_mem_16(&mut self, addr: u16, val: u16) {
-        self.write_mem(addr, val as u8);
-        self.write_mem(addr.wrapping_add(1), (val >> 8) as u8);
+        let [low, high] = val.to_le_bytes();
+        self.write_mem(addr, low);
+        self.write_mem(addr.wrapping_add(1), high);
     }
 
     fn read_io_port(&self, port: u8) -> u8 {

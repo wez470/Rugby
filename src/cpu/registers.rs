@@ -7,18 +7,18 @@ pub struct Register {
 impl Register {
     pub fn new(val: u16) -> Self {
         let mut reg = Register::default();
-        reg.low = (val & 0xFF) as u8;
-        reg.high = ((val >> 8) & 0xFF) as u8;
+        reg.set(val);
         reg
     }
 
     pub fn set(&mut self, val: u16) {
-        self.low = (val & 0xFF) as u8;
-        self.high = ((val >> 8) & 0xFF) as u8;
+        let [low, high] = val.to_le_bytes();
+        self.low = low;
+        self.high = high;
     }
 
     pub fn get(&self) -> u16 {
-        ((self.high as u16) << 8) | (self.low as u16)
+        u16::from_le_bytes([self.low, self.high])
     }
 
     pub fn inc(&mut self, val: i8) {
