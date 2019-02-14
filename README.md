@@ -19,4 +19,4 @@ speed x2    = right bracket (max x4)
 speed x0.5  = left bracket  (min x0.25)
 ```
 
-<img src="https://i.imgur.com/YkgtiOI.png" alt="Rugby Gameplay" width="200"/>
+<img src="https://i.imgur.com/u30jZ22.png" alt="Rugby Gameplay" width="200"/>
