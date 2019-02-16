@@ -3,7 +3,7 @@
 
 # Building / Running
 1. Install SDL2 dev and SDL2 graphics dev libraries.
-1. `cargo run --release run <ROM>`
+2. `cargo run --release run <ROM>`
 
 # Controls
 ```
