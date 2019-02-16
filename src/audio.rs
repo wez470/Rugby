@@ -17,6 +17,17 @@ pub enum Volume {
     Quarter = 3,
 }
 
+impl std::convert::From<Volume> for f32 {
+    fn from(value: Volume) -> f32 {
+        match value {
+            Volume::Zero => 0_f32,
+            Volume::Full => 1_f32,
+            Volume::Half => 0.5_f32,
+            Volume::Quarter => 0.25_f32,
+        }
+    }
+}
+
 pub struct Channel3 {
     /// True if sound is on. Register FF1A
     on: bool,
