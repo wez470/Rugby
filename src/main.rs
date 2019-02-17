@@ -10,6 +10,7 @@ use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+mod audio;
 mod cart;
 mod cart_header;
 mod cpu;

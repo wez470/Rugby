@@ -1,3 +1,4 @@
+use crate::audio::Audio;
 use crate::cart::Cart;
 use crate::gpu::Gpu;
 use crate::interrupts::Interrupt;
@@ -41,6 +42,9 @@ pub struct Cpu {
 
     /// Game cartridge.
     pub cart: Cart,
+
+    /// The audio processing unit.
+    pub audio: Audio,
 
     /// The opcode of the currently-executing instruction.
     current_opcode: u8,
@@ -90,6 +94,7 @@ impl Cpu {
             timer: Timer::new(),
             gpu: Gpu::new(),
             joypad: Joypad::new(),
+            audio: Audio::new(),
             cart,
             current_opcode: 0,
             cycles: 0,
@@ -958,7 +963,10 @@ impl Cpu {
             0x04...0x07 => self.timer.read_reg(port),
             // The top 3 bits are unused and always 1.
             0x0F => 0b1110_0000 | self.interrupt_flags_register.bits(),
-            0x10...0x14 | 0x16...0x1E | 0x20...0x26 | 0x30...0x3F => warn_unimplemented("sound"),
+            0x10...0x14 | 0x16...0x19 | 0x20...0x26 | 0x30...0x3F => warn_unimplemented("sound"),
+
+//            0x1A => self.audio.,
+
             0x40...0x45 | 0x47...0x4B => self.gpu.read_reg(port),
 
             // Cannot read from DMA transfer register.
