@@ -14,6 +14,7 @@ impl Audio {
         match addr {
             0x1A...0x1E => self.channel3.read_reg(addr),
             0x30...0x3F => self.channel3.read_reg(addr),
+            _ => panic!("Unimplemented audio register read"),
         }
     }
 
@@ -21,11 +22,12 @@ impl Audio {
         match addr {
             0x1A...0x1E => self.channel3.write_reg(addr, val),
             0x30...0x3F => self.channel3.write_reg(addr, val),
+            _ => panic!("Unimplemented audio register write"),
         }
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub enum Volume {
     Zero = 0,
     Full = 1,
@@ -98,15 +100,15 @@ impl Channel3 {
             0x1A => (self.on as u8) << 7,
             0x1B => self.length,
             0x1C => (self.volume as u8) << 5,
-            0x1D => self.frequency & 0xFF,
+            0x1D => self.frequency as u8,
             0x1E => {
                 let mut frequency_higher_data = 0b00111000; // Bits 3-5 unused
                 frequency_higher_data |= (self.restart as u8) << 7;
                 frequency_higher_data |= (self.stop as u8) << 6;
-                frequency_higher_data |= (self.frequency >> 8 & 0b111);
+                frequency_higher_data |= ((self.frequency >> 8) as u8) & 0b111;
                 frequency_higher_data
             },
-            0x30...0x3F => self.wave_ram[addr - 0x30],
+            0x30...0x3F => self.wave_ram[(addr - 0x30) as usize],
             _ => panic!("Invalid read address for audio channel 3"),
         }
     }
@@ -126,7 +128,7 @@ impl Channel3 {
                 self.frequency &= 0xFF;
                 self.frequency |= ((val & 0b111) as u16) << 8;
             },
-            0x30...0x3F => self.wave_ram[addr - 0x30] = val,
+            0x30...0x3F => self.wave_ram[(addr - 0x30) as usize] = val,
             _ => panic!("Invalid write address for audio channel 3"),
         }
     }
