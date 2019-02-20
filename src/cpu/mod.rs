@@ -142,7 +142,7 @@ impl Cpu {
         let base_pc = self.regs.pc.get();
         self.current_opcode = self.read_mem(base_pc);
         let instruction_len = inst::INSTRUCTION_LENGTH[self.current_opcode as usize];
-        self.regs.pc.inc(instruction_len as i8);
+        self.regs.pc += instruction_len as u16;
 
         // Read the rest of the bytes of this instruction.
         let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
@@ -193,8 +193,8 @@ impl Cpu {
         if self.interrupts_enabled && enabled && flagged {
             debug!("Handling interrupt {:?}", i);
             // TODO(solson): Use `call` or `call_restart`?
-            self.push_stack(self.regs.get_16(Reg16::PC));
-            self.regs.set_16(Reg16::PC, i.handler_addr());
+            self.push_stack(self.regs.pc.get());
+            self.regs.pc.set(i.handler_addr());
             self.interrupt_flags_register.remove(i);
         }
     }
@@ -304,7 +304,7 @@ impl Cpu {
     /// Increment the program counter by the given offset if the condition is met.
     fn jump_relative(&mut self, offset: i8, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
-            self.regs.pc.inc(offset);
+            self.regs.pc += offset;
         }
     }
 
@@ -326,8 +326,7 @@ impl Cpu {
             }
 
             // The return address is the address of the instruction after the call.
-            let return_addr = self.regs.pc.get();
-            self.push_stack(return_addr);
+            self.push_stack(self.regs.pc.get());
             self.regs.pc.set(fn_addr);
         }
     }
@@ -337,8 +336,7 @@ impl Cpu {
     /// Call the "restart" function at the given address.
     fn call_restart(&mut self, addr: u8) {
         // TODO(solson): Use `call` function?
-        let return_addr = self.regs.pc.get();
-        self.push_stack(return_addr);
+        self.push_stack(self.regs.pc.get());
         self.regs.pc.set(addr as u16);
     }
 
@@ -346,14 +344,13 @@ impl Cpu {
     fn ret(&mut self, cond: Cond) {
         if self.check_cond_and_update_cycles(cond) {
             let return_addr = self.pop_stack();
-            self.regs.set_16(Reg16::PC, return_addr);
+            self.regs.pc.set(return_addr);
         }
     }
 
     /// The `Inst::Push` instruction.
     fn push(&mut self, reg: Reg16) {
-        let val = self.regs.get_16(reg);
-        self.push_stack(val);
+        self.push_stack(self.regs.get_16(reg));
     }
 
     /// The `Inst::Pop` instruction.
@@ -374,15 +371,14 @@ impl Cpu {
     ///
     /// Move 16 bits from `src` and store them into `dest`.
     fn move_16(&mut self, dest: Operand16, src: Operand16) {
-        let val = self.get_operand_16(src);
-        self.set_operand_16(dest, val);
+        self.set_operand_16(dest, self.get_operand_16(src));
     }
 
     /// The `Inst::LdHlSp` and `Inst::AddSp` instructions.
     ///
     /// Loads the stack pointer plus an 8-bit signed value into the specified register.
     fn load_stack_addr_into_reg(&mut self, offset: i8, dest: Reg16) {
-        let sp = self.regs.get_16(Reg16::SP);
+        let sp = self.regs.sp.get();
         let val = (sp as i32 + offset as i32) as u16;
         self.regs.set_16(dest, val);
         self.set_flag(Flag::Zero, false);
@@ -433,10 +429,10 @@ impl Cpu {
 
     /// The `Inst::AddA` instruction
     fn add_accum(&mut self, n: Operand8) {
-        let accum = self.regs.get_8(Reg8::A);
+        let accum = self.regs.a;
         let n_val = self.get_operand_8(n);
         let (new_accum, carry) = accum.overflowing_add(n_val);
-        self.regs.set_8(Reg8::A, new_accum);
+        self.regs.a = new_accum;
         self.set_flag(Flag::Zero, new_accum == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, get_add_half_carry(accum, n_val));
@@ -445,10 +441,10 @@ impl Cpu {
 
     /// The `Inst::AddHl` instruction
     fn add_hl(&mut self, n: Operand16) {
-        let old_hl = self.regs.get_16(Reg16::HL);
+        let old_hl = self.regs.hl.get();
         let n_val = self.get_operand_16(n);
         let (new_hl, carry) = old_hl.overflowing_add(n_val);
-        self.regs.set_16(Reg16::HL, new_hl);
+        self.regs.hl.set(new_hl);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, get_add_half_carry_high(old_hl, n_val));
         self.set_flag(Flag::Carry, carry);
@@ -456,25 +452,26 @@ impl Cpu {
 
     /// The `Inst::AdcA` instruction
     fn add_accum_with_carry(&mut self, n: Operand8) {
-        let accum = self.regs.get_8(Reg8::A);
+        let accum = self.regs.a;
         let n_val = self.get_operand_8(n);
         let carry_val = self.get_flag(Flag::Carry) as u8;
         let (midway_accum, midway_carry) = accum.overflowing_add(n_val);
         let (final_accum, final_carry) = midway_accum.overflowing_add(carry_val);
+        self.regs.a = final_accum;
         self.set_flag(Flag::Zero, final_accum == 0);
         self.set_flag(Flag::Sub, false);
-        let half_carry = get_add_half_carry(accum, n_val) || get_add_half_carry(midway_accum, carry_val);
+        let half_carry = get_add_half_carry(accum, n_val) ||
+            get_add_half_carry(midway_accum, carry_val);
         self.set_flag(Flag::HalfCarry, half_carry);
         self.set_flag(Flag::Carry, midway_carry || final_carry);
-        self.regs.set_8(Reg8::A, final_accum);
     }
 
     /// The `Inst::Sub` instruction
     fn sub_accum(&mut self, n: Operand8) {
-        let accum = self.regs.get_8(Reg8::A);
+        let accum = self.regs.a;
         let n_val = self.get_operand_8(n);
         let (new_accum, carry) = accum.overflowing_sub(n_val);
-        self.regs.set_8(Reg8::A, new_accum);
+        self.regs.a = new_accum;
         self.set_flag(Flag::Zero, new_accum == 0);
         self.set_flag(Flag::Sub, true);
         self.set_flag(Flag::HalfCarry, get_sub_half_carry(accum, n_val));
@@ -483,24 +480,24 @@ impl Cpu {
 
     /// The `Inst::SbcA` instruction
     fn sub_accum_with_carry(&mut self, n: Operand8) {
-        let accum = self.regs.get_8(Reg8::A);
+        let accum = self.regs.a;
         let n_val = self.get_operand_8(n);
         let carry_val = self.get_flag(Flag::Carry) as u8;
         let (midway_accum, midway_carry) = accum.overflowing_sub(n_val);
         let (final_accum, final_carry) = midway_accum.overflowing_sub(carry_val);
+        self.regs.a = final_accum;
         self.set_flag(Flag::Zero, final_accum == 0);
         self.set_flag(Flag::Sub, true);
-        let half_carry = get_sub_half_carry(accum, n_val) || get_sub_half_carry(midway_accum, carry_val);
+        let half_carry = get_sub_half_carry(accum, n_val) ||
+            get_sub_half_carry(midway_accum, carry_val);
         self.set_flag(Flag::HalfCarry, half_carry);
         self.set_flag(Flag::Carry, midway_carry || final_carry);
-        self.regs.set_8(Reg8::A, final_accum);
     }
 
     /// The `Inst::And` instruction.
     fn and_accum(&mut self, n: Operand8) {
-        let result = self.regs.af.high & self.get_operand_8(n);
-        self.regs.af.high = result;
-        self.set_flag(Flag::Zero, result == 0);
+        self.regs.a &= self.get_operand_8(n);
+        self.set_flag(Flag::Zero, self.regs.a == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, true);
         self.set_flag(Flag::Carry, false);
@@ -508,9 +505,8 @@ impl Cpu {
 
     /// The `Inst::Xor` instruction.
     fn xor_accum(&mut self, n: Operand8) {
-        let result = self.regs.af.high ^ self.get_operand_8(n);
-        self.regs.af.high = result;
-        self.set_flag(Flag::Zero, result == 0);
+        self.regs.a ^= self.get_operand_8(n);
+        self.set_flag(Flag::Zero, self.regs.a == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, false);
@@ -518,9 +514,8 @@ impl Cpu {
 
     /// The `Inst::Or` instruction.
     fn or_accum(&mut self, n: Operand8) {
-        let result = self.regs.af.high | self.get_operand_8(n);
-        self.regs.af.high = result;
-        self.set_flag(Flag::Zero, result == 0);
+        self.regs.a |= self.get_operand_8(n);
+        self.set_flag(Flag::Zero, self.regs.a == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, false);
@@ -528,7 +523,7 @@ impl Cpu {
 
     /// The `Inst::Cp` instruction.
     fn compare_accum(&mut self, n: Operand8) {
-        let left = self.regs.af.high;
+        let left = self.regs.a;
         let right = self.get_operand_8(n);
         self.set_flag(Flag::Zero, left == right);
         self.set_flag(Flag::Sub, true);
@@ -653,7 +648,7 @@ impl Cpu {
         let carry = self.get_flag(Flag::Carry);
         let sub = self.get_flag(Flag::Sub);
 
-        let mut accum = self.regs.get_8(Reg8::A);
+        let mut accum = self.regs.a;
         let mut set_carry = false;
         let mut correction = 0;
 
@@ -672,7 +667,7 @@ impl Cpu {
             accum.wrapping_add(correction)
         };
 
-        self.regs.set_8(Reg8::A, accum);
+        self.regs.a = accum;
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, set_carry);
         self.set_flag(Flag::Zero, accum == 0);
@@ -680,7 +675,7 @@ impl Cpu {
 
     /// The `Inst::Cpl` instruction.
     fn complement_accum(&mut self) {
-        self.regs.af.high = !self.regs.af.high;
+        self.regs.a = !self.regs.a;
         self.set_flag(Flag::Sub, true);
         self.set_flag(Flag::HalfCarry, true);
     }
@@ -721,23 +716,26 @@ impl Cpu {
     }
 
     fn push_stack(&mut self, val: u16) {
-        self.regs.sp.inc(-2);
-        let addr = self.regs.sp.get();
-        self.write_mem_16(addr, val);
+        self.regs.sp -= 2u16;
+        self.write_mem_16(self.regs.sp.get(), val);
     }
 
     fn pop_stack(&mut self) -> u16 {
         let addr = self.regs.sp.get();
-        self.regs.sp.inc(2);
+        self.regs.sp += 2u16;
         self.read_mem_16(addr)
     }
 
     fn set_flag(&mut self, flag: Flag, val: bool) {
-        self.regs.af.set_bit(flag as u8, val);
+        if val {
+            self.regs.f |= 1 << flag as u8;
+        } else {
+            self.regs.f &= !(1 << flag as u8);
+        }
     }
 
     fn get_flag(&self, flag: Flag) -> bool {
-        self.regs.af.is_bit_set(flag as u8)
+        self.regs.f & (1 << flag as u8) != 0
     }
 
     /// Get the value of the given 8-bit operand.
@@ -751,20 +749,15 @@ impl Cpu {
             Operand8::MemImm(loc) => self.read_mem(loc),
             Operand8::MemReg(reg) => self.read_mem(self.regs.get_16(reg)),
             Operand8::MemHighImm(offset) => self.read_mem(0xFF00 | offset as u16),
-            Operand8::MemHighC => {
-                let offset = self.regs.get_8(Reg8::C);
-                self.read_mem(0xFF00 | offset as u16)
-            }
+            Operand8::MemHighC => self.read_mem(0xFF00 | self.regs.bc.low() as u16),
             Operand8::MemHlPostInc => {
-                let hl = self.regs.get_16(Reg16::HL);
-                let val = self.read_mem(hl);
-                self.regs.set_16(Reg16::HL, hl.wrapping_add(1));
+                let val = self.read_mem(self.regs.hl.get());
+                self.regs.hl += 1u16;
                 val
             }
             Operand8::MemHlPostDec => {
-                let hl = self.regs.get_16(Reg16::HL);
-                let val = self.read_mem(hl);
-                self.regs.set_16(Reg16::HL, hl.wrapping_sub(1));
+                let val = self.read_mem(self.regs.hl.get());
+                self.regs.hl -= 1u16;
                 val
             }
         }
@@ -779,24 +772,16 @@ impl Cpu {
             Operand8::Imm8(_) => panic!("Attempt to store to an 8-bit immediate value"),
             Operand8::Reg8(reg) => self.regs.set_8(reg, val),
             Operand8::MemImm(loc) => self.write_mem(loc, val),
-            Operand8::MemReg(reg) => {
-                let addr = self.regs.get_16(reg);
-                self.write_mem(addr, val);
-            }
+            Operand8::MemReg(reg) => self.write_mem(self.regs.get_16(reg), val),
             Operand8::MemHighImm(offset) => self.write_mem(0xFF00 | offset as u16, val),
-            Operand8::MemHighC => {
-                let offset = self.regs.get_8(Reg8::C);
-                self.write_mem(0xFF00 | offset as u16, val);
-            }
+            Operand8::MemHighC => self.write_mem(0xFF00 | self.regs.bc.low() as u16, val),
             Operand8::MemHlPostInc => {
-                let hl = self.regs.get_16(Reg16::HL);
-                self.write_mem(hl, val);
-                self.regs.set_16(Reg16::HL, hl.wrapping_add(1));
+                self.write_mem(self.regs.hl.get(), val);
+                self.regs.hl += 1u16;
             }
             Operand8::MemHlPostDec => {
-                let hl = self.regs.get_16(Reg16::HL);
-                self.write_mem(hl, val);
-                self.regs.set_16(Reg16::HL, hl.wrapping_sub(1));
+                self.write_mem(self.regs.hl.get(), val);
+                self.regs.hl -= 1u16;
             }
         }
     }

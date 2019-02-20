@@ -20,12 +20,12 @@ fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
 fn check_diff(actual: &Cpu, expected: &Cpu) -> TestResult {
     let mut err = String::new();
 
-    diff_hex("AF register", &actual.regs.af.get(), &expected.regs.af.get(), &mut err);
-    diff_hex("BC register", &actual.regs.bc.get(), &expected.regs.bc.get(), &mut err);
-    diff_hex("DE register", &actual.regs.de.get(), &expected.regs.de.get(), &mut err);
-    diff_hex("HL register", &actual.regs.hl.get(), &expected.regs.hl.get(), &mut err);
-    diff_hex("SP register", &actual.regs.sp.get(), &expected.regs.sp.get(), &mut err);
-    diff_hex("PC register", &actual.regs.pc.get(), &expected.regs.pc.get(), &mut err);
+    diff_hex("AF", &actual.regs.get_16(Reg16::AF), &expected.regs.get_16(Reg16::AF), &mut err);
+    diff_hex("BC", &actual.regs.get_16(Reg16::BC), &expected.regs.get_16(Reg16::BC), &mut err);
+    diff_hex("DE", &actual.regs.get_16(Reg16::DE), &expected.regs.get_16(Reg16::DE), &mut err);
+    diff_hex("HL", &actual.regs.get_16(Reg16::HL), &expected.regs.get_16(Reg16::HL), &mut err);
+    diff_hex("SP", &actual.regs.get_16(Reg16::SP), &expected.regs.get_16(Reg16::SP), &mut err);
+    diff_hex("PC", &actual.regs.get_16(Reg16::PC), &expected.regs.get_16(Reg16::PC), &mut err);
     diff(
         "interrupts_enabled",
         &actual.interrupts_enabled,
@@ -48,7 +48,7 @@ fn check_diff(actual: &Cpu, expected: &Cpu) -> TestResult {
     let actual_work_ram = actual.work_ram.iter();
     let expected_work_ram = expected.work_ram.iter();
     for (i, (actual_cell, expected_cell)) in actual_work_ram.zip(expected_work_ram).enumerate() {
-        let name = format!("work_ramory location 0x{:02X}", i);
+        let name = format!("work_ram location 0x{:02X}", i);
         diff_hex(&name, actual_cell, expected_cell, &mut err);
     }
 
