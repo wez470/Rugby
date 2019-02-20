@@ -728,14 +728,17 @@ impl Cpu {
 
     fn set_flag(&mut self, flag: Flag, val: bool) {
         if val {
-            self.regs.f |= 1 << flag as u8;
+            // self.regs.f |= 1 << flag as u8;
+            self.regs.f.insert(flag);
         } else {
-            self.regs.f &= !(1 << flag as u8);
+            // self.regs.f &= !(1 << flag as u8);
+            self.regs.f.remove(flag);
         }
     }
 
     fn get_flag(&self, flag: Flag) -> bool {
-        self.regs.f & (1 << flag as u8) != 0
+        // self.regs.f & (1 << flag as u8) != 0
+        self.regs.f.contains(flag)
     }
 
     /// Get the value of the given 8-bit operand.

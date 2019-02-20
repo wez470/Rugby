@@ -1,3 +1,6 @@
+use enumflags2::BitFlags;
+use enumflags2_derive::EnumFlags;
+
 #[derive(Clone, Copy, Debug)]
 pub enum Reg8 { A, B, C, D, E, H, L }
 
@@ -5,15 +8,14 @@ pub enum Reg8 { A, B, C, D, E, H, L }
 #[allow(dead_code)] // Reg16::PC is only used in tests right now.
 pub enum Reg16 { AF, BC, DE, HL, SP, PC }
 
-/// Represents bit indexes of flags in the flags register.
-// TODO(solson): Use BitFlags for this.
-#[derive(Clone, Copy, Debug)]
+/// Game Boy CPU flags, as stored in `F`, the flags register.
+#[derive(Clone, Copy, Debug, EnumFlags)]
 #[repr(u8)]
 pub enum Flag {
-    Zero = 7,
-    Sub = 6,
-    HalfCarry = 5,
-    Carry = 4,
+    Carry     = 1 << 4,
+    HalfCarry = 1 << 5,
+    Sub       = 1 << 6,
+    Zero      = 1 << 7,
 }
 
 /// Represents a 16-bit register in the Game Boy CPU.
@@ -71,7 +73,7 @@ pub struct Registers {
     pub a: u8,
 
     /// Register `F`, the low half of `AF`, also known as the flags register.
-    pub f: u8,
+    pub f: BitFlags<Flag>,
 
     /// Register `BC`. Also accessible in 8-bit halves, `B` (high) and `C` (low).
     pub bc: Register,
@@ -94,7 +96,7 @@ impl Registers {
     pub fn new() -> Self {
         Self {
             a: 0x01,
-            f: 0xB0,
+            f: Flag::Carry | Flag::HalfCarry | Flag::Zero,
             bc: Register(0x1300),
             de: Register(0xD800),
             hl: Register(0x4D01),
@@ -128,10 +130,12 @@ impl Registers {
     }
 
     pub fn set_16(&mut self, reg: Reg16, val: u16) {
-        let [low, high] = val.to_le_bytes();
         match reg {
-            // The four low bits of F, the flag register, must always be zero.
-            Reg16::AF => { self.a = high; self.f = low & 0xF0; }
+            Reg16::AF => {
+                let [low, high] = val.to_le_bytes();
+                self.a = high;
+                self.f = BitFlags::from_bits_truncate(low);
+            }
             Reg16::BC => self.bc.set(val),
             Reg16::DE => self.de.set(val),
             Reg16::HL => self.hl.set(val),
@@ -142,8 +146,7 @@ impl Registers {
 
     pub fn get_16(&self, reg: Reg16) -> u16 {
         match reg {
-            // The four low bits of F, the flag register, must always be zero.
-            Reg16::AF => u16::from_le_bytes([self.f & 0xF0, self.a]),
+            Reg16::AF => u16::from_le_bytes([self.f.bits(), self.a]),
             Reg16::BC => self.bc.get(),
             Reg16::DE => self.de.get(),
             Reg16::HL => self.hl.get(),
