@@ -243,26 +243,14 @@ impl Cpu {
             Inst::Xor(n) => self.xor_accum(n),
             Inst::Or(n) => self.or_accum(n),
             Inst::Cp(n) => self.compare_accum(n),
-            Inst::Rlc(n) => self.rotate_left_circular(n),
-            Inst::Rl(n) => self.rotate_left(n),
-            Inst::Rrc(n) => self.rotate_right_circular(n),
-            Inst::Rr(n) => self.rotate_right(n),
-            Inst::Rlca => {
-                self.rotate_left_circular(Operand8::Reg8(Reg8::A));
-                self.set_flag(Flag::Zero, false);
-            }
-            Inst::Rla => {
-                self.rotate_left(Operand8::Reg8(Reg8::A));
-                self.set_flag(Flag::Zero, false);
-            }
-            Inst::Rrca => {
-                self.rotate_right_circular(Operand8::Reg8(Reg8::A));
-                self.set_flag(Flag::Zero, false);
-            }
-            Inst::Rra => {
-                self.rotate_right(Operand8::Reg8(Reg8::A));
-                self.set_flag(Flag::Zero, false);
-            }
+            Inst::Rlc(n) => self.rotate_left_circular(n, true),
+            Inst::Rl(n) => self.rotate_left(n, true),
+            Inst::Rrc(n) => self.rotate_right_circular(n, true),
+            Inst::Rr(n) => self.rotate_right(n, true),
+            Inst::Rlca => self.rotate_left_circular(Operand8::Reg8(Reg8::A), false),
+            Inst::Rla => self.rotate_left(Operand8::Reg8(Reg8::A), false),
+            Inst::Rrca => self.rotate_right_circular(Operand8::Reg8(Reg8::A), false),
+            Inst::Rra => self.rotate_right(Operand8::Reg8(Reg8::A), false),
             Inst::Sla(n) => self.shift_left_arith(n),
             Inst::Sra(n) => self.shift_right_arith(n),
             Inst::Srl(n) => self.shift_right_logical(n),
@@ -532,46 +520,46 @@ impl Cpu {
     }
 
     /// The `Inst::Rlc` instruction.
-    fn rotate_left_circular(&mut self, n: Operand8) {
+    fn rotate_left_circular(&mut self, n: Operand8, set_zero_flag: bool) {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_left(1);
         self.set_operand_8(n, new_val);
-        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Zero, set_zero_flag && new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, old_val & 0x80 != 0);
     }
 
     /// The `Inst::Rl` instruction.
-    fn rotate_left(&mut self, n: Operand8) {
+    fn rotate_left(&mut self, n: Operand8, set_zero_flag: bool) {
         let old_val = self.get_operand_8(n);
         let old_carry = self.get_flag(Flag::Carry) as u8;
         let new_val = (old_val << 1) | old_carry;
         self.set_operand_8(n, new_val);
-        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Zero, set_zero_flag && new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, old_val & 0x80 != 0);
     }
 
     /// The `Inst::Rrc` instruction.
-    fn rotate_right_circular(&mut self, n: Operand8) {
+    fn rotate_right_circular(&mut self, n: Operand8, set_zero_flag: bool) {
         let old_val = self.get_operand_8(n);
         let new_val = old_val.rotate_right(1);
         self.set_operand_8(n, new_val);
-        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Zero, set_zero_flag && new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, old_val & 0x01 != 0);
     }
 
     /// The `Inst::Rr` instruction.
-    fn rotate_right(&mut self, n: Operand8) {
+    fn rotate_right(&mut self, n: Operand8, set_zero_flag: bool) {
         let old_val = self.get_operand_8(n);
         let old_carry = self.get_flag(Flag::Carry) as u8;
         let new_val = (old_carry << 7) | (old_val >> 1);
         self.set_operand_8(n, new_val);
-        self.set_flag(Flag::Zero, new_val == 0);
+        self.set_flag(Flag::Zero, set_zero_flag && new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
         self.set_flag(Flag::Carry, old_val & 0x01 != 0);
@@ -728,16 +716,13 @@ impl Cpu {
 
     fn set_flag(&mut self, flag: Flag, val: bool) {
         if val {
-            // self.regs.f |= 1 << flag as u8;
             self.regs.f.insert(flag);
         } else {
-            // self.regs.f &= !(1 << flag as u8);
             self.regs.f.remove(flag);
         }
     }
 
     fn get_flag(&self, flag: Flag) -> bool {
-        // self.regs.f & (1 << flag as u8) != 0
         self.regs.f.contains(flag)
     }
 
