@@ -97,9 +97,9 @@ impl Registers {
         Self {
             a: 0x01,
             f: Flag::Carry | Flag::HalfCarry | Flag::Zero,
-            bc: Register(0x1300),
-            de: Register(0xD800),
-            hl: Register(0x4D01),
+            bc: Register(0x0013),
+            de: Register(0x00D8),
+            hl: Register(0x014D),
             sp: Register(0xFFFE),
             pc: Register(0x0100),
         }
