@@ -1,13 +1,15 @@
+use crate::audio::SAMPLE_BUFFER_SIZE;
 use crate::cpu::Cpu;
 use crate::gpu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::joypad::{ButtonKey, DirKey};
 use log::info;
+use sdl2::audio::{AudioCallback, AudioSpecDesired};
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::keyboard::{Keycode, Mod};
 
 const CYCLES_PER_FRAME: usize = 69905;
-const WINDOW_SCALE: usize = 4;
+const WINDOW_SCALE: usize = 5;
 
 pub fn start_frontend(cpu: &mut Cpu) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
@@ -29,6 +31,21 @@ pub fn start_frontend(cpu: &mut Cpu) {
 
     let sdl_controllers = sdl.game_controller().expect("Failed to get SDL game controllers");
     let mut controllers = vec![];
+
+    let sdl_audio = sdl.audio().expect("Failed to access SDL audio subsystem");
+    let desired_spec = AudioSpecDesired {
+        freq: Some(22100),
+        channels: Some(1), // mono
+        samples: Some(SAMPLE_BUFFER_SIZE as u16),
+    };
+    let frontend_audio = FrontendAudio::new(&cpu);
+    let device = sdl_audio.open_playback(None, &desired_spec, |_spec| {
+        // initialize the audio callback
+        frontend_audio
+    }).unwrap();
+
+    // Start playback
+    device.resume();
 
     let mut speed_multiplier: f32 = 1.0;
     let mut paused = false;
@@ -185,3 +202,28 @@ const GAME_BOY_COLORS: [sdl2::pixels::Color; 4] = [
     sdl2::pixels::Color { r: 48,  g: 98,  b: 48, a: 0xFF },
     sdl2::pixels::Color { r: 15,  g: 56,  b: 15, a: 0xFF },
 ];
+
+struct FrontendAudio<'a> {
+    cpu: &'a Cpu,
+    last_played_pos: usize,
+}
+
+impl<'a> FrontendAudio<'a> {
+    pub fn new(cpu: &Cpu) -> FrontendAudio {
+        FrontendAudio {
+            cpu,
+            last_played_pos: 0,
+        }
+    }
+}
+
+impl<'a> AudioCallback for FrontendAudio<'a> {
+    type Channel = f32;
+
+    fn callback(&mut self, out: &mut [f32]) {
+        for i in 0..out.len() {
+            out[i] = self.cpu.audio.buffer[self.last_played_pos] / 256_f32;
+            self.last_played_pos = (self.last_played_pos + 1) % (SAMPLE_BUFFER_SIZE * 2)
+        }
+    }
+}

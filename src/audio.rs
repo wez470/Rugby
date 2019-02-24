@@ -1,12 +1,12 @@
+pub const SAMPLE_BUFFER_SIZE: usize = 1024; // Number of samples in our audio buffer
 const SAMPLE_RATE_CYCLES: usize = 95; // Number of cycles between samples to achieve at rate of 44100Hz
-const SAMPLE_BUFFER_SIZE: usize = 1024; // Number of samples in our audio buffer
 const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 
 #[derive(Clone)]
 pub struct Audio {
     channel3: Channel3,
     cycles: usize,
-    pub buffer: Box<[u8]>,
+    pub buffer: Box<[f32]>,
     curr_buffer_pos: usize,
 }
 
@@ -15,7 +15,7 @@ impl Audio {
         Audio {
             channel3: Channel3::new(),
             cycles: 0,
-            buffer: vec![0; SAMPLE_BUFFER_SIZE].into_boxed_slice(),
+            buffer: vec![0_f32; SAMPLE_BUFFER_SIZE * 2].into_boxed_slice(),
             curr_buffer_pos: 0,
         }
     }
@@ -41,8 +41,8 @@ impl Audio {
         if self.cycles >= SAMPLE_RATE_CYCLES {
             self.cycles %= SAMPLE_RATE_CYCLES;
             for i in 0..WAVE_RAM_LENGTH {
-                buffer[self.curr_buffer_pos] = self.channel3.wave_ram[i];
-                self.curr_buffer_pos = (self.curr_buffer_pos + 1) % SAMPLE_BUFFER_SIZE;
+                self.buffer[self.curr_buffer_pos] = self.channel3.wave_ram[i] as f32 * f32::from(self.channel3.volume);
+                self.curr_buffer_pos = (self.curr_buffer_pos + 1) % (SAMPLE_BUFFER_SIZE * 2);
             }
         }
     }
