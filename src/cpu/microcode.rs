@@ -31,7 +31,12 @@ pub enum MicroInst {
 
     /// Represents `reg16 = reg16 + reg8` where the `reg8` is interpreted as a signed 2's
     /// complement number.
-    AddOffset(Reg16, Reg16, Local),
+    AddOffset {
+        dest: Reg16,
+        src: Reg16,
+        offset: Local,
+        set_flags: bool,
+    },
 
     Move8(Reg8, Reg8),
     Inc8(Local),
@@ -217,7 +222,7 @@ macro_rules! jump_relative {
     ($cond:expr) => (&[
         &[Inc16(PC)],
         &[Read(RegLow(Temp), Mem::Reg(PC)), Inc16(PC), CheckCond($cond)],
-        &[AddOffset(PC, PC, RegLow(Temp))],
+        &[AddOffset { dest: PC, src: PC, offset: RegLow(Temp), set_flags: false }],
     ]);
 }
 
@@ -279,6 +284,23 @@ pub fn microcode(opcode: u8) -> &'static [&'static [MicroInst]] {
             &[Read(RegHigh(Temp), Mem::Reg(PC)), Inc16(PC)],
             &[Write(Mem::Reg(Temp), RegLow(SP)), Inc16(Temp)],
             &[Write(Mem::Reg(Temp), RegHigh(SP))],
+        ],
+
+        // `LD HL, SP+signed_imm8`
+        0xF8 => &[
+            &[Inc16(PC)],
+            &[Read(RegLow(Temp), Mem::Reg(PC)), Inc16(PC)],
+            &[AddOffset { dest: HL, src: SP, offset: RegLow(Temp), set_flags: true }],
+        ],
+
+        // `ADD SP. signed_imm8`
+        0xE8 => &[
+            &[Inc16(PC)],
+            &[Read(RegLow(Temp), Mem::Reg(PC)), Inc16(PC)],
+            &[AddOffset { dest: SP, src: SP, offset: RegLow(Temp), set_flags: true }],
+            // TODO(solson): I have no good hypothesis why this takes one more cycle than
+            // `LD HL, SP+signed_imm8`. For now, we just idle for an extra cycle.
+            &[],
         ],
 
         // `INC reg16`
@@ -442,6 +464,19 @@ pub fn microcode(opcode: u8) -> &'static [&'static [MicroInst]] {
             &[Read(Reg(A), Mem::High(RegLow(Temp)))],
         ],
 
+        // `LD (0xFF00+C), A`
+        0xE2 => &[
+            &[Inc16(PC)],
+            &[Write(Mem::High(Reg(C)), Reg(A))],
+        ],
+
+        // `LD A, (0xFF00+imm8)`
+        0xF2 => &[
+            &[Inc16(PC)],
+            &[Read(Reg(A), Mem::High(Reg(C)))],
+        ],
+
+        // TODO(solson): Merge with `accum_op`?
         // `INC reg8`
         0x04 => inc8!(B),
         0x0C => inc8!(C),
@@ -460,6 +495,22 @@ pub fn microcode(opcode: u8) -> &'static [&'static [MicroInst]] {
         0x2D => dec8!(L),
         0x3D => dec8!(A),
 
+        // TODO(solson): Merge with `accum_op_hl`?
+        // `INC (HL)`
+        0x34 => &[
+            &[Inc16(PC)],
+            &[Read(RegLow(Temp), Mem::Reg(HL)), Inc8(RegLow(Temp))],
+            &[Write(Mem::Reg(HL), RegLow(Temp))],
+        ],
+
+        // `DEC (HL)`
+        0x35 => &[
+            &[Inc16(PC)],
+            &[Read(RegLow(Temp), Mem::Reg(HL)), Dec8(RegLow(Temp))],
+            &[Write(Mem::Reg(HL), RegLow(Temp))],
+        ],
+
+        // TODO(solson): Inst names inside `` are wrong here.
         // `{ADD,SUB} A, reg8`
         // `{ADC,SBC,AND,XOR,OR,CP} reg8`
         0x80 => accum_op!(Add, B),
