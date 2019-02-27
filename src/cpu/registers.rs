@@ -6,7 +6,7 @@ pub enum Reg8 { A, B, C, D, E, H, L }
 
 #[derive(Clone, Copy, Debug)]
 #[allow(dead_code)] // Reg16::PC is only used in tests right now.
-pub enum Reg16 { AF, BC, DE, HL, SP, PC }
+pub enum Reg16 { AF, BC, DE, HL, SP, PC, Temp }
 
 /// Game Boy CPU flags, as stored in `F`, the flags register.
 #[derive(Clone, Copy, Debug, EnumFlags)]
@@ -19,7 +19,7 @@ pub enum Flag {
 }
 
 /// Represents a 16-bit register in the Game Boy CPU.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Register(u16);
 
 impl Register {
@@ -90,6 +90,14 @@ pub struct Registers {
 
     /// Register `PC`, which contains the program counter.
     pub pc: Register,
+
+    /// A virtual register used by the `microcode` module to represent data stored temporarily from
+    /// one cycle of an instruction to a later one.
+    ///
+    /// In the physical Game Boy, there is most likely not actually a single temporary reigster for
+    /// this purpose. Instead, data is likely sent to the specific functional unit that needs to
+    /// handle it next cycle, and then kept alive until then with flip-flops.
+    pub temp: Register,
 }
 
 impl Registers {
@@ -102,6 +110,7 @@ impl Registers {
             hl: Register(0x014D),
             sp: Register(0xFFFE),
             pc: Register(0x0100),
+            temp: Register::default(),
         }
     }
 
@@ -141,6 +150,7 @@ impl Registers {
             Reg16::HL => self.hl.set(val),
             Reg16::SP => self.sp.set(val),
             Reg16::PC => self.pc.set(val),
+            Reg16::Temp => self.temp.set(val),
         }
     }
 
@@ -152,6 +162,55 @@ impl Registers {
             Reg16::HL => self.hl.get(),
             Reg16::SP => self.sp.get(),
             Reg16::PC => self.pc.get(),
+            Reg16::Temp => self.temp.get(),
+        }
+    }
+
+    pub fn set_low(&mut self, reg: Reg16, val: u8) {
+        match reg {
+            Reg16::AF => self.f = BitFlags::from_bits_truncate(val),
+            Reg16::BC => self.bc.set_low(val),
+            Reg16::DE => self.de.set_low(val),
+            Reg16::HL => self.hl.set_low(val),
+            Reg16::SP => self.sp.set_low(val),
+            Reg16::PC => self.pc.set_low(val),
+            Reg16::Temp => self.temp.set_low(val),
+        }
+    }
+
+    pub fn get_low(&self, reg: Reg16) -> u8 {
+        match reg {
+            Reg16::AF => self.f.bits(),
+            Reg16::BC => self.bc.low(),
+            Reg16::DE => self.de.low(),
+            Reg16::HL => self.hl.low(),
+            Reg16::SP => self.sp.low(),
+            Reg16::PC => self.pc.low(),
+            Reg16::Temp => self.temp.low(),
+        }
+    }
+
+    pub fn set_high(&mut self, reg: Reg16, val: u8) {
+        match reg {
+            Reg16::AF => self.a = val,
+            Reg16::BC => self.bc.set_high(val),
+            Reg16::DE => self.de.set_high(val),
+            Reg16::HL => self.hl.set_high(val),
+            Reg16::SP => self.sp.set_high(val),
+            Reg16::PC => self.pc.set_high(val),
+            Reg16::Temp => self.temp.set_high(val),
+        }
+    }
+
+    pub fn get_high(&self, reg: Reg16) -> u8 {
+        match reg {
+            Reg16::AF => self.a,
+            Reg16::BC => self.bc.high(),
+            Reg16::DE => self.de.high(),
+            Reg16::HL => self.hl.high(),
+            Reg16::SP => self.sp.high(),
+            Reg16::PC => self.pc.high(),
+            Reg16::Temp => self.temp.high(),
         }
     }
 }

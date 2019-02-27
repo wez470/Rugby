@@ -150,6 +150,7 @@ macro_rules! cpu_tests {
                 $($var:ident : $var_ty:ty),* $(,)*
             ) {
                 rom = [ $( $rom:expr ),* $(,)* ] $(,)*
+                cycles = $cycles:expr,
                 $(setup $setup:tt)*
                 $(expect $expect:tt)*
             }
@@ -166,9 +167,14 @@ macro_rules! cpu_tests {
                     let (mut actual, mut expected) = setup(rom);
                     $( setup_cpu!(actual, $setup); )*
                     $( setup_cpu!(expected, $expect); )*
-                    while actual.regs.pc.get() as usize != rom_size {
-                        actual.step();
-                    }
+                    actual.step_cycles($cycles);
+                    // loop {
+                    //     actual.step();
+                    //     if actual.regs.pc.get() as usize != rom_size { break; }
+                    // }
+                    // while actual.regs.pc.get() as usize != rom_size {
+                    //     actual.step();
+                    // }
                     check_diff(&actual, &expected)
                 }
             }
@@ -190,6 +196,7 @@ fn high(x: u16) -> u8 {
 cpu_tests! {
     test_nop() {
         rom = [0x00], // nop
+        cycles = 4,
     }
 
     test_ld_reg8_imm8(a: u8, b: u8, c: u8, d: u8, e: u8, h: u8, l: u8) {
@@ -202,6 +209,7 @@ cpu_tests! {
             0x26, h, // ld h, $h
             0x2E, l, // ld l, $l
         ],
+        cycles = 14 * 4,
         setup  { reg8 { A = 0, B = 0, C = 0, D = 0, E = 0, H = 0, L = 0 } }
         expect { reg8 { A = a, B = b, C = c, D = d, E = e, H = h, L = l } }
     }
@@ -213,15 +221,17 @@ cpu_tests! {
             0x21, low(hl), high(hl), // ld hl, $hl
             0x31, low(sp), high(sp), // ld sp, $sp
         ],
+        cycles = 12 * 4,
         setup  { reg16 { BC = 0,  DE = 0,  HL = 0,  SP = 0 } }
         expect { reg16 { BC = bc, DE = de, HL = hl, SP = sp } }
     }
 
-    test_jp_imm16_unconditional() {
+    test_jp_unconditional() {
         // Test that we can jump past a halt instruction without stopping.
         rom = [
             0xC3, 0x04, 0x00, // jp 0x0004
             0x76,             // halt
         ],
+        cycles = 4 * 4,
     }
 }
