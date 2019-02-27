@@ -6,7 +6,7 @@ use crate::joypad::Joypad;
 use crate::timer::Timer;
 use enumflags2::BitFlags;
 use log::{debug, info, log_enabled, trace, warn};
-use self::inst::{Cond, Inst, Operand16, Operand8};
+use self::inst::Cond;
 use self::microcode::MicroInst;
 use self::registers::{Flag, Reg16, Reg8, Registers};
 use std::slice;
@@ -153,6 +153,7 @@ impl Cpu {
                 self.decode_cb_prefixed = false;
                 microcode::microcode_cb_prefixed(opcode).iter()
             } else {
+                trace!("PC=0x{:04X}: starting instruction 0x{:02X}", self.regs.pc.get(), opcode);
                 microcode::microcode(opcode).iter()
             };
             // dbg!(opcode);
@@ -253,11 +254,8 @@ impl Cpu {
             Inc16(reg) => self.regs.set_16(reg, self.regs.get_16(reg).wrapping_add(1)),
             Dec16(reg) => self.regs.set_16(reg, self.regs.get_16(reg).wrapping_sub(1)),
             AddHl(reg) => self.add_hl(reg),
-
-            AddOffset(dest, src, offset) => {
-                let offset_val = self.get_local(offset) as i16 as u16;
-                self.regs.set_16(dest, self.regs.get_16(src).wrapping_add(offset_val));
-            }
+            AddOffset { dest, src, offset, set_flags } =>
+                self.add_offset(dest, src, offset, set_flags),
 
             Move8(dest, src) => self.regs.set_8(dest, self.regs.get_8(src)),
             Inc8(reg) => self.inc_8(reg),
@@ -382,120 +380,138 @@ impl Cpu {
     //     }
     // }
 
-    /// The `Inst::Jp` instruction.
-    ///
-    /// Jump to the specified address if the condition is met.
-    fn jump(&mut self, addr: Operand16, cond: Cond) {
-        let addr_val = self.get_operand_16(addr);
-        if self.check_cond_and_update_cycles(cond) {
-            // TODO(solson): Deduplicate this code with the block in `call`.
-            if log_enabled!(log::Level::Trace) {
-                if let Some(symbols) = &self.debug_symbols {
-                    let rom_addr = crate::wla_symbols::RomAddr { bank: 1, addr: addr_val };
-                    match symbols.labels.get(&rom_addr) {
-                        Some(name) => trace!("tailcalling function {} at 0x{:04X}", name, addr_val),
-                        None => trace!("tailcalling unknown function at 0x{:04X}", addr_val)
-                    }
-                }
-            }
+    // /// The `Inst::Jp` instruction.
+    // ///
+    // /// Jump to the specified address if the condition is met.
+    // fn jump(&mut self, addr: Operand16, cond: Cond) {
+    //     let addr_val = self.get_operand_16(addr);
+    //     if self.check_cond_and_update_cycles(cond) {
+    //         // TODO(solson): Deduplicate this code with the block in `call`.
+    //         if log_enabled!(log::Level::Trace) {
+    //             if let Some(symbols) = &self.debug_symbols {
+    //                 let rom_addr = crate::wla_symbols::RomAddr { bank: 1, addr: addr_val };
+    //                 match symbols.labels.get(&rom_addr) {
+    //                     Some(name) => trace!("tailcalling function {} at 0x{:04X}", name, addr_val),
+    //                     None => trace!("tailcalling unknown function at 0x{:04X}", addr_val)
+    //                 }
+    //             }
+    //         }
+    //         self.regs.pc.set(addr_val);
+    //     }
+    // }
 
-            self.regs.pc.set(addr_val);
-        }
-    }
+    // /// The `Inst::Jr` instruction.
+    // ///
+    // /// Increment the program counter by the given offset if the condition is met.
+    // fn jump_relative(&mut self, offset: i8, cond: Cond) {
+    //     if self.check_cond_and_update_cycles(cond) {
+    //         self.regs.pc += offset;
+    //     }
+    // }
 
-    /// The `Inst::Jr` instruction.
-    ///
-    /// Increment the program counter by the given offset if the condition is met.
-    fn jump_relative(&mut self, offset: i8, cond: Cond) {
-        if self.check_cond_and_update_cycles(cond) {
-            self.regs.pc += offset;
-        }
-    }
+    // /// The `Inst::Call` instruction.
+    // ///
+    // /// Call a subroutine if the condition is met.
+    // fn call(&mut self, fn_addr: u16, cond: Cond) {
+    //     if self.check_cond_and_update_cycles(cond) {
+    //         if log_enabled!(log::Level::Trace) {
+    //             if let Some(symbols) = &self.debug_symbols {
+    //                 // TODO(solson): Fix this harded bank number. (It's not exactly clear to me how
+    //                 // to interpret the WLA DX symbol file bank numbers yet.)
+    //                 let rom_addr = crate::wla_symbols::RomAddr { bank: 1, addr: fn_addr };
+    //                 match symbols.labels.get(&rom_addr) {
+    //                     Some(name) => trace!("calling function {} at 0x{:04X}", name, fn_addr),
+    //                     None => trace!("calling unknown function at 0x{:04X}", fn_addr)
+    //                 }
+    //             }
+    //         }
+    //         // The return address is the address of the instruction after the call.
+    //         self.push_stack(self.regs.pc.get());
+    //         self.regs.pc.set(fn_addr);
+    //     }
+    // }
 
-    /// The `Inst::Call` instruction.
-    ///
-    /// Call a subroutine if the condition is met.
-    fn call(&mut self, fn_addr: u16, cond: Cond) {
-        if self.check_cond_and_update_cycles(cond) {
-            if log_enabled!(log::Level::Trace) {
-                if let Some(symbols) = &self.debug_symbols {
-                    // TODO(solson): Fix this harded bank number. (It's not exactly clear to me how
-                    // to interpret the WLA DX symbol file bank numbers yet.)
-                    let rom_addr = crate::wla_symbols::RomAddr { bank: 1, addr: fn_addr };
-                    match symbols.labels.get(&rom_addr) {
-                        Some(name) => trace!("calling function {} at 0x{:04X}", name, fn_addr),
-                        None => trace!("calling unknown function at 0x{:04X}", fn_addr)
-                    }
-                }
-            }
+    // /// The `Inst::Rst` instruction.
+    // ///
+    // /// Call the "restart" function at the given address.
+    // fn call_restart(&mut self, addr: u8) {
+    //     // TODO(solson): Use `call` function?
+    //     self.push_stack(self.regs.pc.get());
+    //     self.regs.pc.set(addr as u16);
+    // }
 
-            // The return address is the address of the instruction after the call.
-            self.push_stack(self.regs.pc.get());
-            self.regs.pc.set(fn_addr);
-        }
-    }
+    // /// The `Inst::Ret` instruction.
+    // fn ret(&mut self, cond: Cond) {
+    //     if self.check_cond_and_update_cycles(cond) {
+    //         let return_addr = self.pop_stack();
+    //         self.regs.pc.set(return_addr);
+    //     }
+    // }
 
-    /// The `Inst::Rst` instruction.
-    ///
-    /// Call the "restart" function at the given address.
-    fn call_restart(&mut self, addr: u8) {
-        // TODO(solson): Use `call` function?
-        self.push_stack(self.regs.pc.get());
-        self.regs.pc.set(addr as u16);
-    }
+    // /// The `Inst::Push` instruction.
+    // fn push(&mut self, reg: Reg16) {
+    //     self.push_stack(self.regs.get_16(reg));
+    // }
 
-    /// The `Inst::Ret` instruction.
-    fn ret(&mut self, cond: Cond) {
-        if self.check_cond_and_update_cycles(cond) {
-            let return_addr = self.pop_stack();
-            self.regs.pc.set(return_addr);
-        }
-    }
+    // /// The `Inst::Pop` instruction.
+    // fn pop(&mut self, reg: Reg16) {
+    //     let val = self.pop_stack();
+    //     self.regs.set_16(reg, val);
+    // }
 
-    /// The `Inst::Push` instruction.
-    fn push(&mut self, reg: Reg16) {
-        self.push_stack(self.regs.get_16(reg));
-    }
+    // /// The 8-bit `Inst::Ld` instruction.
+    // ///
+    // /// Move 8 bits from `src` and store them into `dest`.
+    // fn move_8(&mut self, dest: Operand8, src: Operand8) {
+    //     let val = self.get_operand_8(src);
+    //     self.set_operand_8(dest, val);
+    // }
 
-    /// The `Inst::Pop` instruction.
-    fn pop(&mut self, reg: Reg16) {
-        let val = self.pop_stack();
-        self.regs.set_16(reg, val);
-    }
+    // /// The 16-bit `Inst::Ld` instruction.
+    // ///
+    // /// Move 16 bits from `src` and store them into `dest`.
+    // fn move_16(&mut self, dest: Operand16, src: Operand16) {
+    //     self.set_operand_16(dest, self.get_operand_16(src));
+    // }
 
-    /// The 8-bit `Inst::Ld` instruction.
-    ///
-    /// Move 8 bits from `src` and store them into `dest`.
-    fn move_8(&mut self, dest: Operand8, src: Operand8) {
-        let val = self.get_operand_8(src);
-        self.set_operand_8(dest, val);
-    }
+    // /// The `Inst::LdHlSp` and `Inst::AddSp` instructions.
+    // ///
+    // /// Loads the stack pointer plus an 8-bit signed value into the specified register.
+    // fn load_stack_addr_into_reg(&mut self, offset: i8, dest: Reg16) {
+    //     let sp = self.regs.sp.get();
+    //     let val = (sp as i32 + offset as i32) as u16;
+    //     self.regs.set_16(dest, val);
+    //     self.set_flag(Flag::Zero, false);
+    //     self.set_flag(Flag::Sub, false);
+    //     // TODO(wcarlson): Potential bugs in this section. Unsure if these implementations are
+    //     // correct
+    //     warn!("executing LdHlSp or AddSp which may be buggy");
+    //     if offset >= 0 {
+    //         self.set_flag(Flag::HalfCarry, get_add_half_carry((sp & 0xFF) as u8, offset as u8));
+    //         self.set_flag(Flag::Carry, (sp & 0xFF) as u16 + offset as u16 > 0xFF);
+    //     } else {
+    //         self.set_flag(Flag::HalfCarry, get_sub_half_carry((val & 0xFF) as u8, (sp & 0xFF) as u8));
+    //         self.set_flag(Flag::Carry, (val & 0xFF) <= (sp & 0xFF)); // Uncertain about this
+    //     }
+    // }
 
-    /// The 16-bit `Inst::Ld` instruction.
-    ///
-    /// Move 16 bits from `src` and store them into `dest`.
-    fn move_16(&mut self, dest: Operand16, src: Operand16) {
-        self.set_operand_16(dest, self.get_operand_16(src));
-    }
-
-    /// The `Inst::LdHlSp` and `Inst::AddSp` instructions.
-    ///
-    /// Loads the stack pointer plus an 8-bit signed value into the specified register.
-    fn load_stack_addr_into_reg(&mut self, offset: i8, dest: Reg16) {
-        let sp = self.regs.sp.get();
-        let val = (sp as i32 + offset as i32) as u16;
+    fn add_offset(&mut self, dest: Reg16, src: Reg16, offset: microcode::Local, set_flags: bool) {
+        let lhs = self.regs.get_16(src);
+        let rhs = self.get_local(offset) as i8;
+        let val = (lhs as i32 + rhs as i32) as u16;
         self.regs.set_16(dest, val);
+        if !set_flags { return; }
         self.set_flag(Flag::Zero, false);
         self.set_flag(Flag::Sub, false);
         // TODO(wcarlson): Potential bugs in this section. Unsure if these implementations are
         // correct
         warn!("executing LdHlSp or AddSp which may be buggy");
-        if offset >= 0 {
-            self.set_flag(Flag::HalfCarry, get_add_half_carry((sp & 0xFF) as u8, offset as u8));
-            self.set_flag(Flag::Carry, (sp & 0xFF) as u16 + offset as u16 > 0xFF);
+        if rhs >= 0 {
+            self.set_flag(Flag::HalfCarry, get_add_half_carry(lhs as u8, rhs as u8));
+            self.set_flag(Flag::Carry, (lhs & 0xFF) as u16 + rhs as u16 > 0xFF);
         } else {
-            self.set_flag(Flag::HalfCarry, get_sub_half_carry((val & 0xFF) as u8, (sp & 0xFF) as u8));
-            self.set_flag(Flag::Carry, (val & 0xFF) <= (sp & 0xFF)); // Uncertain about this
+            self.set_flag(Flag::HalfCarry, get_sub_half_carry(val as u8, lhs as u8));
+            self.set_flag(Flag::Carry, (val & 0xFF) <= (lhs & 0xFF)); // Uncertain about this
         }
     }
 
@@ -519,17 +535,17 @@ impl Cpu {
         self.set_flag(Flag::HalfCarry, get_sub_half_carry(old_val, 1));
     }
 
-    /// The 16-bit `Inst::Inc` instruction.
-    fn inc_16(&mut self, n: Reg16) {
-        let val = self.regs.get_16(n).wrapping_add(1);
-        self.regs.set_16(n, val);
-    }
+    // /// The 16-bit `Inst::Inc` instruction.
+    // fn inc_16(&mut self, n: Reg16) {
+    //     let val = self.regs.get_16(n).wrapping_add(1);
+    //     self.regs.set_16(n, val);
+    // }
 
-    /// The 16-bit `Inst::Dec` instruction.
-    fn dec_16(&mut self, n: Reg16) {
-        let val = self.regs.get_16(n).wrapping_sub(1);
-        self.regs.set_16(n, val);
-    }
+    // /// The 16-bit `Inst::Dec` instruction.
+    // fn dec_16(&mut self, n: Reg16) {
+    //     let val = self.regs.get_16(n).wrapping_sub(1);
+    //     self.regs.set_16(n, val);
+    // }
 
     /// The `Inst::AddA` instruction
     fn add_accum(&mut self, n: microcode::Local) {
@@ -799,15 +815,15 @@ impl Cpu {
         self.set_flag(Flag::Carry, true);
     }
 
-    /// If the given condition is met, increment the cycle count accordingly and return true.
-    fn check_cond_and_update_cycles(&mut self, cond: Cond) -> bool {
-        let condition_met = self.is_cond_met(cond);
-        if condition_met {
-            unimplemented!();
-            // self.cycles += inst::CONDITIONAL_CYCLES[self.current_opcode as usize];
-        }
-        condition_met
-    }
+    // /// If the given condition is met, increment the cycle count accordingly and return true.
+    // fn check_cond_and_update_cycles(&mut self, cond: Cond) -> bool {
+    //     let condition_met = self.is_cond_met(cond);
+    //     if condition_met {
+    //         unimplemented!();
+    //         // self.cycles += inst::CONDITIONAL_CYCLES[self.current_opcode as usize];
+    //     }
+    //     condition_met
+    // }
 
     /// Return true if the given condition is met.
     fn is_cond_met(&self, cond: Cond) -> bool {
@@ -825,11 +841,11 @@ impl Cpu {
         self.write_mem_16(self.regs.sp.get(), val);
     }
 
-    fn pop_stack(&mut self) -> u16 {
-        let addr = self.regs.sp.get();
-        self.regs.sp += 2u16;
-        self.read_mem_16(addr)
-    }
+    // fn pop_stack(&mut self) -> u16 {
+    //     let addr = self.regs.sp.get();
+    //     self.regs.sp += 2u16;
+    //     self.read_mem_16(addr)
+    // }
 
     fn set_flag(&mut self, flag: Flag, val: bool) {
         if val {
@@ -843,69 +859,69 @@ impl Cpu {
         self.regs.f.contains(flag)
     }
 
-    /// Get the value of the given 8-bit operand.
-    ///
-    /// NOTE: Accessing some operands has side effects, so you should not call this twice on a
-    /// given operand.
-    fn get_operand_8(&mut self, src: Operand8) -> u8 {
-        match src {
-            Operand8::Imm8(val) => val,
-            Operand8::Reg8(reg) => self.regs.get_8(reg),
-            Operand8::MemImm(loc) => self.read_mem(loc),
-            Operand8::MemReg(reg) => self.read_mem(self.regs.get_16(reg)),
-            Operand8::MemHighImm(offset) => self.read_mem(0xFF00 | offset as u16),
-            Operand8::MemHighC => self.read_mem(0xFF00 | self.regs.bc.low() as u16),
-            Operand8::MemHlPostInc => {
-                let val = self.read_mem(self.regs.hl.get());
-                self.regs.hl += 1u16;
-                val
-            }
-            Operand8::MemHlPostDec => {
-                let val = self.read_mem(self.regs.hl.get());
-                self.regs.hl -= 1u16;
-                val
-            }
-        }
-    }
+    // /// Get the value of the given 8-bit operand.
+    // ///
+    // /// NOTE: Accessing some operands has side effects, so you should not call this twice on a
+    // /// given operand.
+    // fn get_operand_8(&mut self, src: Operand8) -> u8 {
+    //     match src {
+    //         Operand8::Imm8(val) => val,
+    //         Operand8::Reg8(reg) => self.regs.get_8(reg),
+    //         Operand8::MemImm(loc) => self.read_mem(loc),
+    //         Operand8::MemReg(reg) => self.read_mem(self.regs.get_16(reg)),
+    //         Operand8::MemHighImm(offset) => self.read_mem(0xFF00 | offset as u16),
+    //         Operand8::MemHighC => self.read_mem(0xFF00 | self.regs.bc.low() as u16),
+    //         Operand8::MemHlPostInc => {
+    //             let val = self.read_mem(self.regs.hl.get());
+    //             self.regs.hl += 1u16;
+    //             val
+    //         }
+    //         Operand8::MemHlPostDec => {
+    //             let val = self.read_mem(self.regs.hl.get());
+    //             self.regs.hl -= 1u16;
+    //             val
+    //         }
+    //     }
+    // }
 
-    /// Set the value of the given 8-bit operand.
-    ///
-    /// NOTE: Accessing some operands has side effects, so you should not call this twice on a
-    /// given operand.
-    fn set_operand_8(&mut self, dest: Operand8, val: u8) {
-        match dest {
-            Operand8::Imm8(_) => panic!("Attempt to store to an 8-bit immediate value"),
-            Operand8::Reg8(reg) => self.regs.set_8(reg, val),
-            Operand8::MemImm(loc) => self.write_mem(loc, val),
-            Operand8::MemReg(reg) => self.write_mem(self.regs.get_16(reg), val),
-            Operand8::MemHighImm(offset) => self.write_mem(0xFF00 | offset as u16, val),
-            Operand8::MemHighC => self.write_mem(0xFF00 | self.regs.bc.low() as u16, val),
-            Operand8::MemHlPostInc => {
-                self.write_mem(self.regs.hl.get(), val);
-                self.regs.hl += 1u16;
-            }
-            Operand8::MemHlPostDec => {
-                self.write_mem(self.regs.hl.get(), val);
-                self.regs.hl -= 1u16;
-            }
-        }
-    }
+    // /// Set the value of the given 8-bit operand.
+    // ///
+    // /// NOTE: Accessing some operands has side effects, so you should not call this twice on a
+    // /// given operand.
+    // fn set_operand_8(&mut self, dest: Operand8, val: u8) {
+    //     match dest {
+    //         Operand8::Imm8(_) => panic!("Attempt to store to an 8-bit immediate value"),
+    //         Operand8::Reg8(reg) => self.regs.set_8(reg, val),
+    //         Operand8::MemImm(loc) => self.write_mem(loc, val),
+    //         Operand8::MemReg(reg) => self.write_mem(self.regs.get_16(reg), val),
+    //         Operand8::MemHighImm(offset) => self.write_mem(0xFF00 | offset as u16, val),
+    //         Operand8::MemHighC => self.write_mem(0xFF00 | self.regs.bc.low() as u16, val),
+    //         Operand8::MemHlPostInc => {
+    //             self.write_mem(self.regs.hl.get(), val);
+    //             self.regs.hl += 1u16;
+    //         }
+    //         Operand8::MemHlPostDec => {
+    //             self.write_mem(self.regs.hl.get(), val);
+    //             self.regs.hl -= 1u16;
+    //         }
+    //     }
+    // }
 
-    fn get_operand_16(&self, src: Operand16) -> u16 {
-        match src {
-            Operand16::Imm16(val) => val,
-            Operand16::Reg16(reg) => self.regs.get_16(reg),
-            Operand16::MemImm16(_) => panic!("no Game Boy CPU instruction actually uses this"),
-        }
-    }
+    // fn get_operand_16(&self, src: Operand16) -> u16 {
+    //     match src {
+    //         Operand16::Imm16(val) => val,
+    //         Operand16::Reg16(reg) => self.regs.get_16(reg),
+    //         Operand16::MemImm16(_) => panic!("no Game Boy CPU instruction actually uses this"),
+    //     }
+    // }
 
-    fn set_operand_16(&mut self, dest: Operand16, val: u16) {
-        match dest {
-            Operand16::Imm16(_) => panic!("Attempt to store to a 16-bit immediate value"),
-            Operand16::Reg16(reg) => self.regs.set_16(reg, val),
-            Operand16::MemImm16(addr) => self.write_mem_16(addr, val),
-        }
-    }
+    // fn set_operand_16(&mut self, dest: Operand16, val: u16) {
+    //     match dest {
+    //         Operand16::Imm16(_) => panic!("Attempt to store to a 16-bit immediate value"),
+    //         Operand16::Reg16(reg) => self.regs.set_16(reg, val),
+    //         Operand16::MemImm16(addr) => self.write_mem_16(addr, val),
+    //     }
+    // }
 
     fn read_mem(&self, addr: u16) -> u8 {
         match addr {
@@ -1029,11 +1045,11 @@ impl Cpu {
         }
     }
 
-    fn read_mem_16(&mut self, addr: u16) -> u16 {
-        let low = self.read_mem(addr);
-        let high = self.read_mem(addr.wrapping_add(1));
-        u16::from_le_bytes([low, high])
-    }
+    // fn read_mem_16(&mut self, addr: u16) -> u16 {
+    //     let low = self.read_mem(addr);
+    //     let high = self.read_mem(addr.wrapping_add(1));
+    //     u16::from_le_bytes([low, high])
+    // }
 
     fn write_mem_16(&mut self, addr: u16, val: u16) {
         let [low, high] = val.to_le_bytes();
