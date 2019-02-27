@@ -8,7 +8,7 @@ use crate::cpu::{Reg8, Reg16};
 /// `CONDITIONAL_CYCLES` below).
 ///
 /// `0xCB`-prefixed instructions are handled by a separate table.
-pub const BASE_CYCLES: [usize; 0x100] = [
+pub static BASE_CYCLES: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      4, 12,  8,  8,  4,  4,  8,  4, 20,  8,  8,  8,  4,  4,  8,  4, // 0
      4, 12,  8,  8,  4,  4,  8,  4, 12,  8,  8,  8,  4,  4,  8,  4, // 1
@@ -32,7 +32,7 @@ pub const BASE_CYCLES: [usize; 0x100] = [
 ///
 /// For example, `JP Z, a16` will have cycles added based on this table only if the zero flag is
 /// set, which causes it to actually jump.
-pub const CONDITIONAL_CYCLES: [usize; 0x100] = [
+pub static CONDITIONAL_CYCLES: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 0
      0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0, // 1
@@ -53,7 +53,7 @@ pub const CONDITIONAL_CYCLES: [usize; 0x100] = [
 ];
 
 /// The number of cycles taken by each `0xCB`-prefixed instruction. These are never conditional.
-pub const PREFIX_CB_BASE_CYCLES: [usize; 0x100] = [
+pub static PREFIX_CB_BASE_CYCLES: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 0
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 1
@@ -79,7 +79,7 @@ pub const PREFIX_CB_BASE_CYCLES: [usize; 0x100] = [
 ///
 /// NOTE: The original reference we used claimed 0xE2 and 0xF2 had length 2, but empirically they
 /// seem to be length 1.
-pub const INSTRUCTION_LENGTH: [usize; 0x100] = [
+pub static INSTRUCTION_LENGTH: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      1,  3,  1,  1,  1,  1,  2,  1,  3,  1,  1,  1,  1,  1,  2,  1, // 0
      2,  3,  1,  1,  1,  1,  2,  1,  2,  1,  1,  1,  1,  1,  2,  1, // 1
@@ -147,7 +147,7 @@ pub enum Operand16 {
 }
 
 /// Represents the condition checked by a conditional instruction (JP, JR, RET, or CALL).
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Cond {
     /// Unconditional.
     None,
@@ -217,7 +217,7 @@ pub enum Inst {
     /// `LD x, x`: 8-bit loads, stores, and moves.
     Ld8(Operand8, Operand8),
 
-    /// `LD xx, xx`: 8-bit loads, stores, and moves.
+    /// `LD xx, xx`: 16-bit loads, stores, and moves.
     Ld16(Operand16, Operand16),
 
     /// `LD HL, SP+x`: Add signed 8-bit immediate to stack pointer and store the result in HL.
@@ -395,21 +395,84 @@ impl Inst {
 
         match *bytes {
             [0x00] => Nop,
+
             [0x01, low, high] => Ld16(Reg16(BC), Imm16(u16::from_le_bytes([low, high]))),
-            [0x02] => Ld8(MemReg(BC), Reg8(A)),
-            [0x03] => Inc16(Reg16(BC)),
-            [0x04] => Inc8(Reg8(B)),
-            [0x05] => Dec8(Reg8(B)),
-            [0x06, val] => Ld8(Reg8(B), Imm8(val)),
-            [0x07] => Rlca,
+            [0x11, low, high] => Ld16(Reg16(DE), Imm16(u16::from_le_bytes([low, high]))),
+            [0x21, low, high] => Ld16(Reg16(HL), Imm16(u16::from_le_bytes([low, high]))),
+            [0x31, low, high] => Ld16(Reg16(SP), Imm16(u16::from_le_bytes([low, high]))),
+
             [0x08, low, high] => Ld16(MemImm16(u16::from_le_bytes([low, high])), Reg16(SP)),
-            [0x09] => AddHl(Reg16(BC)),
+
+            [0x02] => Ld8(MemReg(BC), Reg8(A)),
+            [0x12] => Ld8(MemReg(DE), Reg8(A)),
             [0x0A] => Ld8(Reg8(A), MemReg(BC)),
+            [0x1A] => Ld8(Reg8(A), MemReg(DE)),
+
+            [0x03] => Inc16(Reg16(BC)),
+            [0x13] => Inc16(Reg16(DE)),
+            [0x23] => Inc16(Reg16(HL)),
+            [0x33] => Inc16(Reg16(SP)),
+
             [0x0B] => Dec16(Reg16(BC)),
+            [0x1B] => Dec16(Reg16(DE)),
+            [0x2B] => Dec16(Reg16(HL)),
+            [0x3B] => Dec16(Reg16(SP)),
+
+            [0x04] => Inc8(Reg8(B)),
             [0x0C] => Inc8(Reg8(C)),
+            [0x14] => Inc8(Reg8(D)),
+            [0x1C] => Inc8(Reg8(E)),
+            [0x24] => Inc8(Reg8(H)),
+            [0x2C] => Inc8(Reg8(L)),
+            [0x34] => Inc8(MemReg(HL)),
+            [0x3C] => Inc8(Reg8(A)),
+
+            [0x05] => Dec8(Reg8(B)),
             [0x0D] => Dec8(Reg8(C)),
+            [0x15] => Dec8(Reg8(D)),
+            [0x1D] => Dec8(Reg8(E)),
+            [0x25] => Dec8(Reg8(H)),
+            [0x2D] => Dec8(Reg8(L)),
+            [0x35] => Dec8(MemReg(HL)),
+            [0x3D] => Dec8(Reg8(A)),
+
+            [0x06, val] => Ld8(Reg8(B), Imm8(val)),
             [0x0E, val] => Ld8(Reg8(C), Imm8(val)),
+            [0x16, val] => Ld8(Reg8(D), Imm8(val)),
+            [0x1E, val] => Ld8(Reg8(E), Imm8(val)),
+            [0x26, val] => Ld8(Reg8(H), Imm8(val)),
+            [0x2E, val] => Ld8(Reg8(L), Imm8(val)),
+            [0x36, val] => Ld8(MemReg(HL), Imm8(val)),
+            [0x3E, val] => Ld8(Reg8(A), Imm8(val)),
+
+            [0x22] => Ld8(MemHlPostInc, Reg8(A)),
+            [0x32] => Ld8(MemHlPostDec, Reg8(A)),
+            [0x2A] => Ld8(Reg8(A), MemHlPostInc),
+            [0x3A] => Ld8(Reg8(A), MemHlPostDec),
+
+            [0xE0, addr] => Ld8(MemHighImm(addr), Reg8(A)),
+            [0xF0, addr] => Ld8(Reg8(A), MemHighImm(addr)),
+
+            [0xE2] => Ld8(MemHighC, Reg8(A)),
+            [0xF2] => Ld8(Reg8(A), MemHighC),
+
+            [0xEA, low, high] => Ld8(MemImm(u16::from_le_bytes([low, high])), Reg8(A)),
+            [0xFA, low, high] => Ld8(Reg8(A), MemImm(u16::from_le_bytes([low, high]))),
+
+            [0x07] => Rlca,
             [0x0F] => Rrca,
+            [0x17] => Rla,
+            [0x1F] => Rra,
+            [0x27] => Daa,
+            [0x2F] => Cpl,
+            [0x37] => Scf,
+            [0x3F] => Ccf,
+
+            [0x09] => AddHl(Reg16(BC)),
+            [0x19] => AddHl(Reg16(DE)),
+            [0x29] => AddHl(Reg16(HL)),
+            [0x39] => AddHl(Reg16(SP)),
+
             [0x10, zero] => {
                 // FIXME(solson): A valid STOP instruction must be followed by 0x00 according to
                 // the manual. I think I read that it has slightly different behaviour if it is
@@ -419,53 +482,15 @@ impl Inst {
                 }
                 Stop
             }
-            [0x11, low, high] => Ld16(Reg16(DE), Imm16(u16::from_le_bytes([low, high]))),
-            [0x12] => Ld8(MemReg(DE), Reg8(A)),
-            [0x13] => Inc16(Reg16(DE)),
-            [0x14] => Inc8(Reg8(D)),
-            [0x15] => Dec8(Reg8(D)),
-            [0x16, val] => Ld8(Reg8(D), Imm8(val)),
-            [0x17] => Rla,
+
+            [0x76] => Halt,
+
             [0x18, offset] => Jr(offset as i8, Cond::None),
-            [0x19] => AddHl(Reg16(DE)),
-            [0x1A] => Ld8(Reg8(A), MemReg(DE)),
-            [0x1B] => Dec16(Reg16(DE)),
-            [0x1C] => Inc8(Reg8(E)),
-            [0x1D] => Dec8(Reg8(E)),
-            [0x1E, val] => Ld8(Reg8(E), Imm8(val)),
-            [0x1F] => Rra,
             [0x20, offset] => Jr(offset as i8, Cond::NotZero),
-            [0x21, low, high] => Ld16(Reg16(HL), Imm16(u16::from_le_bytes([low, high]))),
-            [0x22] => Ld8(MemHlPostInc, Reg8(A)),
-            [0x23] => Inc16(Reg16(HL)),
-            [0x24] => Inc8(Reg8(H)),
-            [0x25] => Dec8(Reg8(H)),
-            [0x26, val] => Ld8(Reg8(H), Imm8(val)),
-            [0x27] => Daa,
             [0x28, offset] => Jr(offset as i8, Cond::Zero),
-            [0x29] => AddHl(Reg16(HL)),
-            [0x2A] => Ld8(Reg8(A), MemHlPostInc),
-            [0x2B] => Dec16(Reg16(HL)),
-            [0x2C] => Inc8(Reg8(L)),
-            [0x2D] => Dec8(Reg8(L)),
-            [0x2E, val] => Ld8(Reg8(L), Imm8(val)),
-            [0x2F] => Cpl,
             [0x30, offset] => Jr(offset as i8, Cond::NotCarry),
-            [0x31, low, high] => Ld16(Reg16(SP), Imm16(u16::from_le_bytes([low, high]))),
-            [0x32] => Ld8(MemHlPostDec, Reg8(A)),
-            [0x33] => Inc16(Reg16(SP)),
-            [0x34] => Inc8(MemReg(HL)),
-            [0x35] => Dec8(MemReg(HL)),
-            [0x36, val] => Ld8(MemReg(HL), Imm8(val)),
-            [0x37] => Scf,
             [0x38, offset] => Jr(offset as i8, Cond::Carry),
-            [0x39] => AddHl(Reg16(SP)),
-            [0x3A] => Ld8(Reg8(A), MemHlPostDec),
-            [0x3B] => Dec16(Reg16(SP)),
-            [0x3C] => Inc8(Reg8(A)),
-            [0x3D] => Dec8(Reg8(A)),
-            [0x3E, val] => Ld8(Reg8(A), Imm8(val)),
-            [0x3F] => Ccf,
+
             [0x40] => Ld8(Reg8(B), Reg8(B)),
             [0x41] => Ld8(Reg8(B), Reg8(C)),
             [0x42] => Ld8(Reg8(B), Reg8(D)),
@@ -474,6 +499,7 @@ impl Inst {
             [0x45] => Ld8(Reg8(B), Reg8(L)),
             [0x46] => Ld8(Reg8(B), MemReg(HL)),
             [0x47] => Ld8(Reg8(B), Reg8(A)),
+
             [0x48] => Ld8(Reg8(C), Reg8(B)),
             [0x49] => Ld8(Reg8(C), Reg8(C)),
             [0x4A] => Ld8(Reg8(C), Reg8(D)),
@@ -482,6 +508,7 @@ impl Inst {
             [0x4D] => Ld8(Reg8(C), Reg8(L)),
             [0x4E] => Ld8(Reg8(C), MemReg(HL)),
             [0x4F] => Ld8(Reg8(C), Reg8(A)),
+
             [0x50] => Ld8(Reg8(D), Reg8(B)),
             [0x51] => Ld8(Reg8(D), Reg8(C)),
             [0x52] => Ld8(Reg8(D), Reg8(D)),
@@ -490,6 +517,7 @@ impl Inst {
             [0x55] => Ld8(Reg8(D), Reg8(L)),
             [0x56] => Ld8(Reg8(D), MemReg(HL)),
             [0x57] => Ld8(Reg8(D), Reg8(A)),
+
             [0x58] => Ld8(Reg8(E), Reg8(B)),
             [0x59] => Ld8(Reg8(E), Reg8(C)),
             [0x5A] => Ld8(Reg8(E), Reg8(D)),
@@ -498,6 +526,7 @@ impl Inst {
             [0x5D] => Ld8(Reg8(E), Reg8(L)),
             [0x5E] => Ld8(Reg8(E), MemReg(HL)),
             [0x5F] => Ld8(Reg8(E), Reg8(A)),
+
             [0x60] => Ld8(Reg8(H), Reg8(B)),
             [0x61] => Ld8(Reg8(H), Reg8(C)),
             [0x62] => Ld8(Reg8(H), Reg8(D)),
@@ -506,6 +535,7 @@ impl Inst {
             [0x65] => Ld8(Reg8(H), Reg8(L)),
             [0x66] => Ld8(Reg8(H), MemReg(HL)),
             [0x67] => Ld8(Reg8(H), Reg8(A)),
+
             [0x68] => Ld8(Reg8(L), Reg8(B)),
             [0x69] => Ld8(Reg8(L), Reg8(C)),
             [0x6A] => Ld8(Reg8(L), Reg8(D)),
@@ -514,14 +544,15 @@ impl Inst {
             [0x6D] => Ld8(Reg8(L), Reg8(L)),
             [0x6E] => Ld8(Reg8(L), MemReg(HL)),
             [0x6F] => Ld8(Reg8(L), Reg8(A)),
+
             [0x70] => Ld8(MemReg(HL), Reg8(B)),
             [0x71] => Ld8(MemReg(HL), Reg8(C)),
             [0x72] => Ld8(MemReg(HL), Reg8(D)),
             [0x73] => Ld8(MemReg(HL), Reg8(E)),
             [0x74] => Ld8(MemReg(HL), Reg8(H)),
             [0x75] => Ld8(MemReg(HL), Reg8(L)),
-            [0x76] => Halt,
             [0x77] => Ld8(MemReg(HL), Reg8(A)),
+
             [0x78] => Ld8(Reg8(A), Reg8(B)),
             [0x79] => Ld8(Reg8(A), Reg8(C)),
             [0x7A] => Ld8(Reg8(A), Reg8(D)),
@@ -530,6 +561,7 @@ impl Inst {
             [0x7D] => Ld8(Reg8(A), Reg8(L)),
             [0x7E] => Ld8(Reg8(A), MemReg(HL)),
             [0x7F] => Ld8(Reg8(A), Reg8(A)),
+
             [0x80] => AddA(Reg8(B)),
             [0x81] => AddA(Reg8(C)),
             [0x82] => AddA(Reg8(D)),
@@ -538,6 +570,7 @@ impl Inst {
             [0x85] => AddA(Reg8(L)),
             [0x86] => AddA(MemReg(HL)),
             [0x87] => AddA(Reg8(A)),
+
             [0x88] => AdcA(Reg8(B)),
             [0x89] => AdcA(Reg8(C)),
             [0x8A] => AdcA(Reg8(D)),
@@ -546,6 +579,7 @@ impl Inst {
             [0x8D] => AdcA(Reg8(L)),
             [0x8E] => AdcA(MemReg(HL)),
             [0x8F] => AdcA(Reg8(A)),
+
             [0x90] => Sub(Reg8(B)),
             [0x91] => Sub(Reg8(C)),
             [0x92] => Sub(Reg8(D)),
@@ -554,6 +588,7 @@ impl Inst {
             [0x95] => Sub(Reg8(L)),
             [0x96] => Sub(MemReg(HL)),
             [0x97] => Sub(Reg8(A)),
+
             [0x98] => SbcA(Reg8(B)),
             [0x99] => SbcA(Reg8(C)),
             [0x9A] => SbcA(Reg8(D)),
@@ -562,6 +597,7 @@ impl Inst {
             [0x9D] => SbcA(Reg8(L)),
             [0x9E] => SbcA(MemReg(HL)),
             [0x9F] => SbcA(Reg8(A)),
+
             [0xA0] => And(Reg8(B)),
             [0xA1] => And(Reg8(C)),
             [0xA2] => And(Reg8(D)),
@@ -570,6 +606,7 @@ impl Inst {
             [0xA5] => And(Reg8(L)),
             [0xA6] => And(MemReg(HL)),
             [0xA7] => And(Reg8(A)),
+
             [0xA8] => Xor(Reg8(B)),
             [0xA9] => Xor(Reg8(C)),
             [0xAA] => Xor(Reg8(D)),
@@ -578,6 +615,7 @@ impl Inst {
             [0xAD] => Xor(Reg8(L)),
             [0xAE] => Xor(MemReg(HL)),
             [0xAF] => Xor(Reg8(A)),
+
             [0xB0] => Or(Reg8(B)),
             [0xB1] => Or(Reg8(C)),
             [0xB2] => Or(Reg8(D)),
@@ -586,6 +624,7 @@ impl Inst {
             [0xB5] => Or(Reg8(L)),
             [0xB6] => Or(MemReg(HL)),
             [0xB7] => Or(Reg8(A)),
+
             [0xB8] => Cp(Reg8(B)),
             [0xB9] => Cp(Reg8(C)),
             [0xBA] => Cp(Reg8(D)),
@@ -594,17 +633,75 @@ impl Inst {
             [0xBD] => Cp(Reg8(L)),
             [0xBE] => Cp(MemReg(HL)),
             [0xBF] => Cp(Reg8(A)),
+
             [0xC0] => Ret(Cond::NotZero),
-            [0xC1] => Pop(BC),
-            [0xC2, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::NotZero),
-            [0xC3, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::None),
-            [0xC4, low, high] => Call(u16::from_le_bytes([low, high]), Cond::NotZero),
-            [0xC5] => Push(BC),
-            [0xC6, val] => AddA(Imm8(val)),
-            [0xC7] => Rst(0x00),
             [0xC8] => Ret(Cond::Zero),
             [0xC9] => Ret(Cond::None),
+            [0xD0] => Ret(Cond::NotCarry),
+            [0xD8] => Ret(Cond::Carry),
+            [0xD9] => Reti,
+
+            [0xC1] => Pop(BC),
+            [0xD1] => Pop(DE),
+            [0xE1] => Pop(HL),
+            [0xF1] => Pop(AF),
+
+            [0xC5] => Push(BC),
+            [0xD5] => Push(DE),
+            [0xE5] => Push(HL),
+            [0xF5] => Push(AF),
+
+            [0xC2, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::NotZero),
+            [0xC3, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::None),
             [0xCA, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::Zero),
+            [0xD2, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::NotCarry),
+            [0xDA, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::Carry),
+
+            [0xC4, low, high] => Call(u16::from_le_bytes([low, high]), Cond::NotZero),
+            [0xCC, low, high] => Call(u16::from_le_bytes([low, high]), Cond::Zero),
+            [0xCD, low, high] => Call(u16::from_le_bytes([low, high]), Cond::None),
+            [0xD4, low, high] => Call(u16::from_le_bytes([low, high]), Cond::NotCarry),
+            [0xDC, low, high] => Call(u16::from_le_bytes([low, high]), Cond::Carry),
+
+            [0xC6, val] => AddA(Imm8(val)),
+            [0xCE, val] => AdcA(Imm8(val)),
+            [0xD6, val] => Sub(Imm8(val)),
+            [0xDE, val] => SbcA(Imm8(val)),
+            [0xE6, val] => And(Imm8(val)),
+            [0xEE, val] => Xor(Imm8(val)),
+            [0xF6, val] => Or(Imm8(val)),
+            [0xFE, val] => Cp(Imm8(val)),
+
+            [0xC7] => Rst(0x00),
+            [0xCF] => Rst(0x08),
+            [0xD7] => Rst(0x10),
+            [0xDF] => Rst(0x18),
+            [0xE7] => Rst(0x20),
+            [0xEF] => Rst(0x28),
+            [0xF7] => Rst(0x30),
+            [0xFF] => Rst(0x38),
+
+            [b @ 0xD3] => Invalid(b),
+            [b @ 0xDB] => Invalid(b),
+            [b @ 0xDD] => Invalid(b),
+            [b @ 0xE3] => Invalid(b),
+            [b @ 0xE4] => Invalid(b),
+            [b @ 0xEB] => Invalid(b),
+            [b @ 0xEC] => Invalid(b),
+            [b @ 0xED] => Invalid(b),
+            [b @ 0xF4] => Invalid(b),
+            [b @ 0xFC] => Invalid(b),
+            [b @ 0xFD] => Invalid(b),
+
+            [0xE8, offset] => AddSp(offset as i8),
+            [0xF8, offset] => LdHlSp(offset as i8),
+
+            [0xF3] => Di,
+            [0xFB] => Ei,
+
+            [0xE9] => Jp(Reg16(HL), Cond::None),
+            [0xF9] => Ld16(Reg16(SP), Reg16(HL)),
+
             [0xCB, 0x00] => Rlc(Reg8(B)),
             [0xCB, 0x01] => Rlc(Reg8(C)),
             [0xCB, 0x02] => Rlc(Reg8(D)),
@@ -613,6 +710,7 @@ impl Inst {
             [0xCB, 0x05] => Rlc(Reg8(L)),
             [0xCB, 0x06] => Rlc(MemReg(HL)),
             [0xCB, 0x07] => Rlc(Reg8(A)),
+
             [0xCB, 0x08] => Rrc(Reg8(B)),
             [0xCB, 0x09] => Rrc(Reg8(C)),
             [0xCB, 0x0A] => Rrc(Reg8(D)),
@@ -621,6 +719,7 @@ impl Inst {
             [0xCB, 0x0D] => Rrc(Reg8(L)),
             [0xCB, 0x0E] => Rrc(MemReg(HL)),
             [0xCB, 0x0F] => Rrc(Reg8(A)),
+
             [0xCB, 0x10] => Rl(Reg8(B)),
             [0xCB, 0x11] => Rl(Reg8(C)),
             [0xCB, 0x12] => Rl(Reg8(D)),
@@ -629,6 +728,7 @@ impl Inst {
             [0xCB, 0x15] => Rl(Reg8(L)),
             [0xCB, 0x16] => Rl(MemReg(HL)),
             [0xCB, 0x17] => Rl(Reg8(A)),
+
             [0xCB, 0x18] => Rr(Reg8(B)),
             [0xCB, 0x19] => Rr(Reg8(C)),
             [0xCB, 0x1A] => Rr(Reg8(D)),
@@ -637,6 +737,7 @@ impl Inst {
             [0xCB, 0x1D] => Rr(Reg8(L)),
             [0xCB, 0x1E] => Rr(MemReg(HL)),
             [0xCB, 0x1F] => Rr(Reg8(A)),
+
             [0xCB, 0x20] => Sla(Reg8(B)),
             [0xCB, 0x21] => Sla(Reg8(C)),
             [0xCB, 0x22] => Sla(Reg8(D)),
@@ -645,6 +746,7 @@ impl Inst {
             [0xCB, 0x25] => Sla(Reg8(L)),
             [0xCB, 0x26] => Sla(MemReg(HL)),
             [0xCB, 0x27] => Sla(Reg8(A)),
+
             [0xCB, 0x28] => Sra(Reg8(B)),
             [0xCB, 0x29] => Sra(Reg8(C)),
             [0xCB, 0x2A] => Sra(Reg8(D)),
@@ -653,6 +755,7 @@ impl Inst {
             [0xCB, 0x2D] => Sra(Reg8(L)),
             [0xCB, 0x2E] => Sra(MemReg(HL)),
             [0xCB, 0x2F] => Sra(Reg8(A)),
+
             [0xCB, 0x30] => Swap(Reg8(B)),
             [0xCB, 0x31] => Swap(Reg8(C)),
             [0xCB, 0x32] => Swap(Reg8(D)),
@@ -661,6 +764,7 @@ impl Inst {
             [0xCB, 0x35] => Swap(Reg8(L)),
             [0xCB, 0x36] => Swap(MemReg(HL)),
             [0xCB, 0x37] => Swap(Reg8(A)),
+
             [0xCB, 0x38] => Srl(Reg8(B)),
             [0xCB, 0x39] => Srl(Reg8(C)),
             [0xCB, 0x3A] => Srl(Reg8(D)),
@@ -669,6 +773,7 @@ impl Inst {
             [0xCB, 0x3D] => Srl(Reg8(L)),
             [0xCB, 0x3E] => Srl(MemReg(HL)),
             [0xCB, 0x3F] => Srl(Reg8(A)),
+
             [0xCB, 0x40] => Bit(0, Reg8(B)),
             [0xCB, 0x41] => Bit(0, Reg8(C)),
             [0xCB, 0x42] => Bit(0, Reg8(D)),
@@ -677,6 +782,7 @@ impl Inst {
             [0xCB, 0x45] => Bit(0, Reg8(L)),
             [0xCB, 0x46] => Bit(0, MemReg(HL)),
             [0xCB, 0x47] => Bit(0, Reg8(A)),
+
             [0xCB, 0x48] => Bit(1, Reg8(B)),
             [0xCB, 0x49] => Bit(1, Reg8(C)),
             [0xCB, 0x4A] => Bit(1, Reg8(D)),
@@ -685,6 +791,7 @@ impl Inst {
             [0xCB, 0x4D] => Bit(1, Reg8(L)),
             [0xCB, 0x4E] => Bit(1, MemReg(HL)),
             [0xCB, 0x4F] => Bit(1, Reg8(A)),
+
             [0xCB, 0x50] => Bit(2, Reg8(B)),
             [0xCB, 0x51] => Bit(2, Reg8(C)),
             [0xCB, 0x52] => Bit(2, Reg8(D)),
@@ -693,6 +800,7 @@ impl Inst {
             [0xCB, 0x55] => Bit(2, Reg8(L)),
             [0xCB, 0x56] => Bit(2, MemReg(HL)),
             [0xCB, 0x57] => Bit(2, Reg8(A)),
+
             [0xCB, 0x58] => Bit(3, Reg8(B)),
             [0xCB, 0x59] => Bit(3, Reg8(C)),
             [0xCB, 0x5A] => Bit(3, Reg8(D)),
@@ -701,6 +809,7 @@ impl Inst {
             [0xCB, 0x5D] => Bit(3, Reg8(L)),
             [0xCB, 0x5E] => Bit(3, MemReg(HL)),
             [0xCB, 0x5F] => Bit(3, Reg8(A)),
+
             [0xCB, 0x60] => Bit(4, Reg8(B)),
             [0xCB, 0x61] => Bit(4, Reg8(C)),
             [0xCB, 0x62] => Bit(4, Reg8(D)),
@@ -709,6 +818,7 @@ impl Inst {
             [0xCB, 0x65] => Bit(4, Reg8(L)),
             [0xCB, 0x66] => Bit(4, MemReg(HL)),
             [0xCB, 0x67] => Bit(4, Reg8(A)),
+
             [0xCB, 0x68] => Bit(5, Reg8(B)),
             [0xCB, 0x69] => Bit(5, Reg8(C)),
             [0xCB, 0x6A] => Bit(5, Reg8(D)),
@@ -717,6 +827,7 @@ impl Inst {
             [0xCB, 0x6D] => Bit(5, Reg8(L)),
             [0xCB, 0x6E] => Bit(5, MemReg(HL)),
             [0xCB, 0x6F] => Bit(5, Reg8(A)),
+
             [0xCB, 0x70] => Bit(6, Reg8(B)),
             [0xCB, 0x71] => Bit(6, Reg8(C)),
             [0xCB, 0x72] => Bit(6, Reg8(D)),
@@ -725,6 +836,7 @@ impl Inst {
             [0xCB, 0x75] => Bit(6, Reg8(L)),
             [0xCB, 0x76] => Bit(6, MemReg(HL)),
             [0xCB, 0x77] => Bit(6, Reg8(A)),
+
             [0xCB, 0x78] => Bit(7, Reg8(B)),
             [0xCB, 0x79] => Bit(7, Reg8(C)),
             [0xCB, 0x7A] => Bit(7, Reg8(D)),
@@ -733,6 +845,7 @@ impl Inst {
             [0xCB, 0x7D] => Bit(7, Reg8(L)),
             [0xCB, 0x7E] => Bit(7, MemReg(HL)),
             [0xCB, 0x7F] => Bit(7, Reg8(A)),
+
             [0xCB, 0x80] => Res(0, Reg8(B)),
             [0xCB, 0x81] => Res(0, Reg8(C)),
             [0xCB, 0x82] => Res(0, Reg8(D)),
@@ -741,6 +854,7 @@ impl Inst {
             [0xCB, 0x85] => Res(0, Reg8(L)),
             [0xCB, 0x86] => Res(0, MemReg(HL)),
             [0xCB, 0x87] => Res(0, Reg8(A)),
+
             [0xCB, 0x88] => Res(1, Reg8(B)),
             [0xCB, 0x89] => Res(1, Reg8(C)),
             [0xCB, 0x8A] => Res(1, Reg8(D)),
@@ -749,6 +863,7 @@ impl Inst {
             [0xCB, 0x8D] => Res(1, Reg8(L)),
             [0xCB, 0x8E] => Res(1, MemReg(HL)),
             [0xCB, 0x8F] => Res(1, Reg8(A)),
+
             [0xCB, 0x90] => Res(2, Reg8(B)),
             [0xCB, 0x91] => Res(2, Reg8(C)),
             [0xCB, 0x92] => Res(2, Reg8(D)),
@@ -757,6 +872,7 @@ impl Inst {
             [0xCB, 0x95] => Res(2, Reg8(L)),
             [0xCB, 0x96] => Res(2, MemReg(HL)),
             [0xCB, 0x97] => Res(2, Reg8(A)),
+
             [0xCB, 0x98] => Res(3, Reg8(B)),
             [0xCB, 0x99] => Res(3, Reg8(C)),
             [0xCB, 0x9A] => Res(3, Reg8(D)),
@@ -765,6 +881,7 @@ impl Inst {
             [0xCB, 0x9D] => Res(3, Reg8(L)),
             [0xCB, 0x9E] => Res(3, MemReg(HL)),
             [0xCB, 0x9F] => Res(3, Reg8(A)),
+
             [0xCB, 0xA0] => Res(4, Reg8(B)),
             [0xCB, 0xA1] => Res(4, Reg8(C)),
             [0xCB, 0xA2] => Res(4, Reg8(D)),
@@ -773,6 +890,7 @@ impl Inst {
             [0xCB, 0xA5] => Res(4, Reg8(L)),
             [0xCB, 0xA6] => Res(4, MemReg(HL)),
             [0xCB, 0xA7] => Res(4, Reg8(A)),
+
             [0xCB, 0xA8] => Res(5, Reg8(B)),
             [0xCB, 0xA9] => Res(5, Reg8(C)),
             [0xCB, 0xAA] => Res(5, Reg8(D)),
@@ -781,6 +899,7 @@ impl Inst {
             [0xCB, 0xAD] => Res(5, Reg8(L)),
             [0xCB, 0xAE] => Res(5, MemReg(HL)),
             [0xCB, 0xAF] => Res(5, Reg8(A)),
+
             [0xCB, 0xB0] => Res(6, Reg8(B)),
             [0xCB, 0xB1] => Res(6, Reg8(C)),
             [0xCB, 0xB2] => Res(6, Reg8(D)),
@@ -789,6 +908,7 @@ impl Inst {
             [0xCB, 0xB5] => Res(6, Reg8(L)),
             [0xCB, 0xB6] => Res(6, MemReg(HL)),
             [0xCB, 0xB7] => Res(6, Reg8(A)),
+
             [0xCB, 0xB8] => Res(7, Reg8(B)),
             [0xCB, 0xB9] => Res(7, Reg8(C)),
             [0xCB, 0xBA] => Res(7, Reg8(D)),
@@ -797,6 +917,7 @@ impl Inst {
             [0xCB, 0xBD] => Res(7, Reg8(L)),
             [0xCB, 0xBE] => Res(7, MemReg(HL)),
             [0xCB, 0xBF] => Res(7, Reg8(A)),
+
             [0xCB, 0xC0] => Set(0, Reg8(B)),
             [0xCB, 0xC1] => Set(0, Reg8(C)),
             [0xCB, 0xC2] => Set(0, Reg8(D)),
@@ -805,6 +926,7 @@ impl Inst {
             [0xCB, 0xC5] => Set(0, Reg8(L)),
             [0xCB, 0xC6] => Set(0, MemReg(HL)),
             [0xCB, 0xC7] => Set(0, Reg8(A)),
+
             [0xCB, 0xC8] => Set(1, Reg8(B)),
             [0xCB, 0xC9] => Set(1, Reg8(C)),
             [0xCB, 0xCA] => Set(1, Reg8(D)),
@@ -813,6 +935,7 @@ impl Inst {
             [0xCB, 0xCD] => Set(1, Reg8(L)),
             [0xCB, 0xCE] => Set(1, MemReg(HL)),
             [0xCB, 0xCF] => Set(1, Reg8(A)),
+
             [0xCB, 0xD0] => Set(2, Reg8(B)),
             [0xCB, 0xD1] => Set(2, Reg8(C)),
             [0xCB, 0xD2] => Set(2, Reg8(D)),
@@ -821,6 +944,7 @@ impl Inst {
             [0xCB, 0xD5] => Set(2, Reg8(L)),
             [0xCB, 0xD6] => Set(2, MemReg(HL)),
             [0xCB, 0xD7] => Set(2, Reg8(A)),
+
             [0xCB, 0xD8] => Set(3, Reg8(B)),
             [0xCB, 0xD9] => Set(3, Reg8(C)),
             [0xCB, 0xDA] => Set(3, Reg8(D)),
@@ -829,6 +953,7 @@ impl Inst {
             [0xCB, 0xDD] => Set(3, Reg8(L)),
             [0xCB, 0xDE] => Set(3, MemReg(HL)),
             [0xCB, 0xDF] => Set(3, Reg8(A)),
+
             [0xCB, 0xE0] => Set(4, Reg8(B)),
             [0xCB, 0xE1] => Set(4, Reg8(C)),
             [0xCB, 0xE2] => Set(4, Reg8(D)),
@@ -837,6 +962,7 @@ impl Inst {
             [0xCB, 0xE5] => Set(4, Reg8(L)),
             [0xCB, 0xE6] => Set(4, MemReg(HL)),
             [0xCB, 0xE7] => Set(4, Reg8(A)),
+
             [0xCB, 0xE8] => Set(5, Reg8(B)),
             [0xCB, 0xE9] => Set(5, Reg8(C)),
             [0xCB, 0xEA] => Set(5, Reg8(D)),
@@ -845,6 +971,7 @@ impl Inst {
             [0xCB, 0xED] => Set(5, Reg8(L)),
             [0xCB, 0xEE] => Set(5, MemReg(HL)),
             [0xCB, 0xEF] => Set(5, Reg8(A)),
+
             [0xCB, 0xF0] => Set(6, Reg8(B)),
             [0xCB, 0xF1] => Set(6, Reg8(C)),
             [0xCB, 0xF2] => Set(6, Reg8(D)),
@@ -853,6 +980,7 @@ impl Inst {
             [0xCB, 0xF5] => Set(6, Reg8(L)),
             [0xCB, 0xF6] => Set(6, MemReg(HL)),
             [0xCB, 0xF7] => Set(6, Reg8(A)),
+
             [0xCB, 0xF8] => Set(7, Reg8(B)),
             [0xCB, 0xF9] => Set(7, Reg8(C)),
             [0xCB, 0xFA] => Set(7, Reg8(D)),
@@ -861,58 +989,7 @@ impl Inst {
             [0xCB, 0xFD] => Set(7, Reg8(L)),
             [0xCB, 0xFE] => Set(7, MemReg(HL)),
             [0xCB, 0xFF] => Set(7, Reg8(A)),
-            [0xCC, low, high] => Call(u16::from_le_bytes([low, high]), Cond::Zero),
-            [0xCD, low, high] => Call(u16::from_le_bytes([low, high]), Cond::None),
-            [0xCE, val] => AdcA(Imm8(val)),
-            [0xCF] => Rst(0x08),
-            [0xD0] => Ret(Cond::NotCarry),
-            [0xD1] => Pop(DE),
-            [0xD2, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::NotCarry),
-            [b @ 0xD3] => Invalid(b),
-            [0xD4, low, high] => Call(u16::from_le_bytes([low, high]), Cond::NotCarry),
-            [0xD5] => Push(DE),
-            [0xD6, val] => Sub(Imm8(val)),
-            [0xD7] => Rst(0x10),
-            [0xD8] => Ret(Cond::Carry),
-            [0xD9] => Reti,
-            [0xDA, low, high] => Jp(Imm16(u16::from_le_bytes([low, high])), Cond::Carry),
-            [b @ 0xDB] => Invalid(b),
-            [0xDC, low, high] => Call(u16::from_le_bytes([low, high]), Cond::Carry),
-            [b @ 0xDD] => Invalid(b),
-            [0xDE, val] => SbcA(Imm8(val)),
-            [0xDF] => Rst(0x18),
-            [0xE0, addr] => Ld8(MemHighImm(addr), Reg8(A)),
-            [0xE1] => Pop(HL),
-            [0xE2] => Ld8(MemHighC, Reg8(A)),
-            [b @ 0xE3] => Invalid(b),
-            [b @ 0xE4] => Invalid(b),
-            [0xE5] => Push(HL),
-            [0xE6, val] => And(Imm8(val)),
-            [0xE7] => Rst(0x20),
-            [0xE8, offset] => AddSp(offset as i8),
-            [0xE9] => Jp(Reg16(HL), Cond::None),
-            [0xEA, low, high] => Ld8(MemImm(u16::from_le_bytes([low, high])), Reg8(A)),
-            [b @ 0xEB] => Invalid(b),
-            [b @ 0xEC] => Invalid(b),
-            [b @ 0xED] => Invalid(b),
-            [0xEE, val] => Xor(Imm8(val)),
-            [0xEF] => Rst(0x28),
-            [0xF0, addr] => Ld8(Reg8(A), MemHighImm(addr)),
-            [0xF1] => Pop(AF),
-            [0xF2] => Ld8(Reg8(A), MemHighC),
-            [0xF3] => Di,
-            [b @ 0xF4] => Invalid(b),
-            [0xF5] => Push(AF),
-            [0xF6, val] => Or(Imm8(val)),
-            [0xF7] => Rst(0x30),
-            [0xF8, offset] => LdHlSp(offset as i8),
-            [0xF9] => Ld16(Reg16(SP), Reg16(HL)),
-            [0xFA, low, high] => Ld8(Reg8(A), MemImm(u16::from_le_bytes([low, high]))),
-            [0xFB] => Ei,
-            [b @ 0xFC] => Invalid(b),
-            [b @ 0xFD] => Invalid(b),
-            [0xFE, val] => Cp(Imm8(val)),
-            [0xFF] => Rst(0x38),
+
             _ => unreachable!(),
         }
     }

@@ -7,9 +7,12 @@ use crate::timer::Timer;
 use enumflags2::BitFlags;
 use log::{debug, info, log_enabled, trace, warn};
 use self::inst::{Cond, Inst, Operand16, Operand8};
+use self::microcode::MicroInst;
 use self::registers::{Flag, Reg16, Reg8, Registers};
+use std::slice;
 
 mod inst;
+mod microcode;
 mod registers;
 
 #[cfg(test)]
@@ -46,8 +49,9 @@ pub struct Cpu {
     /// The audio processing unit.
     pub audio: Audio,
 
-    /// The opcode of the currently-executing instruction.
-    current_opcode: u8,
+    // FIXME(solson): Document.
+    work_queue: slice::Iter<'static, &'static [MicroInst]>,
+    decode_cb_prefixed: bool,
 
     /// A running total of the number of cycles taken in execution so far.
     cycles: usize,
@@ -85,6 +89,9 @@ pub struct Cpu {
     pub debug_symbols: Option<crate::wla_symbols::WlaSymbols>,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Action { None, StartNextInst }
+
 impl Cpu {
     pub fn new(cart: Cart) -> Cpu {
         Cpu {
@@ -96,7 +103,8 @@ impl Cpu {
             joypad: Joypad::new(),
             audio: Audio::new(),
             cart,
-            current_opcode: 0,
+            work_queue: [].iter(),
+            decode_cb_prefixed: false,
             cycles: 0,
             interrupts_enabled: false,
             pending_disable_interrupts: false,
@@ -126,54 +134,58 @@ impl Cpu {
 
     /// Execute a single instruction. Returns how many cycles it took.
     // TODO(solson): Should calling this directly be avoided, since only `step_cycles` checks for
-    // GPU, Timer, and Joypad interurpts?
+    // GPU, Timer, and Joypad interrupts?
     pub fn step(&mut self) -> usize {
-        let pending_enable_interrupts = self.pending_enable_interrupts;
-        let pending_disable_interrupts = self.pending_disable_interrupts;
-        self.pending_enable_interrupts = false;
-        self.pending_disable_interrupts = false;
-        self.handle_interrupts();
+        if self.work_queue.as_slice().is_empty() {
+            // If the work queue is empty, we are finished the previous instruction. In this case,
+            // we do an instruction decode cycle, refilling the work queue.
 
-        if self.halted {
-            return 4;
+            let pending_enable_interrupts = self.pending_enable_interrupts;
+            let pending_disable_interrupts = self.pending_disable_interrupts;
+            self.pending_enable_interrupts = false;
+            self.pending_disable_interrupts = false;
+
+            self.handle_interrupts();
+            if self.halted { return 4; }
+
+            let opcode = self.read_mem(self.regs.pc.get());
+            self.work_queue = if self.decode_cb_prefixed {
+                self.decode_cb_prefixed = false;
+                microcode::microcode_cb_prefixed(opcode).iter()
+            } else {
+                microcode::microcode(opcode).iter()
+            };
+            // dbg!(opcode);
+            // dbg!(&self.work_queue);
+
+            if pending_enable_interrupts {
+                self.interrupts_enabled = true;
+            }
+
+            if pending_disable_interrupts {
+                self.interrupts_enabled = false;
+            }
         }
 
-        // Get the opcode for the current instruction and find the total instruction length.
-        let base_pc = self.regs.pc.get();
-        self.current_opcode = self.read_mem(base_pc);
-        let instruction_len = inst::INSTRUCTION_LENGTH[self.current_opcode as usize];
-        self.regs.pc += instruction_len as u16;
-
-        // Read the rest of the bytes of this instruction.
-        let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
-        inst_bytes[0] = self.current_opcode;
-        for i in 1..instruction_len {
-            inst_bytes[i] = self.read_mem(base_pc.wrapping_add(i as u16));
+        let cycle_insts = *self.work_queue.next().unwrap();
+        trace!("cycle micro insts: {:?}", cycle_insts);
+        // dbg!(cycle_insts);
+        for micro_inst in cycle_insts {
+            match self.execute_micro_inst(micro_inst) {
+                Action::None => {}
+                Action::StartNextInst => {
+                    // Empty the work queue so we start the next instruction on the next cycle.
+                    self.work_queue = [].iter();
+                    break;
+                }
+            }
         }
 
-        // Update clock cycle count based on the current instruction.
-        let cycles = if self.current_opcode == 0xCB {
-            let opcode_after_cb = inst_bytes[1];
-            inst::PREFIX_CB_BASE_CYCLES[opcode_after_cb as usize]
-        } else {
-            inst::BASE_CYCLES[self.current_opcode as usize]
-        };
+        // // Decode the instruction.
+        // let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
+        // trace!("PC=0x{:04X}: {:?}", base_pc, inst);
 
-        // Decode the instruction.
-        let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-        trace!("PC=0x{:04X}: {:?}", base_pc, inst);
-
-        self.execute(inst);
-
-        if pending_enable_interrupts {
-            self.interrupts_enabled = true;
-        }
-
-        if pending_disable_interrupts {
-            self.interrupts_enabled = false;
-        }
-
-        cycles
+        4
     }
 
     fn handle_interrupts(&mut self) {
@@ -208,63 +220,167 @@ impl Cpu {
         self.interrupt_flags_register |= interrupts;
     }
 
-    fn execute(&mut self, inst: Inst) {
-        match inst {
-            Inst::Nop => {}
-            Inst::Stop => self.stopped = true,
-            Inst::Halt => self.halted = true,
-            Inst::Di => self.pending_disable_interrupts = true,
-            Inst::Ei => self.pending_enable_interrupts = true,
-            Inst::Jp(loc, cond) => self.jump(loc, cond),
-            Inst::Jr(offset, cond) => self.jump_relative(offset, cond),
-            Inst::Call(fn_addr, cond) => self.call(fn_addr, cond),
-            Inst::Rst(addr) => self.call_restart(addr),
-            Inst::Ret(cond) => self.ret(cond),
-            Inst::Reti => {
-                self.interrupts_enabled = true;
-                self.ret(Cond::None);
+    fn execute_micro_inst(&mut self, micro_inst: &MicroInst) -> Action {
+        use MicroInst::*;
+        use microcode::{Local, Mem};
+
+        match *micro_inst {
+            Read(dest, Mem::Reg(src)) => {
+                let val = self.read_mem(self.regs.get_16(src));
+                self.set_local(dest, val);
             }
-            Inst::Push(reg) => self.push(reg),
-            Inst::Pop(reg) => self.pop(reg),
-            Inst::Ld8(dest, src) => self.move_8(dest, src),
-            Inst::Ld16(dest, src) => self.move_16(dest, src),
-            Inst::LdHlSp(offset) => self.load_stack_addr_into_reg(offset, Reg16::HL),
-            Inst::Inc8(n) => self.inc_8(n),
-            Inst::Dec8(n) => self.dec_8(n),
-            Inst::Inc16(n) => self.inc_16(n),
-            Inst::Dec16(n) => self.dec_16(n),
-            Inst::AddA(n) => self.add_accum(n),
-            Inst::AddHl(n) => self.add_hl(n),
-            Inst::AddSp(offset) => self.load_stack_addr_into_reg(offset, Reg16::SP),
-            Inst::AdcA(n) => self.add_accum_with_carry(n),
-            Inst::Sub(n) => self.sub_accum(n),
-            Inst::SbcA(n) => self.sub_accum_with_carry(n),
-            Inst::And(n) => self.and_accum(n),
-            Inst::Xor(n) => self.xor_accum(n),
-            Inst::Or(n) => self.or_accum(n),
-            Inst::Cp(n) => self.compare_accum(n),
-            Inst::Rlc(n) => self.rotate_left_circular(n, true),
-            Inst::Rl(n) => self.rotate_left(n, true),
-            Inst::Rrc(n) => self.rotate_right_circular(n, true),
-            Inst::Rr(n) => self.rotate_right(n, true),
-            Inst::Rlca => self.rotate_left_circular(Operand8::Reg8(Reg8::A), false),
-            Inst::Rla => self.rotate_left(Operand8::Reg8(Reg8::A), false),
-            Inst::Rrca => self.rotate_right_circular(Operand8::Reg8(Reg8::A), false),
-            Inst::Rra => self.rotate_right(Operand8::Reg8(Reg8::A), false),
-            Inst::Sla(n) => self.shift_left_arith(n),
-            Inst::Sra(n) => self.shift_right_arith(n),
-            Inst::Srl(n) => self.shift_right_logical(n),
-            Inst::Swap(n) => self.swap(n),
-            Inst::Bit(bit, n) => self.test_bit(bit, n),
-            Inst::Res(bit, n) => self.reset_bit(bit, n),
-            Inst::Set(bit, n) => self.set_bit(bit, n),
-            Inst::Daa => self.decimal_adjust_accum(),
-            Inst::Cpl => self.complement_accum(),
-            Inst::Ccf => self.complement_carry_flag(),
-            Inst::Scf => self.set_carry_flag(),
-            Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
+
+            Read(dest, Mem::High(src)) => {
+                let addr = 0xFF00 | self.get_local(src) as u16;
+                let val = self.read_mem(addr);
+                self.set_local(dest, val);
+            }
+
+            Write(Mem::Reg(dest), src) => {
+                let addr = self.regs.get_16(dest);
+                let val = self.get_local(src);
+                self.write_mem(addr, val);
+            }
+
+            Write(Mem::High(dest), src) => {
+                let addr = 0xFF00 | self.get_local(dest) as u16;
+                let val = self.get_local(src);
+                self.write_mem(addr, val);
+            }
+
+            Move16(dest, src) => self.regs.set_16(dest, self.regs.get_16(src)),
+            MoveConst16(dest, val) => self.regs.set_16(dest, val),
+            Inc16(reg) => self.regs.set_16(reg, self.regs.get_16(reg).wrapping_add(1)),
+            Dec16(reg) => self.regs.set_16(reg, self.regs.get_16(reg).wrapping_sub(1)),
+            AddHl(reg) => self.add_hl(reg),
+
+            AddOffset(dest, src, offset) => {
+                let offset_val = self.get_local(offset) as i16 as u16;
+                self.regs.set_16(dest, self.regs.get_16(src).wrapping_add(offset_val));
+            }
+
+            Move8(dest, src) => self.regs.set_8(dest, self.regs.get_8(src)),
+            Inc8(reg) => self.inc_8(reg),
+            Dec8(reg) => self.dec_8(reg),
+
+            Add(reg) => self.add_accum(reg),
+            Adc(reg) => self.add_accum_with_carry(reg),
+            Sub(reg) => self.sub_accum(reg),
+            Sbc(reg) => self.sub_accum_with_carry(reg),
+            And(reg) => self.and_accum(reg),
+            Xor(reg) => self.xor_accum(reg),
+            Or(reg) => self.or_accum(reg),
+            Cp(reg) => self.compare_accum(reg),
+
+            Rlca => self.rotate_left_circular(Local::Reg(Reg8::A), false),
+            Rrca => self.rotate_right_circular(Local::Reg(Reg8::A), false),
+            Rla => self.rotate_left(Local::Reg(Reg8::A), false),
+            Rra => self.rotate_right(Local::Reg(Reg8::A), false),
+            Daa => self.decimal_adjust_accum(),
+            Cpl => self.complement_accum(),
+            Scf => self.set_carry_flag(),
+            Ccf => self.complement_carry_flag(),
+
+            Rlc(reg) => self.rotate_left_circular(reg, true),
+            Rl(reg) => self.rotate_left(reg, true),
+            Rrc(reg) => self.rotate_right_circular(reg, true),
+            Rr(reg) => self.rotate_right(reg, true),
+            Sla(reg) => self.shift_left_arith(reg),
+            Sra(reg) => self.shift_right_arith(reg),
+            Srl(reg) => self.shift_right_logical(reg),
+            Swap(reg) => self.swap(reg),
+            Bit(bit, reg) => self.test_bit(bit, reg),
+            Res(bit, reg) => self.reset_bit(bit, reg),
+            Set(bit, reg) => self.set_bit(bit, reg),
+
+            Halt => self.halted = true,
+            EnableInterrupts => self.interrupts_enabled = true,
+            EnableInterruptsDelayed => self.pending_enable_interrupts = true,
+            DisableInterruptsDelayed => self.pending_disable_interrupts = true,
+            DecodePrefixed => self.decode_cb_prefixed = true,
+            CheckCond(cond) => if !self.is_cond_met(cond) { return Action::StartNextInst; },
+
+            Unimplemented => panic!("micro inst unimplemented"),
+        }
+
+        Action::None
+    }
+
+    // TODO(solson): Rename `Local` to something better.
+    fn get_local(&self, local: microcode::Local) -> u8 {
+        match local {
+            microcode::Local::Reg(reg) => self.regs.get_8(reg),
+            microcode::Local::RegLow(reg) => self.regs.get_low(reg),
+            microcode::Local::RegHigh(reg) => self.regs.get_high(reg),
         }
     }
+
+    // TODO(solson): Rename `Local` to something better.
+    fn set_local(&mut self, local: microcode::Local, val: u8) {
+        match local {
+            microcode::Local::Reg(reg) => self.regs.set_8(reg, val),
+            microcode::Local::RegLow(reg) => self.regs.set_low(reg, val),
+            microcode::Local::RegHigh(reg) => self.regs.set_high(reg, val),
+        }
+    }
+
+    // fn execute(&mut self, inst: Inst) {
+    //     match inst {
+    //         Inst::Nop => {}
+    //         Inst::Stop => self.stopped = true,
+    //         Inst::Halt => self.halted = true,
+    //         Inst::Di => self.pending_disable_interrupts = true,
+    //         Inst::Ei => self.pending_enable_interrupts = true,
+    //         Inst::Jp(loc, cond) => self.jump(loc, cond),
+    //         Inst::Jr(offset, cond) => self.jump_relative(offset, cond),
+    //         Inst::Call(fn_addr, cond) => self.call(fn_addr, cond),
+    //         Inst::Rst(addr) => self.call_restart(addr),
+    //         Inst::Ret(cond) => self.ret(cond),
+    //         Inst::Reti => {
+    //             self.interrupts_enabled = true;
+    //             self.ret(Cond::None);
+    //         }
+    //         Inst::Push(reg) => self.push(reg),
+    //         Inst::Pop(reg) => self.pop(reg),
+    //         Inst::Ld8(dest, src) => self.move_8(dest, src),
+    //         Inst::Ld16(dest, src) => self.move_16(dest, src),
+    //         Inst::LdHlSp(offset) => self.load_stack_addr_into_reg(offset, Reg16::HL),
+    //         Inst::Inc8(n) => self.inc_8(n),
+    //         Inst::Dec8(n) => self.dec_8(n),
+    //         Inst::Inc16(n) => self.inc_16(n),
+    //         Inst::Dec16(n) => self.dec_16(n),
+    //         Inst::AddA(n) => self.add_accum(n),
+    //         Inst::AddHl(n) => self.add_hl(n),
+    //         Inst::AddSp(offset) => self.load_stack_addr_into_reg(offset, Reg16::SP),
+    //         Inst::AdcA(n) => self.add_accum_with_carry(n),
+    //         Inst::Sub(n) => self.sub_accum(n),
+    //         Inst::SbcA(n) => self.sub_accum_with_carry(n),
+    //         Inst::And(n) => self.and_accum(n),
+    //         Inst::Xor(n) => self.xor_accum(n),
+    //         Inst::Or(n) => self.or_accum(n),
+    //         Inst::Cp(n) => self.compare_accum(n),
+    //         Inst::Rlc(n) => self.rotate_left_circular(n, true),
+    //         Inst::Rl(n) => self.rotate_left(n, true),
+    //         Inst::Rrc(n) => self.rotate_right_circular(n, true),
+    //         Inst::Rr(n) => self.rotate_right(n, true),
+    //         Inst::Rlca => self.rotate_left_circular(Operand8::Reg8(Reg8::A), false),
+    //         Inst::Rla => self.rotate_left(Operand8::Reg8(Reg8::A), false),
+    //         Inst::Rrca => self.rotate_right_circular(Operand8::Reg8(Reg8::A), false),
+    //         Inst::Rra => self.rotate_right(Operand8::Reg8(Reg8::A), false),
+    //         Inst::Sla(n) => self.shift_left_arith(n),
+    //         Inst::Sra(n) => self.shift_right_arith(n),
+    //         Inst::Srl(n) => self.shift_right_logical(n),
+    //         Inst::Swap(n) => self.swap(n),
+    //         Inst::Bit(bit, n) => self.test_bit(bit, n),
+    //         Inst::Res(bit, n) => self.reset_bit(bit, n),
+    //         Inst::Set(bit, n) => self.set_bit(bit, n),
+    //         Inst::Daa => self.decimal_adjust_accum(),
+    //         Inst::Cpl => self.complement_accum(),
+    //         Inst::Ccf => self.complement_carry_flag(),
+    //         Inst::Scf => self.set_carry_flag(),
+    //         Inst::Invalid(opcode) => panic!("tried to execute invalid opcode {:#X}", opcode),
+    //     }
+    // }
 
     /// The `Inst::Jp` instruction.
     ///
@@ -384,41 +500,41 @@ impl Cpu {
     }
 
     /// The 8-bit `Inst::Inc` instruction.
-    fn inc_8(&mut self, n: Operand8) {
-        let old_val = self.get_operand_8(n);
+    fn inc_8(&mut self, n: microcode::Local) {
+        let old_val = self.get_local(n);
         let new_val = old_val.wrapping_add(1);
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, get_add_half_carry(old_val, 1));
     }
 
     /// The 8-bit `Inst::Dec` instruction.
-    fn dec_8(&mut self, n: Operand8) {
-        let old_val = self.get_operand_8(n);
+    fn dec_8(&mut self, n: microcode::Local) {
+        let old_val = self.get_local(n);
         let new_val = old_val.wrapping_sub(1);
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, new_val == 0);
         self.set_flag(Flag::Sub, true);
         self.set_flag(Flag::HalfCarry, get_sub_half_carry(old_val, 1));
     }
 
     /// The 16-bit `Inst::Inc` instruction.
-    fn inc_16(&mut self, n: Operand16) {
-        let val = self.get_operand_16(n).wrapping_add(1);
-        self.set_operand_16(n, val);
+    fn inc_16(&mut self, n: Reg16) {
+        let val = self.regs.get_16(n).wrapping_add(1);
+        self.regs.set_16(n, val);
     }
 
     /// The 16-bit `Inst::Dec` instruction.
-    fn dec_16(&mut self, n: Operand16) {
-        let val = self.get_operand_16(n).wrapping_sub(1);
-        self.set_operand_16(n, val);
+    fn dec_16(&mut self, n: Reg16) {
+        let val = self.regs.get_16(n).wrapping_sub(1);
+        self.regs.set_16(n, val);
     }
 
     /// The `Inst::AddA` instruction
-    fn add_accum(&mut self, n: Operand8) {
+    fn add_accum(&mut self, n: microcode::Local) {
         let accum = self.regs.a;
-        let n_val = self.get_operand_8(n);
+        let n_val = self.get_local(n);
         let (new_accum, carry) = accum.overflowing_add(n_val);
         self.regs.a = new_accum;
         self.set_flag(Flag::Zero, new_accum == 0);
@@ -428,9 +544,9 @@ impl Cpu {
     }
 
     /// The `Inst::AddHl` instruction
-    fn add_hl(&mut self, n: Operand16) {
+    fn add_hl(&mut self, rhs: Reg16) {
         let old_hl = self.regs.hl.get();
-        let n_val = self.get_operand_16(n);
+        let n_val = self.regs.get_16(rhs);
         let (new_hl, carry) = old_hl.overflowing_add(n_val);
         self.regs.hl.set(new_hl);
         self.set_flag(Flag::Sub, false);
@@ -439,9 +555,9 @@ impl Cpu {
     }
 
     /// The `Inst::AdcA` instruction
-    fn add_accum_with_carry(&mut self, n: Operand8) {
+    fn add_accum_with_carry(&mut self, n: microcode::Local) {
         let accum = self.regs.a;
-        let n_val = self.get_operand_8(n);
+        let n_val = self.get_local(n);
         let carry_val = self.get_flag(Flag::Carry) as u8;
         let (midway_accum, midway_carry) = accum.overflowing_add(n_val);
         let (final_accum, final_carry) = midway_accum.overflowing_add(carry_val);
@@ -455,9 +571,9 @@ impl Cpu {
     }
 
     /// The `Inst::Sub` instruction
-    fn sub_accum(&mut self, n: Operand8) {
+    fn sub_accum(&mut self, n: microcode::Local) {
         let accum = self.regs.a;
-        let n_val = self.get_operand_8(n);
+        let n_val = self.get_local(n);
         let (new_accum, carry) = accum.overflowing_sub(n_val);
         self.regs.a = new_accum;
         self.set_flag(Flag::Zero, new_accum == 0);
@@ -467,9 +583,9 @@ impl Cpu {
     }
 
     /// The `Inst::SbcA` instruction
-    fn sub_accum_with_carry(&mut self, n: Operand8) {
+    fn sub_accum_with_carry(&mut self, n: microcode::Local) {
         let accum = self.regs.a;
-        let n_val = self.get_operand_8(n);
+        let n_val = self.get_local(n);
         let carry_val = self.get_flag(Flag::Carry) as u8;
         let (midway_accum, midway_carry) = accum.overflowing_sub(n_val);
         let (final_accum, final_carry) = midway_accum.overflowing_sub(carry_val);
@@ -483,8 +599,8 @@ impl Cpu {
     }
 
     /// The `Inst::And` instruction.
-    fn and_accum(&mut self, n: Operand8) {
-        self.regs.a &= self.get_operand_8(n);
+    fn and_accum(&mut self, n: microcode::Local) {
+        self.regs.a &= self.get_local(n);
         self.set_flag(Flag::Zero, self.regs.a == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, true);
@@ -492,8 +608,8 @@ impl Cpu {
     }
 
     /// The `Inst::Xor` instruction.
-    fn xor_accum(&mut self, n: Operand8) {
-        self.regs.a ^= self.get_operand_8(n);
+    fn xor_accum(&mut self, n: microcode::Local) {
+        self.regs.a ^= self.get_local(n);
         self.set_flag(Flag::Zero, self.regs.a == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -501,8 +617,8 @@ impl Cpu {
     }
 
     /// The `Inst::Or` instruction.
-    fn or_accum(&mut self, n: Operand8) {
-        self.regs.a |= self.get_operand_8(n);
+    fn or_accum(&mut self, n: microcode::Local) {
+        self.regs.a |= self.get_local(n);
         self.set_flag(Flag::Zero, self.regs.a == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -510,9 +626,9 @@ impl Cpu {
     }
 
     /// The `Inst::Cp` instruction.
-    fn compare_accum(&mut self, n: Operand8) {
+    fn compare_accum(&mut self, n: microcode::Local) {
         let left = self.regs.a;
-        let right = self.get_operand_8(n);
+        let right = self.get_local(n);
         self.set_flag(Flag::Zero, left == right);
         self.set_flag(Flag::Sub, true);
         self.set_flag(Flag::HalfCarry, get_sub_half_carry(left, right));
@@ -520,10 +636,10 @@ impl Cpu {
     }
 
     /// The `Inst::Rlc` instruction.
-    fn rotate_left_circular(&mut self, n: Operand8, set_zero_flag: bool) {
-        let old_val = self.get_operand_8(n);
+    fn rotate_left_circular(&mut self, n: microcode::Local, set_zero_flag: bool) {
+        let old_val = self.get_local(n);
         let new_val = old_val.rotate_left(1);
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, set_zero_flag && new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -531,11 +647,11 @@ impl Cpu {
     }
 
     /// The `Inst::Rl` instruction.
-    fn rotate_left(&mut self, n: Operand8, set_zero_flag: bool) {
-        let old_val = self.get_operand_8(n);
+    fn rotate_left(&mut self, n: microcode::Local, set_zero_flag: bool) {
+        let old_val = self.get_local(n);
         let old_carry = self.get_flag(Flag::Carry) as u8;
         let new_val = (old_val << 1) | old_carry;
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, set_zero_flag && new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -543,10 +659,10 @@ impl Cpu {
     }
 
     /// The `Inst::Rrc` instruction.
-    fn rotate_right_circular(&mut self, n: Operand8, set_zero_flag: bool) {
-        let old_val = self.get_operand_8(n);
+    fn rotate_right_circular(&mut self, n: microcode::Local, set_zero_flag: bool) {
+        let old_val = self.get_local(n);
         let new_val = old_val.rotate_right(1);
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, set_zero_flag && new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -554,11 +670,11 @@ impl Cpu {
     }
 
     /// The `Inst::Rr` instruction.
-    fn rotate_right(&mut self, n: Operand8, set_zero_flag: bool) {
-        let old_val = self.get_operand_8(n);
+    fn rotate_right(&mut self, n: microcode::Local, set_zero_flag: bool) {
+        let old_val = self.get_local(n);
         let old_carry = self.get_flag(Flag::Carry) as u8;
         let new_val = (old_carry << 7) | (old_val >> 1);
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, set_zero_flag && new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -566,10 +682,10 @@ impl Cpu {
     }
 
     /// The `Inst::Sla` instruction.
-    fn shift_left_arith(&mut self, n: Operand8) {
-        let old_val = self.get_operand_8(n);
+    fn shift_left_arith(&mut self, n: microcode::Local) {
+        let old_val = self.get_local(n);
         let new_val = old_val << 1;
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -577,11 +693,11 @@ impl Cpu {
     }
 
     /// The `Inst::Sra` instruction.
-    fn shift_right_arith(&mut self, n: Operand8) {
-        let old_val = self.get_operand_8(n);
+    fn shift_right_arith(&mut self, n: microcode::Local) {
+        let old_val = self.get_local(n);
         let high_bit = old_val & 0x80;
         let new_val = (old_val >> 1) | high_bit;
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -589,10 +705,10 @@ impl Cpu {
     }
 
     /// The `Inst::Srl` instruction.
-    fn shift_right_logical(&mut self, n: Operand8) {
-        let old_val = self.get_operand_8(n);
+    fn shift_right_logical(&mut self, n: microcode::Local) {
+        let old_val = self.get_local(n);
         let new_val = old_val >> 1;
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -600,10 +716,10 @@ impl Cpu {
     }
 
     /// The `Inst::Swap` instruction.
-    fn swap(&mut self, n: Operand8) {
-        let old_val = self.get_operand_8(n);
+    fn swap(&mut self, n: microcode::Local) {
+        let old_val = self.get_local(n);
         let new_val = old_val.rotate_right(4);
-        self.set_operand_8(n, new_val);
+        self.set_local(n, new_val);
         self.set_flag(Flag::Zero, new_val == 0);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, false);
@@ -611,23 +727,23 @@ impl Cpu {
     }
 
     /// The `Inst::Bit` instruction.
-    fn test_bit(&mut self, bit: u8, n: Operand8) {
-        let is_zero = self.get_operand_8(n) & (1 << bit) == 0;
+    fn test_bit(&mut self, bit: u8, n: microcode::Local) {
+        let is_zero = self.get_local(n) & (1 << bit) == 0;
         self.set_flag(Flag::Zero, is_zero);
         self.set_flag(Flag::Sub, false);
         self.set_flag(Flag::HalfCarry, true);
     }
 
     /// The `Inst::Res` instruction.
-    fn reset_bit(&mut self, bit: u8, n: Operand8) {
-        let val = self.get_operand_8(n) & !(1 << bit);
-        self.set_operand_8(n, val);
+    fn reset_bit(&mut self, bit: u8, n: microcode::Local) {
+        let val = self.get_local(n) & !(1 << bit);
+        self.set_local(n, val);
     }
 
     /// The `Inst::Set` instruction.
-    fn set_bit(&mut self, bit: u8, n: Operand8) {
-        let val = self.get_operand_8(n) | (1 << bit);
-        self.set_operand_8(n, val);
+    fn set_bit(&mut self, bit: u8, n: microcode::Local) {
+        let val = self.get_local(n) | (1 << bit);
+        self.set_local(n, val);
     }
 
     /// The `Inst::Daa` instruction.
@@ -687,7 +803,8 @@ impl Cpu {
     fn check_cond_and_update_cycles(&mut self, cond: Cond) -> bool {
         let condition_met = self.is_cond_met(cond);
         if condition_met {
-            self.cycles += inst::CONDITIONAL_CYCLES[self.current_opcode as usize];
+            unimplemented!();
+            // self.cycles += inst::CONDITIONAL_CYCLES[self.current_opcode as usize];
         }
         condition_met
     }
