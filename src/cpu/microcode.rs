@@ -711,6 +711,13 @@ macro_rules! bit_op_hl {
     ($op:ident, $bit:expr) => (&[
         &[Inc16(PC)],
         &[Read(RegLow(Temp), Mem::Reg(HL)), $op($bit, RegLow(Temp))],
+    ]);
+}
+
+macro_rules! bit_op_hl_mut {
+    ($op:ident, $bit:expr) => (&[
+        &[Inc16(PC)],
+        &[Read(RegLow(Temp), Mem::Reg(HL)), $op($bit, RegLow(Temp))],
         &[Write(Mem::Reg(HL), RegLow(Temp))],
     ]);
 }
@@ -991,23 +998,23 @@ pub fn microcode_cb_prefixed(opcode: u8) -> &'static [&'static [MicroInst]] {
         0x76 => bit_op_hl!(Bit, 6),
         0x7E => bit_op_hl!(Bit, 7),
 
-        0x86 => bit_op_hl!(Res, 0),
-        0x8E => bit_op_hl!(Res, 1),
-        0x96 => bit_op_hl!(Res, 2),
-        0x9E => bit_op_hl!(Res, 3),
-        0xA6 => bit_op_hl!(Res, 4),
-        0xAE => bit_op_hl!(Res, 5),
-        0xB6 => bit_op_hl!(Res, 6),
-        0xBE => bit_op_hl!(Res, 7),
+        0x86 => bit_op_hl_mut!(Res, 0),
+        0x8E => bit_op_hl_mut!(Res, 1),
+        0x96 => bit_op_hl_mut!(Res, 2),
+        0x9E => bit_op_hl_mut!(Res, 3),
+        0xA6 => bit_op_hl_mut!(Res, 4),
+        0xAE => bit_op_hl_mut!(Res, 5),
+        0xB6 => bit_op_hl_mut!(Res, 6),
+        0xBE => bit_op_hl_mut!(Res, 7),
 
-        0xC6 => bit_op_hl!(Set, 0),
-        0xCE => bit_op_hl!(Set, 1),
-        0xD6 => bit_op_hl!(Set, 2),
-        0xDE => bit_op_hl!(Set, 3),
-        0xE6 => bit_op_hl!(Set, 4),
-        0xEE => bit_op_hl!(Set, 5),
-        0xF6 => bit_op_hl!(Set, 6),
-        0xFE => bit_op_hl!(Set, 7),
+        0xC6 => bit_op_hl_mut!(Set, 0),
+        0xCE => bit_op_hl_mut!(Set, 1),
+        0xD6 => bit_op_hl_mut!(Set, 2),
+        0xDE => bit_op_hl_mut!(Set, 3),
+        0xE6 => bit_op_hl_mut!(Set, 4),
+        0xEE => bit_op_hl_mut!(Set, 5),
+        0xF6 => bit_op_hl_mut!(Set, 6),
+        0xFE => bit_op_hl_mut!(Set, 7),
 
         _ => unreachable!(),
     }
