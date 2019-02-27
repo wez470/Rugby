@@ -53,16 +53,27 @@ pub static CONDITIONAL_CYCLES: [usize; 0x100] = [
 ];
 
 /// The number of cycles taken by each `0xCB`-prefixed instruction. These are never conditional.
+///
+/// NOTE: The original reference we used claimed that `BIT n, (HL)` instructions take 16 ticks, but
+/// the blargg instr_timing test and Mooneye's [accuracy doc] confirm they actually take 12. This
+/// makes more sense, anyway:
+///
+///     * 4 cycles to read the 0xCB prefix
+///     * 4 cycles to read the opcode
+///     * 4 cycles to read (HL)
+///     * Unlike `RES n, (HL)` or `SET n, (HL)` there is nothing to write back to (HL).
+///
+/// [accuracy doc]: https://github.com/Gekkio/mooneye-gb/blob/master/docs/accuracy.markdown
 pub static PREFIX_CB_BASE_CYCLES: [usize; 0x100] = [
 //   0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  A,  B,  C,  D,  E,  F
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 0
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 1
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 2
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 3
-     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 4
-     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 5
-     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 6
-     8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 7
+     8,  8,  8,  8,  8,  8, 12,  8,  8,  8,  8,  8,  8,  8, 12,  8, // 4
+     8,  8,  8,  8,  8,  8, 12,  8,  8,  8,  8,  8,  8,  8, 12,  8, // 5
+     8,  8,  8,  8,  8,  8, 12,  8,  8,  8,  8,  8,  8,  8, 12,  8, // 6
+     8,  8,  8,  8,  8,  8, 12,  8,  8,  8,  8,  8,  8,  8, 12,  8, // 7
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 8
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // 9
      8,  8,  8,  8,  8,  8, 16,  8,  8,  8,  8,  8,  8,  8, 16,  8, // A
