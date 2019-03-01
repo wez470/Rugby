@@ -292,6 +292,7 @@ impl Cpu {
             Set(bit, reg) => self.set_bit(bit, reg),
 
             Halt => self.halted = true,
+            Stop => self.stopped = true,
             EnableInterrupts => self.interrupts_enabled = true,
             EnableInterruptsDelayed => self.pending_enable_interrupts = true,
             DisableInterruptsDelayed => self.pending_disable_interrupts = true,

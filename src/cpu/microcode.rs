@@ -74,6 +74,7 @@ pub enum MicroInst {
     Set(u8, Local),
 
     Halt,
+    Stop,
     EnableInterrupts,
     EnableInterruptsDelayed,
     DisableInterruptsDelayed,
@@ -681,6 +682,14 @@ pub fn microcode(opcode: u8) -> &'static [&'static [MicroInst]] {
         0xF3 => &[&[Inc16(PC), DisableInterruptsDelayed]],
         0xFB => &[&[Inc16(PC), EnableInterruptsDelayed]],
         0xCB => &[&[Inc16(PC), DecodePrefixed]],
+
+        // TODO(solson): Should we read the next byte after `STOP`? Documentation online vaguely
+        // suggests it needs to be 0x00, but no source I've found is clear on what happens if it
+        // isn't. The same sources also argue that `STOP` acts immediately in the cycle that it's
+        // decoded, meaning it couldn't read the 0x00 byte until later. With this in mind, we will
+        // simply treat `STOP` as a single-byte instruction. A trailing 0x00 will be ignored as a
+        // `NOP` instruction.
+        0x10 => &[&[Inc16(PC), Stop]],
 
         #[cfg(not(test))] opcode => panic!("inst microcode unimplemented: 0x{:02X}", opcode),
         #[cfg(test)] _ => &[&[Unimplemented]],
