@@ -4,7 +4,7 @@ const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 
 #[derive(Clone)]
 pub struct Audio {
-    channel3: Channel3,
+    pub channel3: Channel3,
     cycles: usize,
     pub buffer: Box<[f32]>,
     curr_buffer_pos: usize,
@@ -91,7 +91,7 @@ pub struct Channel3 {
     volume: Volume,
 
     /// Frequency. Register FF1D and Bits 0-2 of Register FF1E
-    frequency: u16,
+    pub frequency: u16,
 
     /// True if we are going to restart sound. TODO(wcarlson): What is this?
     restart: bool,
