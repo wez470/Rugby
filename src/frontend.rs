@@ -205,7 +205,7 @@ const GAME_BOY_COLORS: [sdl2::pixels::Color; 4] = [
 
 struct FrontendAudio<'a> {
     cpu: &'a Cpu,
-    last_played_pos: usize,
+    curr_pos: usize,
     replays: usize,
 }
 
@@ -213,7 +213,7 @@ impl<'a> FrontendAudio<'a> {
     pub fn new(cpu: &Cpu) -> FrontendAudio {
         FrontendAudio {
             cpu,
-            last_played_pos: 0,
+            curr_pos: 0,
             replays: 0,
         }
     }
@@ -224,7 +224,7 @@ impl<'a> AudioCallback for FrontendAudio<'a> {
 
     fn callback(&mut self, out: &mut [f32]) {
         for i in 0..out.len() {
-            out[i] = self.cpu.audio.buffer[self.last_played_pos] / 256_f32;
+            out[i] = self.cpu.audio.buffer[self.curr_pos] / 256_f32;
             self.replays += 1;
             let mut frequency = self.cpu.audio.channel3.frequency;
             if frequency == 0 {
@@ -232,7 +232,7 @@ impl<'a> AudioCallback for FrontendAudio<'a> {
             }
             if self.replays >= (44100 / frequency) as usize {
                 self.replays = 0;
-                self.last_played_pos = (self.last_played_pos + 1) % (SAMPLE_BUFFER_SIZE * 2)
+                self.curr_pos = (self.curr_pos + 1) % (SAMPLE_BUFFER_SIZE * 2)
             }
         }
     }
