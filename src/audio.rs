@@ -6,7 +6,7 @@ const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 pub struct Audio {
     pub channel3: Channel3,
     cycles: usize,
-    pub buffer: Box<[f32]>,
+    pub buffer: Box<[u8]>,
     curr_buffer_pos: usize,
 }
 
@@ -15,7 +15,7 @@ impl Audio {
         Audio {
             channel3: Channel3::new(),
             cycles: 0,
-            buffer: vec![0_f32; SAMPLE_BUFFER_SIZE * 2].into_boxed_slice(),
+            buffer: vec![0; SAMPLE_BUFFER_SIZE * 2].into_boxed_slice(),
             curr_buffer_pos: 0,
         }
     }
@@ -41,7 +41,7 @@ impl Audio {
         if self.cycles >= SAMPLE_RATE_CYCLES {
             self.cycles %= SAMPLE_RATE_CYCLES;
             for i in 0..WAVE_RAM_LENGTH {
-                self.buffer[self.curr_buffer_pos] = self.channel3.wave_ram[i] as f32 * f32::from(self.channel3.volume);
+                self.buffer[self.curr_buffer_pos] = self.channel3.wave_ram[i];
                 self.curr_buffer_pos = (self.curr_buffer_pos + 1) % (SAMPLE_BUFFER_SIZE * 2);
             }
         }
@@ -88,7 +88,7 @@ pub struct Channel3 {
     length: u8,
 
     /// Volume. Register FF1C
-    volume: Volume,
+    pub volume: Volume,
 
     /// Frequency. Register FF1D and Bits 0-2 of Register FF1E
     pub frequency: u16,
