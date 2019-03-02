@@ -33,6 +33,7 @@ pub enum Cart {
     NoMbc(NoMbc),
     Mbc1(Mbc1),
     Mbc3(Mbc3),
+    Mbc5(Mbc5),
 }
 
 #[derive(Clone, Debug, Fail)]
@@ -73,6 +74,7 @@ impl Cart {
             CartType::NoMbc => Cart::NoMbc(NoMbc::new(rom, ram)),
             CartType::Mbc1 => Cart::Mbc1(Mbc1::new(rom, ram)),
             CartType::Mbc3 => Cart::Mbc3(Mbc3::new(rom, ram)),
+            CartType::Mbc5 => Cart::Mbc5(Mbc5::new(rom, ram)),
             _ => panic!("Unimplemented Mbc Type!"),
         })
     }
@@ -82,6 +84,7 @@ impl Cart {
             Cart::NoMbc(nombc) => nombc.read(addr),
             Cart::Mbc1(mbc1) => mbc1.read(addr),
             Cart::Mbc3(mbc3) => mbc3.read(addr),
+            Cart::Mbc5(mbc5) => mbc5.read(addr),
         }
     }
 
@@ -90,6 +93,7 @@ impl Cart {
             Cart::NoMbc(nombc) => nombc.write(addr, val),
             Cart::Mbc1(mbc1) => mbc1.write(addr, val),
             Cart::Mbc3(mbc3) => mbc3.write(addr, val),
+            Cart::Mbc5(mbc5) => mbc5.write(addr, val),
         }
     }
 
@@ -99,6 +103,7 @@ impl Cart {
             Cart::NoMbc(nombc) => &nombc.rom,
             Cart::Mbc1(mbc1) => &mbc1.rom,
             Cart::Mbc3(mbc3) => &mbc3.rom,
+            Cart::Mbc5(mbc5) => &mbc5.rom,
         }
     }
 
@@ -107,6 +112,7 @@ impl Cart {
             Cart::NoMbc(nombc) => &nombc.ram,
             Cart::Mbc1(mbc1) => &mbc1.ram,
             Cart::Mbc3(mbc3) => &mbc3.ram,
+            Cart::Mbc5(mbc5) => &mbc5.ram,
         }
     }
 }
@@ -161,21 +167,21 @@ impl NoMbc {
 pub struct Mbc1 {
     rom: Box<[u8]>,
     ram: Box<[u8]>,
-    mode: Mbc1Mode,
+    mode: MbcMode,
     ram_enabled: bool,
     bank_reg1: u8,
     bank_reg2: u8,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Mbc1Mode {
+pub enum MbcMode {
     Rom,
     Ram,
 }
 
 impl Mbc1 {
     fn new(rom: Box<[u8]>, ram: Box<[u8]>) -> Self {
-        Self { rom, ram, mode: Mbc1Mode::Rom, ram_enabled: false, bank_reg1: 1, bank_reg2: 0 }
+        Self { rom, ram, mode: MbcMode::Rom, ram_enabled: false, bank_reg1: 1, bank_reg2: 0 }
     }
 
     // TODO(solson): Combine with ram_index.
@@ -195,8 +201,8 @@ impl Mbc1 {
         match addr {
             0x0000...0x3FFF => {
                 let bank = match self.mode {
-                    Mbc1Mode::Rom => 0,
-                    Mbc1Mode::Ram => self.bank_reg2 << 5,
+                    MbcMode::Rom => 0,
+                    MbcMode::Ram => self.bank_reg2 << 5,
                 };
                 self.rom[self.rom_index(bank, addr)]
             }
@@ -210,8 +216,8 @@ impl Mbc1 {
                 // When RAM is disabled, the hardware returns all bits set.
                 if !self.ram_enabled || self.ram.len() == 0 { return 0xFF; }
                 let bank = match self.mode {
-                    Mbc1Mode::Rom => 0,
-                    Mbc1Mode::Ram => self.bank_reg2,
+                    MbcMode::Rom => 0,
+                    MbcMode::Ram => self.bank_reg2,
                 };
                 self.ram[self.ram_index(bank, addr)]
             }
@@ -242,7 +248,7 @@ impl Mbc1 {
 
             // ROM / RAM Mode
             0x6000...0x7FFF => {
-                self.mode = if val & 1 == 0 { Mbc1Mode::Rom } else { Mbc1Mode::Ram };
+                self.mode = if val & 1 == 0 { MbcMode::Rom } else { MbcMode::Ram };
             }
 
             // Switchable RAM bank
@@ -250,8 +256,8 @@ impl Mbc1 {
                 // When RAM is disabled, the hardware ignores writes.
                 if !self.ram_enabled || self.ram.len() == 0 { return; }
                 let bank = match self.mode {
-                    Mbc1Mode::Rom => 0,
-                    Mbc1Mode::Ram => self.bank_reg2,
+                    MbcMode::Rom => 0,
+                    MbcMode::Ram => self.bank_reg2,
                 };
                 self.ram[self.ram_index(bank, addr)] = val;
             }
@@ -364,6 +370,95 @@ impl Mbc3 {
             }
 
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Mbc5 {
+    rom: Box<[u8]>,
+    ram: Box<[u8]>,
+    ram_enabled: bool,
+    rom_bank_reg1: u8,
+    rom_bank_reg2: u8,
+    ram_bank_reg: u8,
+}
+
+impl Mbc5 {
+    fn new(rom: Box<[u8]>, ram: Box<[u8]>) -> Self {
+        Self {
+            rom,
+            ram,
+            ram_enabled: false,
+            rom_bank_reg1: 0,
+            rom_bank_reg2: 0,
+            ram_bank_reg: 0,
+        }
+    }
+
+    fn rom_index(&self, bank: u16, addr: u16) -> usize {
+        let bank_base = bank as usize * ROM_BANK_SIZE;
+        let addr_in_bank = addr as usize & (ROM_BANK_SIZE - 1);
+        (bank_base | addr_in_bank) & (self.rom.len() - 1)
+    }
+
+    fn ram_index(&self, bank: u8, addr: u16) -> usize {
+        let bank_base = bank as usize * RAM_BANK_SIZE;
+        let addr_in_bank = addr as usize & (RAM_BANK_SIZE - 1);
+        (bank_base | addr_in_bank) & (self.ram.len() - 1)
+    }
+
+    fn read(&self, addr: u16) -> u8 {
+        match addr {
+            0x0000...0x3FFF => {
+                self.rom[self.rom_index(0, addr)]
+            }
+
+            0x4000...0x7FFF => {
+                let bank = (self.rom_bank_reg2 as u16) << 8 | self.rom_bank_reg1 as u16;
+                self.rom[self.rom_index(bank, addr)]
+            }
+
+            0xA000...0xBFFF => {
+                // When RAM is disabled, the hardware returns all bits set.
+                if !self.ram_enabled || self.ram.len() == 0 { return 0xFF; }
+                self.ram[self.ram_index(self.ram_bank_reg, addr)]
+            }
+
+            _ => panic!("Unimplemented MBC5 read at address: {}", addr),
+        }
+    }
+
+    fn write(&mut self, addr: u16, val: u8) {
+        match addr {
+            // RAM Enable
+            0x0000...0x1FFF => {
+                self.ram_enabled = (val & 0b1111) == 0b1010;
+            }
+
+            // ROM bank lower bits write
+            0x2000...0x2FFF => {
+                self.rom_bank_reg1 = val;
+            }
+
+            // ROM bank higher bit write
+            0x3000...0x3FFF => {
+                self.rom_bank_reg2 = val & 0b0001;
+            }
+
+            // RAM bank write
+            0x4000...0x5FFF => {
+                self.ram_bank_reg = val & 0b1111;
+            }
+
+            // Switchable RAM bank
+            0xA000...0xBFFF => {
+                // When RAM is disabled, the hardware ignores writes.
+                if !self.ram_enabled || self.ram.len() == 0 { return; }
+                self.ram[self.ram_index(self.ram_bank_reg, addr)] = val;
+            }
+
+            _ => panic!("Unimplemented MBC5 write address: {}, value: {}", addr, val),
         }
     }
 }
