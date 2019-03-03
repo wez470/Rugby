@@ -34,7 +34,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
 
     let sdl_audio = sdl.audio().expect("Failed to access SDL audio subsystem");
     let desired_spec = AudioSpecDesired {
-        freq: Some(22100),
+        freq: Some(44100),
         channels: Some(1), // mono
         samples: Some(SAMPLE_BUFFER_SIZE as u16),
     };
@@ -205,14 +205,18 @@ const GAME_BOY_COLORS: [sdl2::pixels::Color; 4] = [
 
 struct FrontendAudio<'a> {
     cpu: &'a Cpu,
-    last_played_pos: usize,
+    curr_pos: usize,
+    replays: usize,
+    nibble: usize,
 }
 
 impl<'a> FrontendAudio<'a> {
     pub fn new(cpu: &Cpu) -> FrontendAudio {
         FrontendAudio {
             cpu,
-            last_played_pos: 0,
+            curr_pos: 0,
+            replays: 0,
+            nibble: 0,
         }
     }
 }
@@ -222,8 +226,29 @@ impl<'a> AudioCallback for FrontendAudio<'a> {
 
     fn callback(&mut self, out: &mut [f32]) {
         for i in 0..out.len() {
-            out[i] = self.cpu.audio.buffer[self.last_played_pos] / 256_f32;
-            self.last_played_pos = (self.last_played_pos + 1) % (SAMPLE_BUFFER_SIZE * 2)
+            let curr_sound = if self.nibble == 0 {
+                ((self.cpu.audio.buffer[self.curr_pos] >> 4) & 0b1111) as f32 * f32::from(self.cpu.audio.channel3.volume) / 15_f32
+            }
+            else {
+                (self.cpu.audio.buffer[self.curr_pos] & 0b1111) as f32 * f32::from(self.cpu.audio.channel3.volume) / 15_f32
+            };
+            out[i] = curr_sound;
+            self.replays += 1;
+            let frequency = self.cpu.audio.channel3.frequency;
+            if frequency == 0 {
+                out[i] = 0_f32;
+                return;
+            }
+            if self.replays >= (44100 / frequency) as usize {
+                self.replays = 0;
+                if self.nibble == 1 {
+                    self.curr_pos = (self.curr_pos + 1) % (SAMPLE_BUFFER_SIZE * 2);
+                    self.nibble = 0;
+                }
+                else {
+                    self.nibble = 1;
+                }
+            }
         }
     }
 }
