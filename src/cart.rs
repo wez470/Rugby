@@ -270,25 +270,19 @@ impl Mbc3 {
     }
 
     fn read(&self, addr: u16) -> u8 {
-        let mut address = addr as usize;
-        match address {
+        match addr {
             // ROM Bank 0
-            0x0000...0x3FFF => self.rom[address],
+            0x0000...0x3FFF => get_rom(&self.rom, 0, addr),
 
             // Switchable ROM bank
-            0x4000...0x7FFF => {
-                let bank = self.rom_bank as usize;
-                address = (address - ROM_BANK_SIZE) + (bank * ROM_BANK_SIZE);
-                self.rom[address]
-            }
+            0x4000...0x7FFF => get_rom(&self.rom, self.rom_bank as u16, addr),
 
             // Switchable RAM bank
             0xA000...0xBFFF => {
-                if !self.ram_rtc_enabled {
-                    panic!("Attempt to read from external RAM or RTC without RAM and RTC enabled");
-                }
+                // When RAM is disabled, the hardware returns all bits set.
+                if !self.ram_rtc_enabled { return 0xFF; }
 
-                let bank = self.ram_rtc_bank as usize;
+                let bank = self.ram_rtc_bank as u16;
                 match bank {
                     // Read from RTC values
                     0x8...0xC => {
@@ -297,10 +291,7 @@ impl Mbc3 {
                     }
 
                     // Read from RAM bank
-                    _ => {
-                        let ram_index = (addr - 0xA000) as usize;
-                        self.ram[ram_index + bank * RAM_BANK_SIZE]
-                    }
+                    _ => get_ram(&self.ram, bank, addr),
                 }
             }
 
@@ -312,17 +303,15 @@ impl Mbc3 {
         match addr {
             // RAM Enable
             0x0000...0x1FFF => {
-                self.ram_rtc_enabled = (val & 0b1111) == 0x0A
+                self.ram_rtc_enabled = (val & 0b1111) == 0b1010;
             }
 
             // ROM bank
             0x2000...0x3FFF => {
-                let mut lower_7_bits = val & 0b0111_1111;
-                if lower_7_bits == 0 {
-                    lower_7_bits = 1;
+                self.rom_bank = val & 0b0111_1111;
+                if self.rom_bank == 0 {
+                    self.rom_bank = 1;
                 }
-                self.rom_bank &= 0b1000_0000;
-                self.rom_bank |= lower_7_bits;
             }
 
             // RAM Bank / RTC register
@@ -337,11 +326,10 @@ impl Mbc3 {
 
             // Switchable RAM bank
             0xA000...0xBFFF => {
-                if !self.ram_rtc_enabled {
-                    panic!("Attempt to write external RAM or RTC bank without RAM and RTC enabled");
-                }
+                // When RAM is disabled, the hardware ignores writes.
+                if !self.ram_rtc_enabled { return; }
 
-                let bank = self.ram_rtc_bank as usize;
+                let bank = self.ram_rtc_bank as u16;
                 match bank {
                     // Write to RTC values
                     0x8...0xC => {
@@ -350,8 +338,9 @@ impl Mbc3 {
 
                     // Write to RAM bank
                     _ => {
-                        let ram_index = (addr - 0xA000) as usize;
-                        self.ram[ram_index + bank * RAM_BANK_SIZE] = val;
+                        // let ram_index = (addr - 0xA000) as usize;
+                        // self.ram[ram_index + bank * RAM_BANK_SIZE] = val;
+                        set_ram(&mut self.ram, bank, addr, val);
                     }
                 }
             }
