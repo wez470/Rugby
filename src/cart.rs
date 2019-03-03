@@ -184,19 +184,6 @@ impl Mbc1 {
         Self { rom, ram, mode: MbcMode::Rom, ram_enabled: false, bank_reg1: 1, bank_reg2: 0 }
     }
 
-    // TODO(solson): Combine with ram_index.
-    fn rom_index(&self, bank: u8, addr: u16) -> usize {
-        let bank_base = bank as usize * ROM_BANK_SIZE;
-        let addr_in_bank = addr as usize & (ROM_BANK_SIZE - 1);
-        (bank_base | addr_in_bank) & (self.rom.len() - 1)
-    }
-
-    fn ram_index(&self, bank: u8, addr: u16) -> usize {
-        let bank_base = bank as usize * RAM_BANK_SIZE;
-        let addr_in_bank = addr as usize & (RAM_BANK_SIZE - 1);
-        (bank_base | addr_in_bank) & (self.ram.len() - 1)
-    }
-
     fn read(&self, addr: u16) -> u8 {
         match addr {
             0x0000...0x3FFF => {
@@ -204,12 +191,12 @@ impl Mbc1 {
                     MbcMode::Rom => 0,
                     MbcMode::Ram => self.bank_reg2 << 5,
                 };
-                self.rom[self.rom_index(bank, addr)]
+                get_rom(&self.rom, bank as u16, addr)
             }
 
             0x4000...0x7FFF => {
                 let bank = self.bank_reg2 << 5 | self.bank_reg1;
-                self.rom[self.rom_index(bank, addr)]
+                get_rom(&self.rom, bank as u16, addr)
             }
 
             0xA000...0xBFFF => {
@@ -219,7 +206,7 @@ impl Mbc1 {
                     MbcMode::Rom => 0,
                     MbcMode::Ram => self.bank_reg2,
                 };
-                self.ram[self.ram_index(bank, addr)]
+                get_ram(&self.ram, bank as u16, addr)
             }
 
             _ => panic!("Unimplemented MBC1 read at address: {}", addr),
@@ -259,7 +246,7 @@ impl Mbc1 {
                     MbcMode::Rom => 0,
                     MbcMode::Ram => self.bank_reg2,
                 };
-                self.ram[self.ram_index(bank, addr)] = val;
+                set_ram(&mut self.ram, bank as u16, addr, val);
             }
 
             _ => panic!("Unimplemented MBC1 write address: {}, value: {}", addr, val),
@@ -396,33 +383,21 @@ impl Mbc5 {
         }
     }
 
-    fn rom_index(&self, bank: u16, addr: u16) -> usize {
-        let bank_base = bank as usize * ROM_BANK_SIZE;
-        let addr_in_bank = addr as usize & (ROM_BANK_SIZE - 1);
-        (bank_base | addr_in_bank) & (self.rom.len() - 1)
-    }
-
-    fn ram_index(&self, bank: u8, addr: u16) -> usize {
-        let bank_base = bank as usize * RAM_BANK_SIZE;
-        let addr_in_bank = addr as usize & (RAM_BANK_SIZE - 1);
-        (bank_base | addr_in_bank) & (self.ram.len() - 1)
-    }
-
     fn read(&self, addr: u16) -> u8 {
         match addr {
             0x0000...0x3FFF => {
-                self.rom[self.rom_index(0, addr)]
+                get_rom(&self.rom, 0, addr)
             }
 
             0x4000...0x7FFF => {
-                let bank = (self.rom_bank_reg2 as u16) << 8 | self.rom_bank_reg1 as u16;
-                self.rom[self.rom_index(bank, addr)]
+                let bank = u16::from_le_bytes([self.rom_bank_reg1, self.rom_bank_reg2]);
+                get_rom(&self.rom, bank, addr)
             }
 
             0xA000...0xBFFF => {
                 // When RAM is disabled, the hardware returns all bits set.
                 if !self.ram_enabled || self.ram.len() == 0 { return 0xFF; }
-                self.ram[self.ram_index(self.ram_bank_reg, addr)]
+                get_ram(&self.ram, self.ram_bank_reg as u16, addr)
             }
 
             _ => panic!("Unimplemented MBC5 read at address: {}", addr),
@@ -455,10 +430,28 @@ impl Mbc5 {
             0xA000...0xBFFF => {
                 // When RAM is disabled, the hardware ignores writes.
                 if !self.ram_enabled || self.ram.len() == 0 { return; }
-                self.ram[self.ram_index(self.ram_bank_reg, addr)] = val;
+                set_ram(&mut self.ram, self.ram_bank_reg as u16, addr, val);
             }
 
             _ => panic!("Unimplemented MBC5 write address: {}, value: {}", addr, val),
         }
     }
+}
+
+fn bank_index(bank: u16, addr: u16, bank_size: usize, total_size: usize) -> usize {
+    let bank_base = bank as usize * bank_size;
+    let addr_in_bank = addr as usize & (bank_size - 1);
+    (bank_base | addr_in_bank) & (total_size - 1)
+}
+
+fn get_rom(rom: &[u8], bank: u16, addr: u16) -> u8 {
+    rom[bank_index(bank, addr, ROM_BANK_SIZE, rom.len())]
+}
+
+fn get_ram(ram: &[u8], bank: u16, addr: u16) -> u8 {
+    ram[bank_index(bank, addr, RAM_BANK_SIZE, ram.len())]
+}
+
+fn set_ram(ram: &mut [u8], bank: u16, addr: u16, val: u8) {
+    ram[bank_index(bank, addr, RAM_BANK_SIZE, ram.len())] = val;
 }
