@@ -124,6 +124,7 @@ impl Cpu {
         while curr_cycles < cycles {
             let mut interrupts = BitFlags::empty();
             let step_cycles = self.step();
+            self.audio.step(step_cycles);
             interrupts |= self.gpu.step(step_cycles);
             interrupts |= self.timer.step(step_cycles);
             interrupts |= self.joypad.step();
