@@ -50,7 +50,7 @@ struct RunOpts {
 struct InfoOpts {
     /// The game ROM file paths
     #[structopt(name = "ROM", parse(from_os_str), required = true)]
-    rom_path: Vec<PathBuf>,
+    rom_paths: Vec<PathBuf>,
 
     /// Show results in a table
     #[structopt(short = "t", long = "table")]
@@ -116,14 +116,15 @@ fn info(opts: &InfoOpts) -> Result<(), failure::Error> {
 /// Print the ROM info in a table with one ROM per row
 fn info_table(opts: &InfoOpts) -> Result<(), failure::Error> {
     let mut out = tabwriter::TabWriter::new(std::io::stdout());
-    writeln!(out, "Title\tVersion\tType\tHardware\tROM size\tRAM size\tGBC\tSGB\tLicensee\tDestination\tManufacturer")?;
+    writeln!(out, "File path\tTitle\tVersion\tType\tHardware\tROM size\tRAM size\tGBC\tSGB\tLicensee\tDestination\tManufacturer")?;
 
-    for path in &opts.rom_path {
+    for path in &opts.rom_paths {
         let rom = std::fs::read(path)
             .with_context(|_| format!("Failed to read ROM file: {}", path.display()))?;
         let cart = cart_header::CartHeader::from_rom(&rom)
             .with_context(|_| format!("Failed to parse cartridge header: {}", path.display()))?;
 
+        write!(out, "{}\t", path.display())?;
         match std::str::from_utf8(&cart.title) {
             Ok(title) => write!(out, "{}\t", title)?,
             Err(_) => write!(out, "{:x?}\t", cart.title)?,
@@ -147,13 +148,14 @@ fn info_table(opts: &InfoOpts) -> Result<(), failure::Error> {
 
 /// Print the ROM info in the style of a list of separate key-value records.
 fn info_records(opts: &InfoOpts) -> Result<(), failure::Error> {
-    for path in &opts.rom_path {
+    for path in &opts.rom_paths {
         let rom = std::fs::read(path)
             .with_context(|_| format!("Failed to read ROM file: {}", path.display()))?;
         let cart = cart_header::CartHeader::from_rom(&rom)
             .with_context(|_| format!("Failed to parse cartridge header: {}", path.display()))?;
         let mut out = tabwriter::TabWriter::new(std::io::stdout());
 
+        writeln!(out, "File path:\t{}", path.display())?;
         match std::str::from_utf8(&cart.title) {
             Ok(title) => writeln!(out, "Title:\t{}", title)?,
             Err(_) => writeln!(out, "Title:\t{:x?}", cart.title)?,
