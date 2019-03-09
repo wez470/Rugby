@@ -791,7 +791,7 @@ impl Cpu {
     }
 
     fn read_mem(&self, addr: u16) -> u8 {
-        match addr {
+        let val = match addr {
             // First 16KB is ROM Bank 00 (in cartridge, fixed at bank 00)
             // Second 16KB are ROM Banks 01..NN (in cartridge, switchable bank number)
             0x0000...0x7FFF => self.cart.read(addr),
@@ -848,11 +848,15 @@ impl Cpu {
 
             // This match is exhaustive but rustc doesn't check that for integer matches.
             _ => unreachable!(),
-        }
+        };
+
+        trace!("read(0x{:04X}) => 0x{:02X}", addr, val);
+
+        val
     }
 
     fn write_mem(&mut self, addr: u16, val: u8) {
-        trace!("mem[0x{:04X}] = 0x{:02X}", addr, val);
+        trace!("write(0x{:04X}, 0x{:02X})", addr, val);
 
         match addr {
             // 32KB cartridge write
