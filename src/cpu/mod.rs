@@ -845,9 +845,6 @@ impl Cpu {
                 (self.interrupt_enable_unused_bits & 0b1110_0000) |
                     self.interrupt_enable_register.bits()
             }
-
-            // This match is exhaustive but rustc doesn't check that for integer matches.
-            _ => unreachable!(),
         };
 
         trace!("read(0x{:04X}) => 0x{:02X}", addr, val);
@@ -910,9 +907,6 @@ impl Cpu {
                 self.interrupt_enable_register = BitFlags::from_bits_truncate(val);
                 self.interrupt_enable_unused_bits = val & 0b1110_0000;
             }
-
-            // This match is exhaustive but rustc doesn't check that for integer matches.
-            _ => unreachable!(),
         }
     }
 
