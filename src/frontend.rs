@@ -235,7 +235,7 @@ impl<'a> AudioCallback for FrontendAudio<'a> {
             out[i] = curr_sound;
             self.replays += 1;
             let frequency = self.cpu.audio.channel3.frequency;
-            if frequency == 0 {
+            if frequency == 0 || !self.cpu.audio.channel3.on {
                 out[i] = 0_f32;
                 continue;
             }

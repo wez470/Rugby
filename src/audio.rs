@@ -82,7 +82,7 @@ impl std::convert::From<u8> for Volume {
 #[derive(Clone)]
 pub struct Channel3 {
     /// True if sound is on. Register FF1A
-    on: bool,
+    pub on: bool,
 
     /// Sound Length. Register FF1B
     length: u8,
