@@ -351,6 +351,10 @@ impl Cpu {
     ///
     /// Move 8 bits from `src` and store them into `dest`.
     fn move_8(&mut self, dest: Operand8, src: Operand8) {
+        match (dest, src) {
+            (Operand8::Reg8(Reg8::B), Operand8::Reg8(Reg8::B)) => panic!("debug opcode"),
+            _ => {}
+        }
         let val = self.get_operand_8(src);
         self.set_operand_8(dest, val);
     }
