@@ -237,7 +237,7 @@ impl<'a> AudioCallback for FrontendAudio<'a> {
             let frequency = self.cpu.audio.channel3.frequency;
             if frequency == 0 {
                 out[i] = 0_f32;
-                return;
+                continue;
             }
             if self.replays >= (44100 / frequency) as usize {
                 self.replays = 0;
