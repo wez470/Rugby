@@ -8,6 +8,7 @@ pub struct Audio {
     cycles: usize,
     pub buffer: Box<[u8]>,
     curr_buffer_pos: usize,
+    nibble: usize,
 }
 
 impl Audio {
@@ -17,6 +18,7 @@ impl Audio {
             cycles: 0,
             buffer: vec![0; SAMPLE_BUFFER_SIZE * 2].into_boxed_slice(),
             curr_buffer_pos: 0,
+            nibble: 0
         }
     }
 
@@ -36,13 +38,18 @@ impl Audio {
         }
     }
 
-    pub fn step(&mut self, cycles: usize) {
+    pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
         self.cycles += cycles;
         if self.cycles >= SAMPLE_RATE_CYCLES {
             self.cycles %= SAMPLE_RATE_CYCLES;
-            for i in 0..WAVE_RAM_LENGTH {
-                self.buffer[self.curr_buffer_pos] = self.channel3.wave_ram[i];
-                self.curr_buffer_pos = (self.curr_buffer_pos + 1) % (SAMPLE_BUFFER_SIZE * 2);
+            if self.nibble == 0 {
+                audio_queue.queue(&[(self.channel3.wave_ram[self.curr_buffer_pos] >> 4) / u8::from(self.channel3.volume)]);
+                self.nibble = 1
+            }
+            else {
+                audio_queue.queue(&[(self.channel3.wave_ram[self.curr_buffer_pos] & 0b1111) / u8::from(self.channel3.volume)]);
+                self.nibble = 0;
+                self.curr_buffer_pos = (self.curr_buffer_pos + 1) % (WAVE_RAM_LENGTH);
             }
         }
     }
@@ -63,6 +70,17 @@ impl std::convert::From<Volume> for f32 {
             Volume::Full => 1_f32,
             Volume::Half => 0.5_f32,
             Volume::Quarter => 0.25_f32,
+        }
+    }
+}
+
+impl std::convert::From<Volume> for u8 {
+    fn from(value: Volume) -> u8 {
+        match value {
+            Volume::Zero => 255,
+            Volume::Full => 1,
+            Volume::Half => 2,
+            Volume::Quarter => 4,
         }
     }
 }

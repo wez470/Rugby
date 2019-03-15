@@ -3,7 +3,7 @@ use crate::cpu::Cpu;
 use crate::gpu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::joypad::{ButtonKey, DirKey};
 use log::info;
-use sdl2::audio::{AudioCallback, AudioSpecDesired};
+use sdl2::audio::AudioSpecDesired;
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::keyboard::{Keycode, Mod};
@@ -38,14 +38,8 @@ pub fn start_frontend(cpu: &mut Cpu) {
         channels: Some(1), // mono
         samples: Some(SAMPLE_BUFFER_SIZE as u16),
     };
-    let frontend_audio = FrontendAudio::new(&cpu);
-    let device = sdl_audio.open_playback(None, &desired_spec, |_spec| {
-        // initialize the audio callback
-        frontend_audio
-    }).unwrap();
-
-    // Start playback
-    device.resume();
+    let mut audio_queue = sdl_audio.open_queue(None, &desired_spec).expect("Failed to open audio queue");
+    audio_queue.resume();
 
     let mut speed_multiplier: f32 = 1.0;
     let mut paused = false;
@@ -188,7 +182,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
         }
 
         if !paused {
-            cpu.step_cycles((CYCLES_PER_FRAME as f32 * speed_multiplier) as usize);
+            cpu.step_cycles((CYCLES_PER_FRAME as f32 * speed_multiplier) as usize, &mut audio_queue);
         }
 
         sdl_fps.delay();
@@ -202,53 +196,3 @@ const GAME_BOY_COLORS: [sdl2::pixels::Color; 4] = [
     sdl2::pixels::Color { r: 48,  g: 98,  b: 48, a: 0xFF },
     sdl2::pixels::Color { r: 15,  g: 56,  b: 15, a: 0xFF },
 ];
-
-struct FrontendAudio<'a> {
-    cpu: &'a Cpu,
-    curr_pos: usize,
-    replays: usize,
-    nibble: usize,
-}
-
-impl<'a> FrontendAudio<'a> {
-    pub fn new(cpu: &Cpu) -> FrontendAudio {
-        FrontendAudio {
-            cpu,
-            curr_pos: 0,
-            replays: 0,
-            nibble: 0,
-        }
-    }
-}
-
-impl<'a> AudioCallback for FrontendAudio<'a> {
-    type Channel = f32;
-
-    fn callback(&mut self, out: &mut [f32]) {
-        for i in 0..out.len() {
-            let curr_sound = if self.nibble == 0 {
-                ((self.cpu.audio.buffer[self.curr_pos] >> 4) & 0b1111) as f32 * f32::from(self.cpu.audio.channel3.volume) / 15_f32
-            }
-            else {
-                (self.cpu.audio.buffer[self.curr_pos] & 0b1111) as f32 * f32::from(self.cpu.audio.channel3.volume) / 15_f32
-            };
-            out[i] = curr_sound;
-            self.replays += 1;
-            let frequency = self.cpu.audio.channel3.frequency;
-            if frequency == 0 || !self.cpu.audio.channel3.on {
-                out[i] = 0_f32;
-                continue;
-            }
-            if self.replays >= (44100 / frequency) as usize {
-                self.replays = 0;
-                if self.nibble == 1 {
-                    self.curr_pos = (self.curr_pos + 1) % (SAMPLE_BUFFER_SIZE * 2);
-                    self.nibble = 0;
-                }
-                else {
-                    self.nibble = 1;
-                }
-            }
-        }
-    }
-}

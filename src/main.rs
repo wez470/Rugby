@@ -1,3 +1,5 @@
+extern crate sdl2;
+
 use crate::cart::{Cart, CartConfig};
 use crate::cart_header::{CartHardware, CartHeader};
 use crate::cpu::Cpu;

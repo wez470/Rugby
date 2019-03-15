@@ -111,12 +111,12 @@ impl Cpu {
     }
 
     /// Keep executing instructions until more than the given number of cycles have passed.
-    pub fn step_cycles(&mut self, cycles: usize) {
+    pub fn step_cycles(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
             let mut interrupts = BitFlags::empty();
             let step_cycles = self.step();
-            self.audio.step(step_cycles);
+            self.audio.step(step_cycles, audio_queue);
             interrupts |= self.gpu.step(step_cycles);
             interrupts |= self.timer.step(step_cycles);
             interrupts |= self.joypad.step();
