@@ -59,7 +59,7 @@ impl Audio {
                 }
                 self.repeats = 0;
             }
-            audio_queue.queue(&[self.last_played]);
+            audio_queue.queue(&[((255 * (self.last_played as usize)) / 15) as u8]);
         }
     }
 }
