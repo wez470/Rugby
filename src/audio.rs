@@ -9,6 +9,8 @@ pub struct Audio {
     pub buffer: Box<[u8]>,
     curr_buffer_pos: usize,
     nibble: usize,
+    repeats: usize,
+    last_played: u8,
 }
 
 impl Audio {
@@ -18,7 +20,9 @@ impl Audio {
             cycles: 0,
             buffer: vec![0; SAMPLE_BUFFER_SIZE * 2].into_boxed_slice(),
             curr_buffer_pos: 0,
-            nibble: 0
+            nibble: 0,
+            repeats: 0,
+            last_played: 0,
         }
     }
 
@@ -42,15 +46,20 @@ impl Audio {
         self.cycles += cycles;
         if self.cycles >= SAMPLE_RATE_CYCLES {
             self.cycles %= SAMPLE_RATE_CYCLES;
-            if self.nibble == 0 {
-                audio_queue.queue(&[(self.channel3.wave_ram[self.curr_buffer_pos] >> 4) / u8::from(self.channel3.volume)]);
-                self.nibble = 1
+            self.repeats += 1;
+            if self.repeats > 65536 / (2048 - self.channel3.frequency as usize) {
+                if self.nibble == 0 {
+                    self.last_played = (self.channel3.wave_ram[self.curr_buffer_pos] >> 4) / u8::from(self.channel3.volume);
+                    self.nibble = 1
+                }
+                else {
+                    self.last_played = (self.channel3.wave_ram[self.curr_buffer_pos] & 0b1111) / u8::from(self.channel3.volume);
+                    self.nibble = 0;
+                    self.curr_buffer_pos = (self.curr_buffer_pos + 1) % WAVE_RAM_LENGTH;
+                }
+                self.repeats = 0;
             }
-            else {
-                audio_queue.queue(&[(self.channel3.wave_ram[self.curr_buffer_pos] & 0b1111) / u8::from(self.channel3.volume)]);
-                self.nibble = 0;
-                self.curr_buffer_pos = (self.curr_buffer_pos + 1) % (WAVE_RAM_LENGTH);
-            }
+            audio_queue.queue(&[self.last_played]);
         }
     }
 }
@@ -118,7 +127,7 @@ pub struct Channel3 {
     stop: bool,
 
     /// Wave pattern RAM. Registers FF30-FF3F
-    wave_ram: Box<[u8]>,
+    wave_ram: Box<[u8]>
 }
 
 impl Channel3 {
