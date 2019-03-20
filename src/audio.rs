@@ -6,9 +6,7 @@ const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 pub struct Audio {
     pub channel3: Channel3,
     cycles: usize,
-    pub buffer: Box<[u8]>,
-    curr_buffer_pos: usize,
-    nibble: usize,
+    curr_sample: usize,
 }
 
 impl Audio {
@@ -16,9 +14,7 @@ impl Audio {
         Audio {
             channel3: Channel3::new(),
             cycles: 0,
-            buffer: vec![0; SAMPLE_BUFFER_SIZE * 2].into_boxed_slice(),
-            curr_buffer_pos: 0,
-            nibble: 0
+            curr_sample: 0,
         }
     }
 
@@ -40,18 +36,15 @@ impl Audio {
 
     pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
         self.cycles += cycles;
-        if self.cycles >= SAMPLE_RATE_CYCLES {
-            self.cycles %= SAMPLE_RATE_CYCLES;
-            if self.nibble == 0 {
-                audio_queue.queue(&[(self.channel3.wave_ram[self.curr_buffer_pos] >> 4) / u8::from(self.channel3.volume)]);
-                self.nibble = 1
-            }
-            else {
-                audio_queue.queue(&[(self.channel3.wave_ram[self.curr_buffer_pos] & 0b1111) / u8::from(self.channel3.volume)]);
-                self.nibble = 0;
-                self.curr_buffer_pos = (self.curr_buffer_pos + 1) % (WAVE_RAM_LENGTH);
-            }
-        }
+        if self.cycles < SAMPLE_RATE_CYCLES { return; }
+        self.cycles %= SAMPLE_RATE_CYCLES;
+        if !self.channel3.on { return; }
+        let sample_index = self.curr_sample / 2;
+        let nibble = self.curr_sample % 2;
+        let volume_div = u8::from(self.channel3.volume);
+        let sample = ((self.channel3.wave_ram[sample_index] >> (nibble * 4)) & 0x0F) / volume_div;
+        audio_queue.queue(&[sample]);
+        self.curr_sample = (self.curr_sample + 1) % (WAVE_RAM_LENGTH * 2);
     }
 }
 
