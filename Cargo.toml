@@ -25,6 +25,5 @@ features = ["gfx"]
 [dev-dependencies]
 quickcheck = "0.8.0"
 
-[profile.release]
-debug = true
-overflow-checks = true
+[profile.dev]
+opt-level = 2
