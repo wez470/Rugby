@@ -1,7 +1,7 @@
 use crate::cart::{Cart, CartConfig};
 use crate::cart_header::{CartHardware, CartHeader};
 use crate::cpu::Cpu;
-use crate::frontend::start_frontend;
+use crate::frontend::{start_frontend, start_frontend_debug};
 use crate::wla_symbols::WlaSymbols;
 use failure::ResultExt;
 use log::info;
@@ -27,6 +27,9 @@ enum Opts {
     #[structopt(name = "run", about = "Runs the given Game Boy ROM file")]
     Run(RunOpts),
 
+    #[structopt(name = "debug", about = "Runs the given Game Boy ROM file in debug mode")]
+    Debug(DebugOpts),
+
     #[structopt(name = "info", about = "Prints information about the given Game Boy ROMs")]
     Info(InfoOpts),
 }
@@ -47,6 +50,18 @@ struct RunOpts {
 }
 
 #[derive(Debug, StructOpt)]
+struct DebugOpts {
+    /// The game ROM file path
+    #[structopt(name = "ROM", parse(from_os_str))]
+    rom_path: PathBuf,
+
+    /// Load symbol file for debugging (in the WLA DX assembler's format
+    #[structopt(short = "S", long = "symbol-file", name = "SYMBOLS", parse(from_os_str))]
+    symbols_path: Option<PathBuf>,
+}
+
+
+#[derive(Debug, StructOpt)]
 struct InfoOpts {
     /// The game ROM file paths
     #[structopt(name = "ROM", parse(from_os_str), required = true)]
@@ -65,6 +80,7 @@ fn main() -> Result<(), failure::Error> {
 
     match &Opts::from_args() {
         Opts::Run(run_opts) => run(run_opts),
+        Opts::Debug(debug_opts) => debug(debug_opts),
         Opts::Info(info_opts) => info(info_opts),
     }
 }
@@ -97,10 +113,26 @@ fn run(opts: &RunOpts) -> Result<(), failure::Error> {
 
     start_frontend(&mut cpu);
 
-    if let Some(path) = &opts.save_path {
-        std::fs::write(path, cpu.cart.ram()).context("Failed to write to save file")?;
-        info!("Successfully wrote cartridge RAM to save file");
+    Ok(())
+}
+
+fn debug(opts: &DebugOpts) -> Result<(), failure::Error> {
+    let rom = std::fs::read(&opts.rom_path)
+        .context("Failed to read ROM file")?
+        .into_boxed_slice();
+    let cart_header = CartHeader::from_rom(&rom).context("Failed to parse cartridge header")?;
+    let cart_config = CartConfig::from_cart_header(&cart_header)?;
+
+    let cart = Cart::new(rom, None, &cart_config).context("Failed to initialize cartridge")?;
+    let mut cpu = Cpu::new(cart);
+
+    if let Some(path) = &opts.symbols_path {
+        let file = File::open(path).context("Failed to open symbol file")?;
+        cpu.debug_symbols = Some(WlaSymbols::parse(BufReader::new(file))
+            .context("Failed to parse WLA DX symbol file")?);
     }
+
+    start_frontend_debug(&mut cpu);
 
     Ok(())
 }
