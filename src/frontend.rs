@@ -200,7 +200,7 @@ w <r>:  Watch writes to a memory address 'r' (TODO)
 rm:     Read memory address (TODO)
 rr:     Read registers
 l:      List watches (TODO)
-rm:     Remove watch (TODO)
+d:      Delete watch (TODO)
 s [n]:  Step forward 'n' instructions (defaults to 1)
 e:      Exit debugger";
 
