@@ -125,9 +125,7 @@ impl Cpu {
     }
 
     /// Execute a single instruction. Returns how many cycles it took.
-    // TODO(solson): Should calling this directly be avoided, since only `step_cycles` checks for
-    // GPU, Timer, and Joypad interurpts?
-    pub fn step(&mut self) -> usize {
+    fn step(&mut self) -> usize {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
@@ -985,6 +983,110 @@ impl Cpu {
 
             _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }
+    }
+
+    /// Keep executing instructions in debug mode until more than the given number of cycles have passed.
+    pub fn step_cycles_debug(&mut self, cycles: usize) {
+        let mut curr_cycles: usize = 0;
+        while curr_cycles < cycles {
+            let mut interrupts = BitFlags::empty();
+            let step_cycles = self.step_debug(false);
+            interrupts |= self.gpu.step(step_cycles);
+            interrupts |= self.timer.step(step_cycles);
+            interrupts |= self.joypad.step();
+            self.request_interrupts(interrupts);
+            curr_cycles += step_cycles;
+        }
+    }
+
+    /// Debug step n instructions forward.
+    pub fn step_n_debug(&mut self, n: usize) {
+        for _ in 0..n {
+            let mut interrupts = BitFlags::empty();
+            let step_cycles = self.step_debug(true);
+            interrupts |= self.gpu.step(step_cycles);
+            interrupts |= self.timer.step(step_cycles);
+            interrupts |= self.joypad.step();
+            self.request_interrupts(interrupts);
+        }
+    }
+
+    /// Execute a single instruction in debug mode. Returns how many cycles it took.
+    fn step_debug(&mut self, print_instr: bool) -> usize {
+        let pending_enable_interrupts = self.pending_enable_interrupts;
+        let pending_disable_interrupts = self.pending_disable_interrupts;
+        self.pending_enable_interrupts = false;
+        self.pending_disable_interrupts = false;
+        self.handle_interrupts();
+
+        if self.halted {
+            return 4;
+        }
+
+        // Get the opcode for the current instruction and find the total instruction length.
+        let base_pc = self.regs.pc.get();
+        self.current_opcode = self.read_mem(base_pc);
+        let instruction_len = inst::INSTRUCTION_LENGTH[self.current_opcode as usize];
+        self.regs.pc += instruction_len as u16;
+
+        // Read the rest of the bytes of this instruction.
+        let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
+        inst_bytes[0] = self.current_opcode;
+        for i in 1..instruction_len {
+            inst_bytes[i] = self.read_mem(base_pc.wrapping_add(i as u16));
+        }
+
+        // Update clock cycle count based on the current instruction.
+        let cycles = if self.current_opcode == 0xCB {
+            let opcode_after_cb = inst_bytes[1];
+            inst::PREFIX_CB_BASE_CYCLES[opcode_after_cb as usize]
+        } else {
+            inst::BASE_CYCLES[self.current_opcode as usize]
+        };
+
+        // Decode the instruction.
+        let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
+        if print_instr {
+            println!("PC=0x{:04X}: {:?}", base_pc, inst);
+        }
+
+        self.execute(inst);
+
+        if pending_enable_interrupts {
+            self.interrupts_enabled = true;
+        }
+
+        if pending_disable_interrupts {
+            self.interrupts_enabled = false;
+        }
+
+        cycles
+    }
+
+    /// Print the values of each register
+    pub fn print_regs(&self) {
+        println!(
+            "A:     {}\n\
+             B:     {}\n\
+             C:     {}\n\
+             D:     {}\n\
+             E:     {}\n\
+             F:     {:#10b}\n\
+             H:     {}\n\
+             L:     {}\n\
+             SP:    {}\n\
+             PC:    {}",
+            self.regs.get_8(Reg8::A),
+            self.regs.get_8(Reg8::B),
+            self.regs.get_8(Reg8::C),
+            self.regs.get_8(Reg8::D),
+            self.regs.get_8(Reg8::E),
+            self.regs.get_8(Reg8::H),
+            self.regs.get_8(Reg8::L),
+            self.regs.f.bits(),
+            self.regs.get_16(Reg16::SP),
+            self.regs.get_16(Reg16::PC)
+        );
     }
 }
 
