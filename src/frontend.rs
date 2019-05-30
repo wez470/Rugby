@@ -196,13 +196,12 @@ pub fn start_frontend(cpu: &mut Cpu) {
 const COMMANDS: &str = "\
 h:      Display commands
 p:      Play emulator (Press again to pause)
-wr:     Watch reads from a memory address (TODO)
-ww:     Watch writes to a memory address (TODO)
+w <r>:  Watch writes to a memory address 'r' (TODO)
 rm:     Read memory address (TODO)
 rr:     Read registers
 l:      List watches (TODO)
 rm:     Remove watch (TODO)
-s [n]:  Step forward 'n' instruction (defaults to 1)
+s [n]:  Step forward 'n' instructions (defaults to 1)
 e:      Exit debugger";
 
 pub fn start_frontend_debug(cpu: &mut Cpu) {
