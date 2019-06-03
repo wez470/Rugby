@@ -14,6 +14,7 @@ use sdl2::controller::GameController;
 use linefeed::{Interface, ReadResult};
 use hex;
 use hex::FromHex;
+use std::collections::HashSet;
 
 const CYCLES_PER_FRAME: usize = 69905;
 const WINDOW_SCALE: usize = 4;
@@ -230,7 +231,7 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
     let reader = Interface::new("rugby-interactive-debugger").expect("Failed to create interactive terminal");
     println!("\nWelcome to the rugby debugger! Press h for help");
     reader.set_prompt("rugby> ").expect("Failed to set terminal prompt");
-    let mut watches = vec![];
+    let mut watches = HashSet::new();
 
     while let Some(ReadResult::Input(input)) = reader.read_line().ok() {
         let (cmd, args) = split_first_word(&input);
@@ -285,7 +286,7 @@ fn split_first_word(s: &str) -> (&str, &str) {
 fn run_emulator(
     cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut EventPump, sdl_fps: &mut FPSManager,
     sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>,
-    num_instrs: Option<usize>, watches: &Vec<u16>
+    num_instrs: Option<usize>, watches: &HashSet<u16>
 ) {
     'main: loop {
         const BYTES_PER_PIXEL: usize = 4;
@@ -426,10 +427,10 @@ fn print_mem(cpu: &mut Cpu, args: &str) {
     }
 }
 
-fn add_watch(watches: &mut Vec<u16>, args: &str) -> () {
+fn add_watch(watches: &mut HashSet<u16>, args: &str) {
     let r = parse_hex(args);
     match r {
-        Ok(addr) => watches.push(addr),
+        Ok(addr) => { watches.insert(addr); },
         Err(_) => println!("invalid memory address: {:?}", args)
     }
 }
@@ -455,7 +456,7 @@ fn parse_hex(inp: &str) -> Result<u16, &str> {
     }
 }
 
-fn print_watches(watches: &Vec<u16>) {
+fn print_watches(watches: &HashSet<u16>) {
     for addr in watches {
         println!("0x{}", hex::encode_upper(vec![(*addr >> 8) as u8, *addr as u8]));
     }
