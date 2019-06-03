@@ -12,6 +12,7 @@ use sdl2::gfx::framerate::FPSManager;
 use sdl2::GameControllerSubsystem;
 use sdl2::controller::GameController;
 use linefeed::{Interface, ReadResult};
+use hex;
 use hex::FromHex;
 
 const CYCLES_PER_FRAME: usize = 69905;
@@ -195,15 +196,15 @@ pub fn start_frontend(cpu: &mut Cpu) {
 }
 
 const COMMANDS: &str = "\
-h:      Display commands
-p:      Play emulator (Press again to pause)
-w <r>:  Watch writes to a memory address 'r' (TODO)
-rm:     Read memory address
-rr:     Read registers
-l:      List watches (TODO)
-d:      Delete watch (TODO)
-s [n]:  Step forward 'n' instructions (defaults to 1)
-e:      Exit debugger";
+h:          Display commands
+p:          Play emulator (Press again to pause)
+w <addr>:   Watch writes to a memory address 'addr'. Hex format (TODO)
+rm <addr>:  Read memory address 'addr'. Hex format
+rr:         Read registers
+l:          List watches (TODO)
+d:          Delete watch (TODO)
+s [n]:      Step forward 'n' instructions (defaults to 1)
+e:          Exit debugger";
 
 pub fn start_frontend_debug(cpu: &mut Cpu) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
@@ -229,7 +230,7 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
     let reader = Interface::new("rugby-interactive-debugger").expect("Failed to create interactive terminal");
     println!("\nWelcome to the rugby debugger! Press h for help");
     reader.set_prompt("rugby> ").expect("Failed to set terminal prompt");
-
+    let mut watches = vec![];
 
     while let Some(ReadResult::Input(input)) = reader.read_line().ok() {
         let (cmd, args) = split_first_word(&input);
@@ -239,7 +240,7 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
                 println!("{}", COMMANDS);
             }
             "p" => {
-                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, None)
+                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, None, &watches)
             }
             "s" => {
                 let n;
@@ -249,13 +250,19 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
                 else {
                     n = 1;
                 }
-                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, Some(n))
+                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, Some(n), &watches)
             }
             "rr" => {
                 cpu.print_regs();
             }
             "rm" => {
                 print_mem(cpu, args)
+            }
+            "w" => {
+                add_watch(&mut watches, args)
+            }
+            "l" => {
+                print_watches(&watches)
             }
             "e" => {
                 println!("Happy debugging :)");
@@ -275,7 +282,11 @@ fn split_first_word(s: &str) -> (&str, &str) {
     }
 }
 
-fn run_emulator(cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut EventPump, sdl_fps: &mut FPSManager, sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, num_instrs: Option<usize>) {
+fn run_emulator(
+    cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut EventPump, sdl_fps: &mut FPSManager,
+    sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>,
+    num_instrs: Option<usize>, watches: &Vec<u16>
+) {
     'main: loop {
         const BYTES_PER_PIXEL: usize = 4;
         let mut image = [0u8; SCREEN_WIDTH * SCREEN_HEIGHT * BYTES_PER_PIXEL];
@@ -407,9 +418,28 @@ fn run_emulator(cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut Eve
     }
 }
 
-fn print_mem(cpu: &mut Cpu, args: &str) -> () {
-    let mut hex_str = args.trim();
-    if hex_str.len() > 2 && hex_str.starts_with("0x") {
+fn print_mem(cpu: &mut Cpu, args: &str) {
+    let r = parse_hex(args);
+    match r {
+        Ok(addr) => println!("{}: {}", args, cpu.read_mem_debug(addr)),
+        Err(_) => println!("invalid memory address: {:?}", args)
+    }
+}
+
+fn add_watch(watches: &mut Vec<u16>, args: &str) -> () {
+    let r = parse_hex(args);
+    match r {
+        Ok(addr) => watches.push(addr),
+        Err(_) => println!("invalid memory address: {:?}", args)
+    }
+}
+
+fn parse_hex(inp: &str) -> Result<u16, &str> {
+    let mut hex_str = inp.trim();
+    if hex_str.is_empty() {
+        return Result::Err("invalid input hex string");
+    }
+    if hex_str.starts_with("0x") {
         hex_str = &hex_str[2..];
     }
     let mut zero = "0".to_owned();
@@ -417,14 +447,16 @@ fn print_mem(cpu: &mut Cpu, args: &str) -> () {
         zero.push_str(hex_str);
         hex_str = &zero[..];
     }
-    if let Some(addr_bytes) = Vec::from_hex(hex_str.clone()).ok() {
-        let addr = if addr_bytes.len() > 1 {
-            (addr_bytes[0] as u16) << 8 | (addr_bytes[1] as u16)
-        } else {
-            addr_bytes[0] as u16
-        };
-        println!("0x{}: {}", hex_str, cpu.read_mem_debug(addr));
+    let addr_bytes = Vec::from_hex(hex_str).map_err(|_| "failed to parse hex")?;
+    if addr_bytes.len() > 1 {
+        Result::Ok((addr_bytes[0] as u16) << 8 | (addr_bytes[1] as u16))
     } else {
-        println!("invalid memory address: {:?}", args)
+        Result::Ok(addr_bytes[0] as u16)
+    }
+}
+
+fn print_watches(watches: &Vec<u16>) {
+    for addr in watches {
+        println!("0x{}", hex::encode_upper(vec![(*addr >> 8) as u8, *addr as u8]));
     }
 }
