@@ -202,8 +202,8 @@ p:          Play emulator (Press again to pause)
 w <addr>:   Watch writes to a memory address 'addr'. Hex format (TODO)
 rm <addr>:  Read memory address 'addr'. Hex format
 rr:         Read registers
-l:          List watches (TODO)
-d:          Delete watch (TODO)
+l:          List watches
+d <addr>:   Delete watch. Hex format
 s [n]:      Step forward 'n' instructions (defaults to 1)
 e:          Exit debugger";
 
@@ -264,6 +264,9 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
             }
             "l" => {
                 print_watches(&watches)
+            }
+            "d" => {
+                delete_watch(&mut watches, args)
             }
             "e" => {
                 println!("Happy debugging :)");
@@ -459,5 +462,13 @@ fn parse_hex(inp: &str) -> Result<u16, &str> {
 fn print_watches(watches: &HashSet<u16>) {
     for addr in watches {
         println!("0x{}", hex::encode_upper(vec![(*addr >> 8) as u8, *addr as u8]));
+    }
+}
+
+fn delete_watch(watches: &mut HashSet<u16>, args: &str) {
+    let r = parse_hex(args);
+    match r {
+        Ok(addr) => { watches.remove(&addr); },
+        Err(_) => println!("invalid memory address: {:?}", args)
     }
 }
