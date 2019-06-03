@@ -12,6 +12,7 @@ use sdl2::gfx::framerate::FPSManager;
 use sdl2::GameControllerSubsystem;
 use sdl2::controller::GameController;
 use linefeed::{Interface, ReadResult};
+use hex::FromHex;
 
 const CYCLES_PER_FRAME: usize = 69905;
 const WINDOW_SCALE: usize = 4;
@@ -197,7 +198,7 @@ const COMMANDS: &str = "\
 h:      Display commands
 p:      Play emulator (Press again to pause)
 w <r>:  Watch writes to a memory address 'r' (TODO)
-rm:     Read memory address (TODO)
+rm:     Read memory address
 rr:     Read registers
 l:      List watches (TODO)
 d:      Delete watch (TODO)
@@ -252,6 +253,9 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
             }
             "rr" => {
                 cpu.print_regs();
+            }
+            "rm" => {
+                print_mem(cpu, args)
             }
             "e" => {
                 println!("Happy debugging :)");
@@ -400,5 +404,27 @@ fn run_emulator(cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut Eve
         }
 
         sdl_fps.delay();
+    }
+}
+
+fn print_mem(cpu: &mut Cpu, args: &str) -> () {
+    let mut hex_str = args.trim();
+    if hex_str.len() > 2 && hex_str.starts_with("0x") {
+        hex_str = &hex_str[2..];
+    }
+    let mut zero = "0".to_owned();
+    if hex_str.len() % 2 != 0 {
+        zero.push_str(hex_str);
+        hex_str = &zero[..];
+    }
+    if let Some(addr_bytes) = Vec::from_hex(hex_str.clone()).ok() {
+        let addr = if addr_bytes.len() > 1 {
+            (addr_bytes[0] as u16) << 8 | (addr_bytes[1] as u16)
+        } else {
+            addr_bytes[0] as u16
+        };
+        println!("0x{}: {}", hex_str, cpu.read_mem_debug(addr));
+    } else {
+        println!("invalid memory address: {:?}", args)
     }
 }

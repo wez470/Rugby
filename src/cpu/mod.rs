@@ -788,6 +788,10 @@ impl Cpu {
         }
     }
 
+    pub fn read_mem_debug(&self, addr: u16) -> u8 {
+        self.read_mem(addr)
+    }
+
     fn read_mem(&self, addr: u16) -> u8 {
         let val = match addr {
             // First 16KB is ROM Bank 00 (in cartridge, fixed at bank 00)
