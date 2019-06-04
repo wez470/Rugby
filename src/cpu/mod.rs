@@ -4,6 +4,7 @@ use crate::gpu::Gpu;
 use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
 use crate::timer::Timer;
+use std::collections::HashSet;
 use enumflags2::BitFlags;
 use log::{debug, info, log_enabled, trace, warn};
 use self::inst::{Cond, Inst, Operand16, Operand8};
@@ -83,6 +84,10 @@ pub struct Cpu {
     /// Symbolic information for more detailed debug output.
     // TODO(solson): Should we find another place to store this?
     pub debug_symbols: Option<crate::wla_symbols::WlaSymbols>,
+
+    /// Memory addresses to watch changes to. Used for debugging.
+    // TODO(wcarlson): Should we find another place to store this?
+    watches: HashSet<u16>,
 }
 
 impl Cpu {
@@ -107,6 +112,7 @@ impl Cpu {
             halted: false,
             stopped: false,
             debug_symbols: None,
+            watches: HashSet::new(),
         }
     }
 
@@ -990,33 +996,42 @@ impl Cpu {
     }
 
     /// Keep executing instructions in debug mode until more than the given number of cycles have passed.
-    pub fn step_cycles_debug(&mut self, cycles: usize) {
+    pub fn step_cycles_debug(&mut self, cycles: usize, watches: &HashSet<u16>) -> bool {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
             let mut interrupts = BitFlags::empty();
-            let step_cycles = self.step_debug(false);
-            interrupts |= self.gpu.step(step_cycles);
-            interrupts |= self.timer.step(step_cycles);
-            interrupts |= self.joypad.step();
-            self.request_interrupts(interrupts);
-            curr_cycles += step_cycles;
+            match self.step_debug(false, watches) {
+                Some(step_cycles) => {
+                    interrupts |= self.gpu.step(step_cycles);
+                    interrupts |= self.timer.step(step_cycles);
+                    interrupts |= self.joypad.step();
+                    self.request_interrupts(interrupts);
+                    curr_cycles += step_cycles;
+                },
+                None => return true,
+            }
         }
+        false
     }
 
     /// Debug step n instructions forward.
-    pub fn step_n_debug(&mut self, n: usize) {
+    pub fn step_n_debug(&mut self, n: usize, watches: &HashSet<u16>) {
         for _ in 0..n {
             let mut interrupts = BitFlags::empty();
-            let step_cycles = self.step_debug(true);
-            interrupts |= self.gpu.step(step_cycles);
-            interrupts |= self.timer.step(step_cycles);
-            interrupts |= self.joypad.step();
-            self.request_interrupts(interrupts);
+            match self.step_debug(true, watches) {
+                Some(step_cycles) => {
+                    interrupts |= self.gpu.step(step_cycles);
+                    interrupts |= self.timer.step(step_cycles);
+                    interrupts |= self.joypad.step();
+                    self.request_interrupts(interrupts);
+                },
+                None => break,
+            }
         }
     }
 
     /// Execute a single instruction in debug mode. Returns how many cycles it took.
-    fn step_debug(&mut self, print_instr: bool) -> usize {
+    fn step_debug(&mut self, print_instr: bool, watches: &HashSet<u16>) -> Option<usize> {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
@@ -1024,14 +1039,13 @@ impl Cpu {
         self.handle_interrupts();
 
         if self.halted {
-            return 4;
+            return Some(4);
         }
 
         // Get the opcode for the current instruction and find the total instruction length.
         let base_pc = self.regs.pc.get();
         self.current_opcode = self.read_mem(base_pc);
         let instruction_len = inst::INSTRUCTION_LENGTH[self.current_opcode as usize];
-        self.regs.pc += instruction_len as u16;
 
         // Read the rest of the bytes of this instruction.
         let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
@@ -1053,6 +1067,10 @@ impl Cpu {
         if print_instr {
             println!("PC=0x{:04X}: {:?}", base_pc, inst);
         }
+        if self.is_watch_hit(inst, watches) {
+            return None;
+        }
+        self.regs.pc += instruction_len as u16;
 
         self.execute(inst);
 
@@ -1064,7 +1082,47 @@ impl Cpu {
             self.interrupts_enabled = false;
         }
 
-        cycles
+        Some(cycles)
+    }
+
+    fn is_watch_hit(&self, inst: Inst, watches: &HashSet<u16>) -> bool {
+        match inst {
+            Inst::Ld8(n, _) | Inst::Inc8(n) | Inst::Dec8(n) | Inst::Rlc(n) | Inst::Rl(n)
+            | Inst::Rrc(n) | Inst::Rr(n) | Inst::Sla(n) | Inst::Sra(n) | Inst::Srl(n)
+            | Inst::Swap(n) | Inst::Res(_, n) | Inst::Set(_, n) => {
+                if let Some(addr) = self.get_operand_8_memory_address(n) {
+                    log::debug!("Writing to addr: {}", addr);
+                    return watches.contains(&addr);
+                }
+            },
+            Inst::Ld16(n, _) | Inst::Inc16(n) | Inst::Dec16(n) => {
+                if let Some(addrs) = self.get_operand_16_memory_addresses(n) {
+                    log::debug!("Writing to addrs: {} {}", addrs.0, addrs.1);
+                    return watches.contains(&addrs.0) || watches.contains(&addrs.1);
+                }
+            },
+            _ => {},
+        }
+        false
+    }
+
+    fn get_operand_8_memory_address(&self, dest: Operand8) -> Option<u16> {
+        match dest {
+            Operand8::MemImm(loc) => Some(loc),
+            Operand8::MemReg(reg) => Some(self.regs.get_16(reg)),
+            Operand8::MemHighImm(offset) => Some(0xFF00 | offset as u16),
+            Operand8::MemHighC => Some(0xFF00 | self.regs.bc.low() as u16),
+            Operand8::MemHlPostInc => Some(self.regs.hl.get()),
+            Operand8::MemHlPostDec => Some(self.regs.hl.get()),
+            _ => None,
+        }
+    }
+
+    fn get_operand_16_memory_addresses(&self, dest: Operand16) -> Option<(u16, u16)> {
+        match dest {
+            Operand16::MemImm16(addr) => Some((addr, addr.wrapping_add(1))),
+            _ => None
+        }
     }
 
     /// Print the values of each register

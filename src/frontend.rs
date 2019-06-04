@@ -412,10 +412,15 @@ fn run_emulator(
 
         match num_instrs {
             Some(n) => {
-                cpu.step_n_debug(n);
+                cpu.step_n_debug(n, watches);
                 break 'main;
             },
-            None => cpu.step_cycles_debug(CYCLES_PER_FRAME),
+            None => {
+                let should_break = cpu.step_cycles_debug(CYCLES_PER_FRAME, watches);
+                if should_break {
+                    break 'main;
+                }
+            },
         }
 
         sdl_fps.delay();
