@@ -199,7 +199,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
 const COMMANDS: &str = "\
 h:          Display commands
 p:          Play emulator (Press again to pause)
-w <addr>:   Watch writes to a memory address 'addr'. Hex format (TODO)
+w <addr>:   Watch writes to a memory address 'addr'. Hex format
 rm <addr>:  Read memory address 'addr'. Hex format
 rr:         Read registers
 l:          List watches

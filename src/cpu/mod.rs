@@ -1000,7 +1000,7 @@ impl Cpu {
         let mut curr_cycles: usize = 0;
         while curr_cycles < cycles {
             let mut interrupts = BitFlags::empty();
-            match self.step_debug(false, watches) {
+            match self.step_debug(false, true, watches) {
                 Some(step_cycles) => {
                     interrupts |= self.gpu.step(step_cycles);
                     interrupts |= self.timer.step(step_cycles);
@@ -1016,9 +1016,10 @@ impl Cpu {
 
     /// Debug step n instructions forward.
     pub fn step_n_debug(&mut self, n: usize, watches: &HashSet<u16>) {
+        let check_watches = n != 1;
         for _ in 0..n {
             let mut interrupts = BitFlags::empty();
-            match self.step_debug(true, watches) {
+            match self.step_debug(true, check_watches, watches) {
                 Some(step_cycles) => {
                     interrupts |= self.gpu.step(step_cycles);
                     interrupts |= self.timer.step(step_cycles);
@@ -1031,7 +1032,7 @@ impl Cpu {
     }
 
     /// Execute a single instruction in debug mode. Returns how many cycles it took.
-    fn step_debug(&mut self, print_instr: bool, watches: &HashSet<u16>) -> Option<usize> {
+    fn step_debug(&mut self, print_instr: bool, check_watches: bool, watches: &HashSet<u16>) -> Option<usize> {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
@@ -1067,7 +1068,8 @@ impl Cpu {
         if print_instr {
             println!("PC=0x{:04X}: {:?}", base_pc, inst);
         }
-        if self.is_watch_hit(inst, watches) {
+        if check_watches && self.is_watch_hit(inst, watches) {
+            println!("BREAK: PC=0x{:04X}: {:?}", base_pc, inst);
             return None;
         }
         self.regs.pc += instruction_len as u16;
