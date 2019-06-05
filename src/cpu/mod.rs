@@ -117,21 +117,45 @@ impl Cpu {
     }
 
     /// Keep executing instructions until more than the given number of cycles have passed.
-    pub fn step_cycles(&mut self, cycles: usize) {
+    /// Returns true if we have hit a watch.
+    pub fn step_cycles(&mut self, cycles: usize, watches: &HashSet<u16>) -> bool {
         let mut curr_cycles: usize = 0;
+        let check_watches = watches.len() > 0;
         while curr_cycles < cycles {
             let mut interrupts = BitFlags::empty();
-            let step_cycles = self.step();
-            interrupts |= self.gpu.step(step_cycles);
-            interrupts |= self.timer.step(step_cycles);
-            interrupts |= self.joypad.step();
-            self.request_interrupts(interrupts);
-            curr_cycles += step_cycles;
+            match self.step(false, check_watches, watches) {
+                Some(step_cycles) => {
+                    interrupts |= self.gpu.step(step_cycles);
+                    interrupts |= self.timer.step(step_cycles);
+                    interrupts |= self.joypad.step();
+                    self.request_interrupts(interrupts);
+                    curr_cycles += step_cycles;
+                },
+                None => return true,
+            }
+        }
+        false
+    }
+
+    /// step n instructions forward.
+    pub fn step_n(&mut self, n: usize, watches: &HashSet<u16>) {
+        let check_watches = n != 1;
+        for _ in 0..n {
+            let mut interrupts = BitFlags::empty();
+            match self.step(true, check_watches, watches) {
+                Some(step_cycles) => {
+                    interrupts |= self.gpu.step(step_cycles);
+                    interrupts |= self.timer.step(step_cycles);
+                    interrupts |= self.joypad.step();
+                    self.request_interrupts(interrupts);
+                },
+                None => break,
+            }
         }
     }
 
-    /// Execute a single instruction. Returns how many cycles it took.
-    fn step(&mut self) -> usize {
+    /// Execute a single instruction. Returns how many cycles it took and None if a watch is hit.
+    fn step(&mut self, print_instr: bool, check_watches: bool, watches: &HashSet<u16>) -> Option<usize> {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
@@ -139,14 +163,13 @@ impl Cpu {
         self.handle_interrupts();
 
         if self.halted {
-            return 4;
+            return Some(4);
         }
 
         // Get the opcode for the current instruction and find the total instruction length.
         let base_pc = self.regs.pc.get();
         self.current_opcode = self.read_mem(base_pc);
         let instruction_len = inst::INSTRUCTION_LENGTH[self.current_opcode as usize];
-        self.regs.pc += instruction_len as u16;
 
         // Read the rest of the bytes of this instruction.
         let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
@@ -165,7 +188,17 @@ impl Cpu {
 
         // Decode the instruction.
         let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-        trace!("PC=0x{:04X}: {:?}", base_pc, inst);
+        if print_instr {
+            println!("PC=0x{:04X}: {:?}", base_pc, inst);
+        }
+        else {
+            trace!("PC=0x{:04X}: {:?}", base_pc, inst);
+        }
+        if check_watches && self.is_watch_hit(inst, watches) {
+            println!("BREAK: PC=0x{:04X}: {:?}", base_pc, inst);
+            return None;
+        }
+        self.regs.pc += instruction_len as u16;
 
         self.execute(inst);
 
@@ -177,7 +210,7 @@ impl Cpu {
             self.interrupts_enabled = false;
         }
 
-        cycles
+        Some(cycles)
     }
 
     fn handle_interrupts(&mut self) {
@@ -993,98 +1026,6 @@ impl Cpu {
 
             _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }
-    }
-
-    /// Keep executing instructions in debug mode until more than the given number of cycles have passed.
-    pub fn step_cycles_debug(&mut self, cycles: usize, watches: &HashSet<u16>) -> bool {
-        let mut curr_cycles: usize = 0;
-        while curr_cycles < cycles {
-            let mut interrupts = BitFlags::empty();
-            match self.step_debug(false, true, watches) {
-                Some(step_cycles) => {
-                    interrupts |= self.gpu.step(step_cycles);
-                    interrupts |= self.timer.step(step_cycles);
-                    interrupts |= self.joypad.step();
-                    self.request_interrupts(interrupts);
-                    curr_cycles += step_cycles;
-                },
-                None => return true,
-            }
-        }
-        false
-    }
-
-    /// Debug step n instructions forward.
-    pub fn step_n_debug(&mut self, n: usize, watches: &HashSet<u16>) {
-        let check_watches = n != 1;
-        for _ in 0..n {
-            let mut interrupts = BitFlags::empty();
-            match self.step_debug(true, check_watches, watches) {
-                Some(step_cycles) => {
-                    interrupts |= self.gpu.step(step_cycles);
-                    interrupts |= self.timer.step(step_cycles);
-                    interrupts |= self.joypad.step();
-                    self.request_interrupts(interrupts);
-                },
-                None => break,
-            }
-        }
-    }
-
-    /// Execute a single instruction in debug mode. Returns how many cycles it took.
-    fn step_debug(&mut self, print_instr: bool, check_watches: bool, watches: &HashSet<u16>) -> Option<usize> {
-        let pending_enable_interrupts = self.pending_enable_interrupts;
-        let pending_disable_interrupts = self.pending_disable_interrupts;
-        self.pending_enable_interrupts = false;
-        self.pending_disable_interrupts = false;
-        self.handle_interrupts();
-
-        if self.halted {
-            return Some(4);
-        }
-
-        // Get the opcode for the current instruction and find the total instruction length.
-        let base_pc = self.regs.pc.get();
-        self.current_opcode = self.read_mem(base_pc);
-        let instruction_len = inst::INSTRUCTION_LENGTH[self.current_opcode as usize];
-
-        // Read the rest of the bytes of this instruction.
-        let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
-        inst_bytes[0] = self.current_opcode;
-        for i in 1..instruction_len {
-            inst_bytes[i] = self.read_mem(base_pc.wrapping_add(i as u16));
-        }
-
-        // Update clock cycle count based on the current instruction.
-        let cycles = if self.current_opcode == 0xCB {
-            let opcode_after_cb = inst_bytes[1];
-            inst::PREFIX_CB_BASE_CYCLES[opcode_after_cb as usize]
-        } else {
-            inst::BASE_CYCLES[self.current_opcode as usize]
-        };
-
-        // Decode the instruction.
-        let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-        if print_instr {
-            println!("PC=0x{:04X}: {:?}", base_pc, inst);
-        }
-        if check_watches && self.is_watch_hit(inst, watches) {
-            println!("BREAK: PC=0x{:04X}: {:?}", base_pc, inst);
-            return None;
-        }
-        self.regs.pc += instruction_len as u16;
-
-        self.execute(inst);
-
-        if pending_enable_interrupts {
-            self.interrupts_enabled = true;
-        }
-
-        if pending_disable_interrupts {
-            self.interrupts_enabled = false;
-        }
-
-        Some(cycles)
     }
 
     fn is_watch_hit(&self, inst: Inst, watches: &HashSet<u16>) -> bool {
