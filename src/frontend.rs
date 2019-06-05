@@ -48,9 +48,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
     let sdl_controllers = sdl.game_controller().expect("Failed to get SDL game controllers");
     let mut controllers = vec![];
 
-    let watches = HashSet::new();
-
-    run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, false, None, &watches)
+    run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, false, None, &HashSet::new())
 }
 
 fn run_emulator(
