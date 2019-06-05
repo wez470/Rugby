@@ -84,10 +84,6 @@ pub struct Cpu {
     /// Symbolic information for more detailed debug output.
     // TODO(solson): Should we find another place to store this?
     pub debug_symbols: Option<crate::wla_symbols::WlaSymbols>,
-
-    /// Memory addresses to watch changes to. Used for debugging.
-    // TODO(wcarlson): Should we find another place to store this?
-    watches: HashSet<u16>,
 }
 
 impl Cpu {
@@ -112,7 +108,6 @@ impl Cpu {
             halted: false,
             stopped: false,
             debug_symbols: None,
-            watches: HashSet::new(),
         }
     }
 
