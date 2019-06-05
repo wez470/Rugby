@@ -134,7 +134,7 @@ impl Cpu {
 
     /// step n instructions forward.
     pub fn step_n(&mut self, n: usize, watches: &HashSet<u16>) {
-        let check_watches = n != 1;
+        let check_watches = watches.len() > 1;
         for _ in 0..n {
             let mut interrupts = BitFlags::empty();
             match self.step(true, check_watches, watches) {
