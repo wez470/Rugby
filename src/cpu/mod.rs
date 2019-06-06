@@ -5,6 +5,7 @@ use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
 use crate::timer::Timer;
 use std::collections::HashSet;
+use sdl2::audio::AudioQueue;
 use enumflags2::BitFlags;
 use log::{debug, info, log_enabled, trace, warn};
 use self::inst::{Cond, Inst, Operand16, Operand8};
@@ -113,7 +114,7 @@ impl Cpu {
 
     /// Keep executing instructions until more than the given number of cycles have passed.
     /// Returns true if we have hit a watch.
-    pub fn step_cycles(&mut self, cycles: usize,  audio_queue: &mut sdl2::audio::AudioQueue<u8>, watches: &HashSet<u16>) -> bool {
+    pub fn step_cycles(&mut self, cycles: usize, audio_queue: &mut AudioQueue<u8>, watches: &HashSet<u16>) -> bool {
         let mut curr_cycles: usize = 0;
         let check_watches = watches.len() > 0;
         while curr_cycles < cycles {

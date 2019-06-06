@@ -3,7 +3,7 @@ use crate::cpu::Cpu;
 use crate::gpu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::joypad::{ButtonKey, DirKey};
 use log::info;
-use sdl2::audio::AudioSpecDesired;
+use sdl2::audio::{AudioQueue, AudioSpecDesired};
 use sdl2::controller::Button;
 use sdl2::event::Event;
 use sdl2::EventPump;
@@ -59,13 +59,13 @@ pub fn start_frontend(cpu: &mut Cpu) {
     let mut audio_queue = sdl_audio.open_queue(None, &desired_spec).expect("Failed to open audio queue");
     audio_queue.resume();
 
-    run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, false, None, &HashSet::new())
+    run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, false, None, &HashSet::new())
 }
 
 fn run_emulator(
     cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut EventPump, sdl_fps: &mut FPSManager,
-    sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, debug: bool,
-    num_instrs: Option<usize>, watches: &HashSet<u16>
+    sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, audio_queue: &mut AudioQueue<u8>,
+    debug: bool, num_instrs: Option<usize>, watches: &HashSet<u16>
 ) {
     let mut speed_multiplier: f32 = 1.0;
     let mut paused = false;
@@ -220,7 +220,7 @@ fn run_emulator(
                 if !paused {
                     let should_break = cpu.step_cycles(
                         (CYCLES_PER_FRAME as f32 * speed_multiplier) as usize,
-                        &mut audio_queue,
+                        audio_queue,
                         watches,
                     );
                     if should_break {
@@ -266,6 +266,15 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
     let sdl_controllers = sdl.game_controller().expect("Failed to get SDL game controllers");
     let mut controllers = vec![];
 
+    let sdl_audio = sdl.audio().expect("Failed to access SDL audio subsystem");
+    let desired_spec = AudioSpecDesired {
+        freq: Some(44100),
+        channels: Some(1), // mono
+        samples: Some(SAMPLE_BUFFER_SIZE as u16),
+    };
+    let mut audio_queue = sdl_audio.open_queue(None, &desired_spec).expect("Failed to open audio queue");
+    audio_queue.resume();
+
     let reader = Interface::new("rugby-interactive-debugger").expect("Failed to create interactive terminal");
     println!("\nWelcome to the rugby debugger! Press h for help");
     reader.set_prompt("rugby> ").expect("Failed to set terminal prompt");
@@ -279,11 +288,11 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
                 println!("{}", COMMANDS);
             }
             "p" => {
-                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, true, None, &watches)
+                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, true, None, &watches)
             }
             "s" => {
                 let n= if let Some(x) = args.parse::<usize>().ok() { x } else { 1 };
-                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, true, Some(n), &watches)
+                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, true, Some(n), &watches)
             }
             "rr" => {
                 cpu.print_regs();
