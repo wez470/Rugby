@@ -1,10 +1,11 @@
 use quickcheck::{quickcheck, TestResult};
 use std::fmt::{Debug, UpperHex, Write};
 use std::mem;
+use std::collections::HashSet;
 use super::*;
 
 fn setup(rom: Vec<u8>) -> (Cpu, Cpu) {
-    use crate::cart::{Cart, CartConfig};
+    use crate::cart::CartConfig;
     use crate::cart_header::CartType;
     let rom_size = rom.len();
     let cart_config = CartConfig { cart_type: CartType::NoMbc, rom_size, ram_size: 0 };
@@ -167,7 +168,7 @@ macro_rules! cpu_tests {
                     $( setup_cpu!(actual, $setup); )*
                     $( setup_cpu!(expected, $expect); )*
                     while actual.regs.pc.get() as usize != rom_size {
-                        actual.step();
+                        actual.step(false, false, &HashSet::new());
                     }
                     check_diff(&actual, &expected)
                 }
