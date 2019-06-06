@@ -3,7 +3,7 @@ extern crate sdl2;
 use crate::cart::{Cart, CartConfig};
 use crate::cart_header::{CartHardware, CartHeader};
 use crate::cpu::Cpu;
-use crate::frontend::start_frontend;
+use crate::frontend::{start_frontend, start_frontend_debug};
 use crate::wla_symbols::WlaSymbols;
 use failure::ResultExt;
 use log::info;
@@ -29,6 +29,9 @@ enum Opts {
     #[structopt(name = "run", about = "Runs the given Game Boy ROM file")]
     Run(RunOpts),
 
+    #[structopt(name = "debug", about = "Runs the given Game Boy ROM file in debug mode")]
+    Debug(DebugOpts),
+
     #[structopt(name = "info", about = "Prints information about the given Game Boy ROMs")]
     Info(InfoOpts),
 }
@@ -49,10 +52,22 @@ struct RunOpts {
 }
 
 #[derive(Debug, StructOpt)]
+struct DebugOpts {
+    /// The game ROM file path
+    #[structopt(name = "ROM", parse(from_os_str))]
+    rom_path: PathBuf,
+
+    /// Load symbol file for debugging (in the WLA DX assembler's format
+    #[structopt(short = "S", long = "symbol-file", name = "SYMBOLS", parse(from_os_str))]
+    symbols_path: Option<PathBuf>,
+}
+
+
+#[derive(Debug, StructOpt)]
 struct InfoOpts {
     /// The game ROM file paths
     #[structopt(name = "ROM", parse(from_os_str), required = true)]
-    rom_path: Vec<PathBuf>,
+    rom_paths: Vec<PathBuf>,
 
     /// Show results in a table
     #[structopt(short = "t", long = "table")]
@@ -67,6 +82,7 @@ fn main() -> Result<(), failure::Error> {
 
     match &Opts::from_args() {
         Opts::Run(run_opts) => run(run_opts),
+        Opts::Debug(debug_opts) => debug(debug_opts),
         Opts::Info(info_opts) => info(info_opts),
     }
 }
@@ -99,10 +115,26 @@ fn run(opts: &RunOpts) -> Result<(), failure::Error> {
 
     start_frontend(&mut cpu);
 
-    if let Some(path) = &opts.save_path {
-        std::fs::write(path, cpu.cart.ram()).context("Failed to write to save file")?;
-        info!("Successfully wrote cartridge RAM to save file");
+    Ok(())
+}
+
+fn debug(opts: &DebugOpts) -> Result<(), failure::Error> {
+    let rom = std::fs::read(&opts.rom_path)
+        .context("Failed to read ROM file")?
+        .into_boxed_slice();
+    let cart_header = CartHeader::from_rom(&rom).context("Failed to parse cartridge header")?;
+    let cart_config = CartConfig::from_cart_header(&cart_header)?;
+
+    let cart = Cart::new(rom, None, &cart_config).context("Failed to initialize cartridge")?;
+    let mut cpu = Cpu::new(cart);
+
+    if let Some(path) = &opts.symbols_path {
+        let file = File::open(path).context("Failed to open symbol file")?;
+        cpu.debug_symbols = Some(WlaSymbols::parse(BufReader::new(file))
+            .context("Failed to parse WLA DX symbol file")?);
     }
+
+    start_frontend_debug(&mut cpu);
 
     Ok(())
 }
@@ -118,14 +150,15 @@ fn info(opts: &InfoOpts) -> Result<(), failure::Error> {
 /// Print the ROM info in a table with one ROM per row
 fn info_table(opts: &InfoOpts) -> Result<(), failure::Error> {
     let mut out = tabwriter::TabWriter::new(std::io::stdout());
-    writeln!(out, "Title\tVersion\tType\tHardware\tROM size\tRAM size\tGBC\tSGB\tLicensee\tDestination\tManufacturer")?;
+    writeln!(out, "File path\tTitle\tVersion\tType\tHardware\tROM size\tRAM size\tGBC\tSGB\tLicensee\tDestination\tManufacturer")?;
 
-    for path in &opts.rom_path {
+    for path in &opts.rom_paths {
         let rom = std::fs::read(path)
             .with_context(|_| format!("Failed to read ROM file: {}", path.display()))?;
         let cart = cart_header::CartHeader::from_rom(&rom)
             .with_context(|_| format!("Failed to parse cartridge header: {}", path.display()))?;
 
+        write!(out, "{}\t", path.display())?;
         match std::str::from_utf8(&cart.title) {
             Ok(title) => write!(out, "{}\t", title)?,
             Err(_) => write!(out, "{:x?}\t", cart.title)?,
@@ -149,13 +182,14 @@ fn info_table(opts: &InfoOpts) -> Result<(), failure::Error> {
 
 /// Print the ROM info in the style of a list of separate key-value records.
 fn info_records(opts: &InfoOpts) -> Result<(), failure::Error> {
-    for path in &opts.rom_path {
+    for path in &opts.rom_paths {
         let rom = std::fs::read(path)
             .with_context(|_| format!("Failed to read ROM file: {}", path.display()))?;
         let cart = cart_header::CartHeader::from_rom(&rom)
             .with_context(|_| format!("Failed to parse cartridge header: {}", path.display()))?;
         let mut out = tabwriter::TabWriter::new(std::io::stdout());
 
+        writeln!(out, "File path:\t{}", path.display())?;
         match std::str::from_utf8(&cart.title) {
             Ok(title) => writeln!(out, "Title:\t{}", title)?,
             Err(_) => writeln!(out, "Title:\t{:x?}", cart.title)?,

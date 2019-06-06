@@ -147,7 +147,7 @@ pub enum Operand16 {
 }
 
 /// Represents the condition checked by a conditional instruction (JP, JR, RET, or CALL).
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Cond {
     /// Unconditional.
     None,
@@ -165,7 +165,7 @@ pub enum Cond {
     NotCarry,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Inst {
     /// `NOP`: No operation.
     Nop,

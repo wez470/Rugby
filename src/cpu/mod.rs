@@ -4,6 +4,7 @@ use crate::gpu::Gpu;
 use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
 use crate::timer::Timer;
+use std::collections::HashSet;
 use enumflags2::BitFlags;
 use log::{debug, info, log_enabled, trace, warn};
 use self::inst::{Cond, Inst, Operand16, Operand8};
@@ -111,24 +112,46 @@ impl Cpu {
     }
 
     /// Keep executing instructions until more than the given number of cycles have passed.
-    pub fn step_cycles(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
+    /// Returns true if we have hit a watch.
+    pub fn step_cycles(&mut self, cycles: usize,  audio_queue: &mut sdl2::audio::AudioQueue<u8>, watches: &HashSet<u16>) -> bool {
         let mut curr_cycles: usize = 0;
+        let check_watches = watches.len() > 0;
         while curr_cycles < cycles {
             let mut interrupts = BitFlags::empty();
-            let step_cycles = self.step();
-            self.audio.step(step_cycles, audio_queue);
-            interrupts |= self.gpu.step(step_cycles);
-            interrupts |= self.timer.step(step_cycles);
-            interrupts |= self.joypad.step();
-            self.request_interrupts(interrupts);
-            curr_cycles += step_cycles;
+            match self.step(false, check_watches, watches) {
+                Some(step_cycles) => {
+                    self.audio.step(step_cycles, audio_queue);
+                    interrupts |= self.gpu.step(step_cycles);
+                    interrupts |= self.timer.step(step_cycles);
+                    interrupts |= self.joypad.step();
+                    self.request_interrupts(interrupts);
+                    curr_cycles += step_cycles;
+                },
+                None => return true,
+            }
+        }
+        false
+    }
+
+    /// step n instructions forward.
+    pub fn step_n(&mut self, n: usize, watches: &HashSet<u16>) {
+        let check_watches = watches.len() > 1;
+        for _ in 0..n {
+            let mut interrupts = BitFlags::empty();
+            match self.step(true, check_watches, watches) {
+                Some(step_cycles) => {
+                    interrupts |= self.gpu.step(step_cycles);
+                    interrupts |= self.timer.step(step_cycles);
+                    interrupts |= self.joypad.step();
+                    self.request_interrupts(interrupts);
+                },
+                None => break,
+            }
         }
     }
 
-    /// Execute a single instruction. Returns how many cycles it took.
-    // TODO(solson): Should calling this directly be avoided, since only `step_cycles` checks for
-    // GPU, Timer, and Joypad interurpts?
-    pub fn step(&mut self) -> usize {
+    /// Execute a single instruction. Returns how many cycles it took and None if a watch is hit.
+    fn step(&mut self, print_instr: bool, check_watches: bool, watches: &HashSet<u16>) -> Option<usize> {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
@@ -136,14 +159,13 @@ impl Cpu {
         self.handle_interrupts();
 
         if self.halted {
-            return 4;
+            return Some(4);
         }
 
         // Get the opcode for the current instruction and find the total instruction length.
         let base_pc = self.regs.pc.get();
         self.current_opcode = self.read_mem(base_pc);
         let instruction_len = inst::INSTRUCTION_LENGTH[self.current_opcode as usize];
-        self.regs.pc += instruction_len as u16;
 
         // Read the rest of the bytes of this instruction.
         let mut inst_bytes = [0u8; inst::MAX_INSTRUCTION_LENGTH];
@@ -162,7 +184,17 @@ impl Cpu {
 
         // Decode the instruction.
         let inst = Inst::from_bytes(&inst_bytes[..instruction_len]);
-        trace!("PC=0x{:04X}: {:?}", base_pc, inst);
+        if print_instr {
+            println!("PC=0x{:04X}: {:?}", base_pc, inst);
+        }
+        else {
+            trace!("PC=0x{:04X}: {:?}", base_pc, inst);
+        }
+        if check_watches && self.is_watch_hit(inst, watches) {
+            println!("BREAK: PC=0x{:04X}: {:?}", base_pc, inst);
+            return None;
+        }
+        self.regs.pc += instruction_len as u16;
 
         self.execute(inst);
 
@@ -174,7 +206,7 @@ impl Cpu {
             self.interrupts_enabled = false;
         }
 
-        cycles
+        Some(cycles)
     }
 
     fn handle_interrupts(&mut self) {
@@ -791,8 +823,12 @@ impl Cpu {
         }
     }
 
+    pub fn read_mem_debug(&self, addr: u16) -> u8 {
+        self.read_mem(addr)
+    }
+
     fn read_mem(&self, addr: u16) -> u8 {
-        match addr {
+        let val = match addr {
             // First 16KB is ROM Bank 00 (in cartridge, fixed at bank 00)
             // Second 16KB are ROM Banks 01..NN (in cartridge, switchable bank number)
             0x0000...0x7FFF => self.cart.read(addr),
@@ -846,14 +882,15 @@ impl Cpu {
                 (self.interrupt_enable_unused_bits & 0b1110_0000) |
                     self.interrupt_enable_register.bits()
             }
+        };
 
-            // This match is exhaustive but rustc doesn't check that for integer matches.
-            _ => unreachable!(),
-        }
+        trace!("read(0x{:04X}) => 0x{:02X}", addr, val);
+
+        val
     }
 
     fn write_mem(&mut self, addr: u16, val: u8) {
-        trace!("mem[0x{:04X}] = 0x{:02X}", addr, val);
+        trace!("write(0x{:04X}, 0x{:02X})", addr, val);
 
         match addr {
             // 32KB cartridge write
@@ -907,9 +944,6 @@ impl Cpu {
                 self.interrupt_enable_register = BitFlags::from_bits_truncate(val);
                 self.interrupt_enable_unused_bits = val & 0b1110_0000;
             }
-
-            // This match is exhaustive but rustc doesn't check that for integer matches.
-            _ => unreachable!(),
         }
     }
 
@@ -988,6 +1022,72 @@ impl Cpu {
 
             _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }
+    }
+
+    fn is_watch_hit(&self, inst: Inst, watches: &HashSet<u16>) -> bool {
+        match inst {
+            Inst::Ld8(n, _) | Inst::Inc8(n) | Inst::Dec8(n) | Inst::Rlc(n) | Inst::Rl(n)
+            | Inst::Rrc(n) | Inst::Rr(n) | Inst::Sla(n) | Inst::Sra(n) | Inst::Srl(n)
+            | Inst::Swap(n) | Inst::Res(_, n) | Inst::Set(_, n) => {
+                if let Some(addr) = self.get_operand_8_memory_address(n) {
+                    log::debug!("Writing to addr: {}", addr);
+                    return watches.contains(&addr);
+                }
+            },
+            Inst::Ld16(n, _) | Inst::Inc16(n) | Inst::Dec16(n) => {
+                if let Some(addrs) = self.get_operand_16_memory_addresses(n) {
+                    log::debug!("Writing to addrs: {} {}", addrs.0, addrs.1);
+                    return watches.contains(&addrs.0) || watches.contains(&addrs.1);
+                }
+            },
+            _ => {},
+        }
+        false
+    }
+
+    fn get_operand_8_memory_address(&self, dest: Operand8) -> Option<u16> {
+        match dest {
+            Operand8::MemImm(loc) => Some(loc),
+            Operand8::MemReg(reg) => Some(self.regs.get_16(reg)),
+            Operand8::MemHighImm(offset) => Some(0xFF00 | offset as u16),
+            Operand8::MemHighC => Some(0xFF00 | self.regs.bc.low() as u16),
+            Operand8::MemHlPostInc => Some(self.regs.hl.get()),
+            Operand8::MemHlPostDec => Some(self.regs.hl.get()),
+            _ => None,
+        }
+    }
+
+    fn get_operand_16_memory_addresses(&self, dest: Operand16) -> Option<(u16, u16)> {
+        match dest {
+            Operand16::MemImm16(addr) => Some((addr, addr.wrapping_add(1))),
+            _ => None
+        }
+    }
+
+    /// Print the values of each register
+    pub fn print_regs(&self) {
+        println!(
+            "A:     {}\n\
+             B:     {}\n\
+             C:     {}\n\
+             D:     {}\n\
+             E:     {}\n\
+             F:     {:#10b}\n\
+             H:     {}\n\
+             L:     {}\n\
+             SP:    {}\n\
+             PC:    {}",
+            self.regs.get_8(Reg8::A),
+            self.regs.get_8(Reg8::B),
+            self.regs.get_8(Reg8::C),
+            self.regs.get_8(Reg8::D),
+            self.regs.get_8(Reg8::E),
+            self.regs.get_8(Reg8::H),
+            self.regs.get_8(Reg8::L),
+            self.regs.f.bits(),
+            self.regs.get_16(Reg16::SP),
+            self.regs.get_16(Reg16::PC)
+        );
     }
 }
 
