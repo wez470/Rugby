@@ -1,5 +1,6 @@
 use crate::audio::Audio;
 use crate::cart::Cart;
+use crate::debug::Watch;
 use crate::gpu::Gpu;
 use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
@@ -113,7 +114,7 @@ impl Cpu {
 
     /// Keep executing instructions until more than the given number of cycles have passed.
     /// Returns true if we have hit a watch.
-    pub fn step_cycles(&mut self, cycles: usize, watches: &HashSet<u16>) -> bool {
+    pub fn step_cycles(&mut self, cycles: usize, watches: &HashSet<Watch>) -> bool {
         let mut curr_cycles: usize = 0;
         let check_watches = watches.len() > 0;
         while curr_cycles < cycles {
@@ -133,7 +134,7 @@ impl Cpu {
     }
 
     /// step n instructions forward.
-    pub fn step_n(&mut self, n: usize, watches: &HashSet<u16>) {
+    pub fn step_n(&mut self, n: usize, watches: &HashSet<Watch>) {
         let check_watches = watches.len() > 1;
         for _ in 0..n {
             let mut interrupts = BitFlags::empty();
@@ -150,7 +151,7 @@ impl Cpu {
     }
 
     /// Execute a single instruction. Returns how many cycles it took and None if a watch is hit.
-    fn step(&mut self, print_instr: bool, check_watches: bool, watches: &HashSet<u16>) -> Option<usize> {
+    fn step(&mut self, print_instr: bool, check_watches: bool, watches: &HashSet<Watch>) -> Option<usize> {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
@@ -1023,20 +1024,36 @@ impl Cpu {
         }
     }
 
-    fn is_watch_hit(&self, inst: Inst, watches: &HashSet<u16>) -> bool {
+    fn is_watch_hit(&self, inst: Inst, watches: &HashSet<Watch>) -> bool {
         match inst {
             Inst::Ld8(n, _) | Inst::Inc8(n) | Inst::Dec8(n) | Inst::Rlc(n) | Inst::Rl(n)
             | Inst::Rrc(n) | Inst::Rr(n) | Inst::Sla(n) | Inst::Sra(n) | Inst::Srl(n)
             | Inst::Swap(n) | Inst::Res(_, n) | Inst::Set(_, n) => {
                 if let Some(addr) = self.get_operand_8_memory_address(n) {
-                    log::debug!("Writing to addr: {}", addr);
-                    return watches.contains(&addr);
+                    for watch in watches {
+                        match watch {
+                            Watch::Mem(watch_addr) => if addr == *watch_addr { return true; },
+                            Watch::MemRange(start, end) => if addr >= *start && addr <= *end { return true; },
+                        }
+                    }
                 }
             },
             Inst::Ld16(n, _) | Inst::Inc16(n) | Inst::Dec16(n) => {
                 if let Some(addrs) = self.get_operand_16_memory_addresses(n) {
-                    log::debug!("Writing to addrs: {} {}", addrs.0, addrs.1);
-                    return watches.contains(&addrs.0) || watches.contains(&addrs.1);
+                    for watch in watches {
+                        match watch {
+                            Watch::Mem(watch_addr) => {
+                                if addrs.0 == *watch_addr || addrs.1 == *watch_addr {
+                                    return true;
+                                }
+                            },
+                            Watch::MemRange(start, end) => {
+                                if (addrs.0 >= *start && addrs.0 <= *end) || (addrs.1 >= *start && addrs.1 <= *end) {
+                                    return true;
+                                }
+                            },
+                        }
+                    }
                 }
             },
             _ => {},

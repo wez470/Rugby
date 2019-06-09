@@ -14,6 +14,7 @@ mod audio;
 mod cart;
 mod cart_header;
 mod cpu;
+mod debug;
 mod frontend;
 mod gpu;
 mod interrupts;
