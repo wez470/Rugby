@@ -223,15 +223,15 @@ fn run_emulator(
 }
 
 const COMMANDS: &str = "\
-h:          Display commands
-p:          Play emulator (Press again to pause)
-w <addr>:   Watch writes to a memory address 'addr'. Hex format
-rm <addr>:  Read memory address 'addr'. Hex format
-rr:         Read registers
-l:          List watches
-d <addr>:   Delete watch. Hex format
-s [n]:      Step forward 'n' instructions (defaults to 1)
-e:          Exit debugger";
+h:                      Display commands
+p:                      Play emulator (Press again to pause)
+w <addr>:               Watch writes to a memory address 'addr'. Hex format
+rm <addr> [end_addr]:   Read memory address 'addr'. Specifying 'end_addr' will read a range. Hex format
+rr:                     Read registers
+l:                      List watches
+d <addr>:               Delete watch. Hex format
+s [n]:                  Step forward 'n' instructions (defaults to 1)
+e:                      Exit debugger";
 
 pub fn start_frontend_debug(cpu: &mut Cpu) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
@@ -306,11 +306,33 @@ fn split_first_word(s: &str) -> (&str, &str) {
     }
 }
 
-fn print_mem(cpu: &mut Cpu, args: &str) {
-    let r = parse_hex(args);
-    match r {
-        Ok(addr) => println!("{}: {}", args, cpu.read_mem_debug(addr)),
-        Err(_) => println!("invalid memory address: {:?}", args)
+fn print_mem(cpu: &mut Cpu, args: &str) -> () {
+    let addrs = args.trim().split(" ").collect::<Vec<&str>>();
+    if addrs.len() == 1 {
+        let r = parse_hex(args);
+        match r {
+            Ok(addr) => println!("{}: {}", args, cpu.read_mem_debug(addr)),
+            Err(_) => println!("invalid memory address: {:?}", args)
+        }
+    } else {
+        let start = match parse_hex(addrs[0]) {
+            Ok(addr) => addr,
+            Err(_) => {
+                println!("invalid memory address: {:?}", addrs[0]);
+                return
+            }
+        };
+        let end = match parse_hex(addrs[1]) {
+            Ok(addr) => addr,
+            Err(_) => {
+                println!("invalid memory address: {:?}", addrs[0]);
+                return
+            }
+        };
+        for i in start..end {
+            println!("{}: {}", u16_to_hex(i), cpu.read_mem_debug(i))
+        }
+        println!("{}: {}", u16_to_hex(end), cpu.read_mem_debug(end))
     }
 }
 
@@ -318,6 +340,20 @@ fn add_watch(watches: &mut HashSet<u16>, args: &str) {
     let r = parse_hex(args);
     match r {
         Ok(addr) => { watches.insert(addr); },
+        Err(_) => println!("invalid memory address: {:?}", args)
+    }
+}
+
+fn print_watches(watches: &HashSet<u16>) {
+    for addr in watches {
+        println!("0x{}", u16_to_hex(*addr));
+    }
+}
+
+fn delete_watch(watches: &mut HashSet<u16>, args: &str) {
+    let r = parse_hex(args);
+    match r {
+        Ok(addr) => { watches.remove(&addr); },
         Err(_) => println!("invalid memory address: {:?}", args)
     }
 }
@@ -343,16 +379,6 @@ fn parse_hex(inp: &str) -> Result<u16, &str> {
     }
 }
 
-fn print_watches(watches: &HashSet<u16>) {
-    for addr in watches {
-        println!("0x{}", hex::encode_upper(vec![(*addr >> 8) as u8, *addr as u8]));
-    }
-}
-
-fn delete_watch(watches: &mut HashSet<u16>, args: &str) {
-    let r = parse_hex(args);
-    match r {
-        Ok(addr) => { watches.remove(&addr); },
-        Err(_) => println!("invalid memory address: {:?}", args)
-    }
+fn u16_to_hex(n: u16) -> String {
+    hex::encode_upper(vec![(n >> 8) as u8, n as u8])
 }
