@@ -1,5 +1,6 @@
 use crate::audio::Audio;
 use crate::cart::Cart;
+use crate::debug::{Watch, u16_to_hex, u8_to_hex};
 use crate::gpu::Gpu;
 use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
@@ -12,7 +13,7 @@ use self::inst::{Cond, Inst, Operand16, Operand8};
 use self::registers::{Flag, Reg16, Reg8, Registers};
 
 mod inst;
-mod registers;
+pub mod registers;
 
 #[cfg(test)]
 mod test;
@@ -20,6 +21,13 @@ mod test;
 // TODO: Refactor later to extract memory-related stuff out of the cpu module.
 const WORK_RAM_SIZE: usize = 8 * 1024; // 8 KB
 const HIGH_RAM_SIZE: usize = 127; // For the address range 0xFF80-0xFFFE (inclusive).
+
+enum Dest {
+    Mem8(u16),
+    Reg8(Reg8),
+    Mem16(u16, u16),
+    Reg16(Reg16),
+}
 
 #[derive(Clone)]
 pub struct Cpu {
@@ -114,7 +122,7 @@ impl Cpu {
 
     /// Keep executing instructions until more than the given number of cycles have passed.
     /// Returns true if we have hit a watch.
-    pub fn step_cycles(&mut self, cycles: usize, audio_queue: &mut AudioQueue<u8>, watches: &HashSet<u16>) -> bool {
+    pub fn step_cycles(&mut self, cycles: usize, audio_queue: &mut AudioQueue<u8>, watches: &HashSet<Watch>) -> bool {
         let mut curr_cycles: usize = 0;
         let check_watches = watches.len() > 0;
         while curr_cycles < cycles {
@@ -135,8 +143,8 @@ impl Cpu {
     }
 
     /// step n instructions forward.
-    pub fn step_n(&mut self, n: usize, watches: &HashSet<u16>) {
-        let check_watches = watches.len() > 1;
+    pub fn step_n(&mut self, n: usize, watches: &HashSet<Watch>) {
+        let check_watches = n > 1;
         for _ in 0..n {
             let mut interrupts = BitFlags::empty();
             match self.step(true, check_watches, watches) {
@@ -152,7 +160,7 @@ impl Cpu {
     }
 
     /// Execute a single instruction. Returns how many cycles it took and None if a watch is hit.
-    fn step(&mut self, print_instr: bool, check_watches: bool, watches: &HashSet<u16>) -> Option<usize> {
+    fn step(&mut self, print_instr: bool, check_watches: bool, watches: &HashSet<Watch>) -> Option<usize> {
         let pending_enable_interrupts = self.pending_enable_interrupts;
         let pending_disable_interrupts = self.pending_disable_interrupts;
         self.pending_enable_interrupts = false;
@@ -1025,20 +1033,50 @@ impl Cpu {
         }
     }
 
-    fn is_watch_hit(&self, inst: Inst, watches: &HashSet<u16>) -> bool {
+    fn is_watch_hit(&self, inst: Inst, watches: &HashSet<Watch>) -> bool {
         match inst {
             Inst::Ld8(n, _) | Inst::Inc8(n) | Inst::Dec8(n) | Inst::Rlc(n) | Inst::Rl(n)
             | Inst::Rrc(n) | Inst::Rr(n) | Inst::Sla(n) | Inst::Sra(n) | Inst::Srl(n)
             | Inst::Swap(n) | Inst::Res(_, n) | Inst::Set(_, n) => {
-                if let Some(addr) = self.get_operand_8_memory_address(n) {
-                    log::debug!("Writing to addr: {}", addr);
-                    return watches.contains(&addr);
+                if let Some(dest) = self.get_operand_8_dest(n) {
+                    match dest {
+                        Dest::Reg8(reg) => return watches.contains(&Watch::Reg8(reg)),
+                        Dest::Mem8(addr) => {
+                            for watch in watches {
+                                match watch {
+                                    Watch::Mem(watch_addr) => if addr == *watch_addr { return true; },
+                                    Watch::MemRange(start, end) => if addr >= *start && addr <= *end { return true; },
+                                    _ => {},
+                                }
+                            }
+                        },
+                        _ => panic!("Invalid operand 8 destination"),
+                    }
                 }
             },
             Inst::Ld16(n, _) | Inst::Inc16(n) | Inst::Dec16(n) => {
-                if let Some(addrs) = self.get_operand_16_memory_addresses(n) {
-                    log::debug!("Writing to addrs: {} {}", addrs.0, addrs.1);
-                    return watches.contains(&addrs.0) || watches.contains(&addrs.1);
+                if let Some(dest) = self.get_operand_16_dest(n) {
+                    match dest {
+                        Dest::Reg16(reg) => return watches.contains(&Watch::Reg16(reg)),
+                        Dest::Mem16(first, second) => {
+                            for watch in watches {
+                                match watch {
+                                    Watch::Mem(watch_addr) => {
+                                        if first == *watch_addr || second == *watch_addr {
+                                            return true;
+                                        }
+                                    },
+                                    Watch::MemRange(start, end) => {
+                                        if (first >= *start && first <= *end) || (second >= *start && second <= *end) {
+                                            return true;
+                                        }
+                                    },
+                                    _ => {},
+                                }
+                            }
+                        }
+                        _ => panic!("Invalid operand 8 destination"),
+                    }
                 }
             },
             _ => {},
@@ -1046,21 +1084,23 @@ impl Cpu {
         false
     }
 
-    fn get_operand_8_memory_address(&self, dest: Operand8) -> Option<u16> {
+    fn get_operand_8_dest(&self, dest: Operand8) -> Option<Dest> {
         match dest {
-            Operand8::MemImm(loc) => Some(loc),
-            Operand8::MemReg(reg) => Some(self.regs.get_16(reg)),
-            Operand8::MemHighImm(offset) => Some(0xFF00 | offset as u16),
-            Operand8::MemHighC => Some(0xFF00 | self.regs.bc.low() as u16),
-            Operand8::MemHlPostInc => Some(self.regs.hl.get()),
-            Operand8::MemHlPostDec => Some(self.regs.hl.get()),
+            Operand8::MemImm(loc) => Some(Dest::Mem8(loc)),
+            Operand8::MemReg(reg) => Some(Dest::Mem8(self.regs.get_16(reg))),
+            Operand8::MemHighImm(offset) => Some(Dest::Mem8(0xFF00 | offset as u16)),
+            Operand8::MemHighC => Some(Dest::Mem8(0xFF00 | self.regs.bc.low() as u16)),
+            Operand8::MemHlPostInc => Some(Dest::Mem8(self.regs.hl.get())),
+            Operand8::MemHlPostDec => Some(Dest::Mem8(self.regs.hl.get())),
+            Operand8::Reg8(reg) => Some(Dest::Reg8(reg)),
             _ => None,
         }
     }
 
-    fn get_operand_16_memory_addresses(&self, dest: Operand16) -> Option<(u16, u16)> {
+    fn get_operand_16_dest(&self, dest: Operand16) -> Option<Dest> {
         match dest {
-            Operand16::MemImm16(addr) => Some((addr, addr.wrapping_add(1))),
+            Operand16::MemImm16(addr) => Some(Dest::Mem16(addr, addr.wrapping_add(1))),
+            Operand16::Reg16(reg) => Some(Dest::Reg16(reg)),
             _ => None
         }
     }
@@ -1068,26 +1108,26 @@ impl Cpu {
     /// Print the values of each register
     pub fn print_regs(&self) {
         println!(
-            "A:     {}\n\
-             B:     {}\n\
-             C:     {}\n\
-             D:     {}\n\
-             E:     {}\n\
-             F:     {:#10b}\n\
-             H:     {}\n\
-             L:     {}\n\
-             SP:    {}\n\
-             PC:    {}",
-            self.regs.get_8(Reg8::A),
-            self.regs.get_8(Reg8::B),
-            self.regs.get_8(Reg8::C),
-            self.regs.get_8(Reg8::D),
-            self.regs.get_8(Reg8::E),
-            self.regs.get_8(Reg8::H),
-            self.regs.get_8(Reg8::L),
-            self.regs.f.bits(),
-            self.regs.get_16(Reg16::SP),
-            self.regs.get_16(Reg16::PC)
+            "A:     {}\t0x{}\n\
+             B:     {}\t0x{}\n\
+             C:     {}\t0x{}\n\
+             D:     {}\t0x{}\n\
+             E:     {}\t0x{}\n\
+             F:     {}\n\
+             H:     {}\t0x{}\n\
+             L:     {}\t0x{}\n\
+             SP:    {}\t0x{}\n\
+             PC:    {}\t0x{}",
+            self.regs.get_8(Reg8::A), u8_to_hex(self.regs.get_8(Reg8::A)),
+            self.regs.get_8(Reg8::B), u8_to_hex(self.regs.get_8(Reg8::B)),
+            self.regs.get_8(Reg8::C), u8_to_hex(self.regs.get_8(Reg8::C)),
+            self.regs.get_8(Reg8::D), u8_to_hex(self.regs.get_8(Reg8::D)),
+            self.regs.get_8(Reg8::E), u8_to_hex(self.regs.get_8(Reg8::E)),
+            format!("{:#06b}", self.regs.f.bits() >> 4),
+            self.regs.get_8(Reg8::H), u8_to_hex(self.regs.get_8(Reg8::H)),
+            self.regs.get_8(Reg8::L), u8_to_hex(self.regs.get_8(Reg8::L)),
+            self.regs.get_16(Reg16::SP), u16_to_hex(self.regs.get_16(Reg16::SP)),
+            self.regs.get_16(Reg16::PC), u16_to_hex(self.regs.get_16(Reg16::PC))
         );
     }
 }

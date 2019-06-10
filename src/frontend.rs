@@ -1,5 +1,7 @@
 use crate::audio::SAMPLE_BUFFER_SIZE;
 use crate::cpu::Cpu;
+use crate::cpu::registers::{Reg8, Reg16};
+use crate::debug::{Watch, u16_to_hex, u8_to_hex};
 use crate::gpu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::joypad::{ButtonKey, DirKey};
 use log::info;
@@ -65,7 +67,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
 fn run_emulator(
     cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut EventPump, sdl_fps: &mut FPSManager,
     sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, audio_queue: &mut AudioQueue<u8>,
-    debug: bool, num_instrs: Option<usize>, watches: &HashSet<u16>
+    debug: bool, num_instrs: Option<usize>, watches: &HashSet<Watch>
 ) {
     let mut speed_multiplier: f32 = 1.0;
     let mut paused = false;
@@ -235,15 +237,17 @@ fn run_emulator(
 }
 
 const COMMANDS: &str = "\
-h:          Display commands
-p:          Play emulator (Press again to pause)
-w <addr>:   Watch writes to a memory address 'addr'. Hex format
-rm <addr>:  Read memory address 'addr'. Hex format
-rr:         Read registers
-l:          List watches
-d <addr>:   Delete watch. Hex format
-s [n]:      Step forward 'n' instructions (defaults to 1)
-e:          Exit debugger";
+h:                      Display commands
+p:                      Play emulator (Press again to pause)
+wm <addr> [end_addr]:   Watch writes to a memory address 'addr'. Specifying 'end_addr' will watch a range. Hex format
+wr <reg>:               Watch writes to register 'reg'. Supports 8 and 16 bit registers. e.g. HL, AF, A, B, etc
+rm <addr> [end_addr]:   Read memory address 'addr'. Specifying 'end_addr' will read a range. Hex format
+rr:                     Read registers
+l:                      List watches
+dm <addr> [end_addr]:   Delete memory address watch. Hex format
+dr <reg>:               Delete register watch.
+s [n]:                  Step forward 'n' instructions (defaults to 1)
+e:                      Exit debugger";
 
 pub fn start_frontend_debug(cpu: &mut Cpu) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
@@ -300,14 +304,20 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
             "rm" => {
                 print_mem(cpu, args)
             }
-            "w" => {
-                add_watch(&mut watches, args)
+            "wm" => {
+                add_mem_watch(&mut watches, args)
+            }
+            "wr" => {
+                add_reg_watch(&mut watches, args)
             }
             "l" => {
                 print_watches(&watches)
             }
-            "d" => {
-                delete_watch(&mut watches, args)
+            "dm" => {
+                delete_mem_watch(&mut watches, args)
+            }
+            "dr" => {
+                delete_reg_watch(&mut watches, args)
             }
             "e" => {
                 println!("Happy debugging :)");
@@ -327,20 +337,150 @@ fn split_first_word(s: &str) -> (&str, &str) {
     }
 }
 
-fn print_mem(cpu: &mut Cpu, args: &str) {
-    let r = parse_hex(args);
-    match r {
-        Ok(addr) => println!("{}: {}", args, cpu.read_mem_debug(addr)),
-        Err(_) => println!("invalid memory address: {:?}", args)
+fn print_mem(cpu: &mut Cpu, args: &str) -> () {
+    let addrs = args.trim().split(" ").collect::<Vec<&str>>();
+    match addrs.len() {
+        1 => {
+            let r = parse_hex(args);
+            match r {
+                Ok(addr) => {
+                    let val = cpu.read_mem_debug(addr);
+                    println!("{}: {} \t0x{}", args, val, u8_to_hex(val));
+                },
+                Err(_) => println!("invalid memory address: {:?}", args)
+            }
+        },
+        2 => {
+            match parse_range(addrs) {
+                Ok((start, end)) => {
+                    for i in start..end {
+                        let val = cpu.read_mem_debug(i);
+                        println!("{}: {} \t0x{}", u16_to_hex(i), val, u8_to_hex(val));
+                    }
+                    let val = cpu.read_mem_debug(end);
+                    println!("{}: {} \t0x{}", u16_to_hex(end), val, u8_to_hex(val));
+                },
+                Err(e) => println!("{}", e),
+            }
+        },
+        _ => println!("invalid memory address: {:?}", args),
     }
 }
 
-fn add_watch(watches: &mut HashSet<u16>, args: &str) {
-    let r = parse_hex(args);
-    match r {
-        Ok(addr) => { watches.insert(addr); },
-        Err(_) => println!("invalid memory address: {:?}", args)
+fn add_mem_watch(watches: &mut HashSet<Watch>, args: &str) {
+    let addrs = args.trim().split(" ").collect::<Vec<&str>>();
+    match addrs.len() {
+        1 => {
+            let r = parse_hex(args);
+            match r {
+                Ok(addr) => { watches.insert(Watch::Mem(addr)); },
+                Err(_) => println!("invalid memory address: {:?}", args)
+            }
+        },
+        2 => {
+            match parse_range(addrs) {
+                Ok((start, end)) => {
+                    if start >= end {
+                        println!("invalid memory range. start must be less than end");
+                        return;
+                    }
+                    watches.insert(Watch::MemRange(start, end));
+                },
+                Err(e) => println!("{}", e),
+            }
+        },
+        _ => println!("invalid memory address: {:?}", args),
     }
+}
+
+fn add_reg_watch(watches: &mut HashSet<Watch>, args: &str) {
+    let reg = args.trim();
+    match reg.len() {
+        1 => {
+            match reg.to_uppercase().as_ref() {
+                "A" => { watches.insert(Watch::Reg8(Reg8::A)); },
+                "B" => { watches.insert(Watch::Reg8(Reg8::B)); },
+                "C" => { watches.insert(Watch::Reg8(Reg8::C)); },
+                "D" => { watches.insert(Watch::Reg8(Reg8::D)); },
+                "E" => { watches.insert(Watch::Reg8(Reg8::E)); },
+                "H" => { watches.insert(Watch::Reg8(Reg8::H)); },
+                "L" => { watches.insert(Watch::Reg8(Reg8::L)); },
+                "F" => println!("cannot watch F register"),
+                _ => println!("invalid register: {:?}", args),
+            };
+        },
+        2 => {
+            match reg.to_uppercase().as_ref() {
+                "AF" => { watches.insert(Watch::Reg16(Reg16::AF)); },
+                "BC" => { watches.insert(Watch::Reg16(Reg16::BC)); },
+                "DE" => { watches.insert(Watch::Reg16(Reg16::DE)); },
+                "HL" => { watches.insert(Watch::Reg16(Reg16::HL)); },
+                "SP" => println!("cannot watch SP register"),
+                "PC" => println!("cannot watch PC register"),
+                _ => println!("invalid register: {:?}", args),
+            };
+        },
+        _ => println!("invalid register: {:?}", args),
+    };
+}
+
+fn print_watches(watches: &HashSet<Watch>) {
+    for watch in watches {
+        match watch {
+            Watch::Mem(addr) => println!("0x{}", u16_to_hex(*addr)),
+            Watch::MemRange(start, end) => println!("0x{}:0x{}", u16_to_hex(*start), u16_to_hex(*end)),
+            Watch::Reg8(reg) => println!("{:?}", reg),
+            Watch::Reg16(reg) => println!("{:?}", reg),
+        }
+    }
+}
+
+fn delete_mem_watch(watches: &mut HashSet<Watch>, args: &str) {
+    let addrs = args.trim().split(" ").collect::<Vec<&str>>();
+    match addrs.len() {
+        1 => {
+            let r = parse_hex(args);
+            match r {
+                Ok(addr) => { watches.remove(&Watch::Mem(addr)); },
+                Err(_) => println!("invalid memory address: {:?}", args)
+            }
+        },
+        2 => {
+            match parse_range(addrs) {
+                Ok((start, end)) => { watches.remove(&Watch::MemRange(start, end)); },
+                Err(e) => println!("{}", e),
+            }
+        },
+        _ => println!("invalid memory address: {:?}", args),
+    }
+}
+
+fn delete_reg_watch(watches: &mut HashSet<Watch>, args: &str) {
+    let reg = args.trim();
+    match reg.len() {
+        1 => {
+            match reg.to_uppercase().as_ref() {
+                "A" => { watches.remove(&Watch::Reg8(Reg8::A)); },
+                "B" => { watches.remove(&Watch::Reg8(Reg8::B)); },
+                "C" => { watches.remove(&Watch::Reg8(Reg8::C)); },
+                "D" => { watches.remove(&Watch::Reg8(Reg8::D)); },
+                "E" => { watches.remove(&Watch::Reg8(Reg8::E)); },
+                "H" => { watches.remove(&Watch::Reg8(Reg8::H)); },
+                "L" => { watches.remove(&Watch::Reg8(Reg8::L)); },
+                _ => println!("invalid register: {:?}", args),
+            };
+        },
+        2 => {
+            match reg.to_uppercase().as_ref() {
+                "AF" => { watches.remove(&Watch::Reg16(Reg16::AF)); },
+                "BC" => { watches.remove(&Watch::Reg16(Reg16::BC)); },
+                "DE" => { watches.remove(&Watch::Reg16(Reg16::DE)); },
+                "HL" => { watches.remove(&Watch::Reg16(Reg16::HL)); },
+                _ => println!("invalid register: {:?}", args),
+            };
+        },
+        _ => println!("invalid register: {:?}", args),
+    };
 }
 
 fn parse_hex(inp: &str) -> Result<u16, &str> {
@@ -364,16 +504,21 @@ fn parse_hex(inp: &str) -> Result<u16, &str> {
     }
 }
 
-fn print_watches(watches: &HashSet<u16>) {
-    for addr in watches {
-        println!("0x{}", hex::encode_upper(vec![(*addr >> 8) as u8, *addr as u8]));
+fn parse_range(addrs: Vec<&str>) -> Result<(u16, u16), String> {
+    if addrs.len() != 2 {
+        return Err("Invalid length for range".to_owned());
     }
-}
-
-fn delete_watch(watches: &mut HashSet<u16>, args: &str) {
-    let r = parse_hex(args);
-    match r {
-        Ok(addr) => { watches.remove(&addr); },
-        Err(_) => println!("invalid memory address: {:?}", args)
-    }
+    let start = match parse_hex(addrs[0]) {
+        Ok(addr) => addr,
+        Err(_) => {
+            return Err(format!("invalid memory address: {:?}", addrs[0]));
+        }
+    };
+    let end = match parse_hex(addrs[1]) {
+        Ok(addr) => addr,
+        Err(_) => {
+            return Err(format!("invalid memory address: {:?}", addrs[1]));
+        }
+    };
+    return Ok((start, end))
 }

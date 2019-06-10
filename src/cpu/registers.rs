@@ -1,10 +1,10 @@
 use enumflags2::BitFlags;
 use enumflags2_derive::EnumFlags;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Reg8 { A, B, C, D, E, H, L }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 #[allow(dead_code)] // Reg16::PC is only used in tests right now.
 pub enum Reg16 { AF, BC, DE, HL, SP, PC }
 
