@@ -1,4 +1,5 @@
 use crate::cpu::Cpu;
+use crate::cpu::registers::{Reg8, Reg16};
 use crate::debug::Watch;
 use crate::gpu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::joypad::{ButtonKey, DirKey};
@@ -226,11 +227,13 @@ fn run_emulator(
 const COMMANDS: &str = "\
 h:                      Display commands
 p:                      Play emulator (Press again to pause)
-w <addr> [end_addr]:    Watch writes to a memory address 'addr'. Specifying 'end_addr' will watch a range. Hex format
+wm <addr> [end_addr]:   Watch writes to a memory address 'addr'. Specifying 'end_addr' will watch a range. Hex format
+wr <reg>:               Watch writes to a register 'reg'. Supports 8 and 16 bit registers. e.g. HL, AF, A, B, etc
 rm <addr> [end_addr]:   Read memory address 'addr'. Specifying 'end_addr' will read a range. Hex format
 rr:                     Read registers
 l:                      List watches
-d <addr>:               Delete watch. Hex format
+dm <addr> [end_addr]:   Delete memory address watch. Hex format
+dr <reg>:               Delete register watch.
 s [n]:                  Step forward 'n' instructions (defaults to 1)
 e:                      Exit debugger";
 
@@ -280,14 +283,20 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
             "rm" => {
                 print_mem(cpu, args)
             }
-            "w" => {
-                add_watch(&mut watches, args)
+            "wm" => {
+                add_mem_watch(&mut watches, args)
+            }
+            "wr" => {
+                add_reg_watch(&mut watches, args)
             }
             "l" => {
                 print_watches(&watches)
             }
-            "d" => {
-                delete_watch(&mut watches, args)
+            "dm" => {
+                delete_mem_watch(&mut watches, args)
+            }
+            "dr" => {
+                delete_reg_watch(&mut watches, args)
             }
             "e" => {
                 println!("Happy debugging :)");
@@ -332,7 +341,7 @@ fn print_mem(cpu: &mut Cpu, args: &str) -> () {
     }
 }
 
-fn add_watch(watches: &mut HashSet<Watch>, args: &str) {
+fn add_mem_watch(watches: &mut HashSet<Watch>, args: &str) {
     let addrs = args.trim().split(" ").collect::<Vec<&str>>();
     match addrs.len() {
         1 => {
@@ -358,6 +367,37 @@ fn add_watch(watches: &mut HashSet<Watch>, args: &str) {
     }
 }
 
+fn add_reg_watch(watches: &mut HashSet<Watch>, args: &str) {
+    let reg = args.trim();
+    match reg.len() {
+        1 => {
+            match reg.to_uppercase().as_ref() {
+                "A" => { watches.insert(Watch::Reg8(Reg8::A)); },
+                "B" => { watches.insert(Watch::Reg8(Reg8::B)); },
+                "C" => { watches.insert(Watch::Reg8(Reg8::C)); },
+                "D" => { watches.insert(Watch::Reg8(Reg8::D)); },
+                "E" => { watches.insert(Watch::Reg8(Reg8::E)); },
+                "H" => { watches.insert(Watch::Reg8(Reg8::H)); },
+                "L" => { watches.insert(Watch::Reg8(Reg8::L)); },
+                "F" => println!("cannot watch F register"),
+                _ => println!("invalid register: {:?}", args),
+            };
+        },
+        2 => {
+            match reg.to_uppercase().as_ref() {
+                "AF" => { watches.insert(Watch::Reg16(Reg16::AF)); },
+                "BC" => { watches.insert(Watch::Reg16(Reg16::BC)); },
+                "DE" => { watches.insert(Watch::Reg16(Reg16::DE)); },
+                "HL" => { watches.insert(Watch::Reg16(Reg16::HL)); },
+                "SP" => println!("cannot watch SP register"),
+                "PC" => println!("cannot watch PC register"),
+                _ => println!("invalid register: {:?}", args),
+            };
+        },
+        _ => println!("invalid register: {:?}", args),
+    };
+}
+
 fn print_watches(watches: &HashSet<Watch>) {
     for watch in watches {
         match watch {
@@ -369,7 +409,7 @@ fn print_watches(watches: &HashSet<Watch>) {
     }
 }
 
-fn delete_watch(watches: &mut HashSet<Watch>, args: &str) {
+fn delete_mem_watch(watches: &mut HashSet<Watch>, args: &str) {
     let addrs = args.trim().split(" ").collect::<Vec<&str>>();
     match addrs.len() {
         1 => {
@@ -387,6 +427,34 @@ fn delete_watch(watches: &mut HashSet<Watch>, args: &str) {
         },
         _ => println!("invalid memory address: {:?}", args),
     }
+}
+
+fn delete_reg_watch(watches: &mut HashSet<Watch>, args: &str) {
+    let reg = args.trim();
+    match reg.len() {
+        1 => {
+            match reg.to_uppercase().as_ref() {
+                "A" => { watches.remove(&Watch::Reg8(Reg8::A)); },
+                "B" => { watches.remove(&Watch::Reg8(Reg8::B)); },
+                "C" => { watches.remove(&Watch::Reg8(Reg8::C)); },
+                "D" => { watches.remove(&Watch::Reg8(Reg8::D)); },
+                "E" => { watches.remove(&Watch::Reg8(Reg8::E)); },
+                "H" => { watches.remove(&Watch::Reg8(Reg8::H)); },
+                "L" => { watches.remove(&Watch::Reg8(Reg8::L)); },
+                _ => println!("invalid register: {:?}", args),
+            };
+        },
+        2 => {
+            match reg.to_uppercase().as_ref() {
+                "AF" => { watches.remove(&Watch::Reg16(Reg16::AF)); },
+                "BC" => { watches.remove(&Watch::Reg16(Reg16::BC)); },
+                "DE" => { watches.remove(&Watch::Reg16(Reg16::DE)); },
+                "HL" => { watches.remove(&Watch::Reg16(Reg16::HL)); },
+                _ => println!("invalid register: {:?}", args),
+            };
+        },
+        _ => println!("invalid register: {:?}", args),
+    };
 }
 
 fn parse_hex(inp: &str) -> Result<u16, &str> {
