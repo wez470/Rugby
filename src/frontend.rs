@@ -1,6 +1,6 @@
 use crate::cpu::Cpu;
 use crate::cpu::registers::{Reg8, Reg16};
-use crate::debug::Watch;
+use crate::debug::{Watch, u16_to_hex, u8_to_hex};
 use crate::gpu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::joypad::{ButtonKey, DirKey};
 use log::info;
@@ -228,7 +228,7 @@ const COMMANDS: &str = "\
 h:                      Display commands
 p:                      Play emulator (Press again to pause)
 wm <addr> [end_addr]:   Watch writes to a memory address 'addr'. Specifying 'end_addr' will watch a range. Hex format
-wr <reg>:               Watch writes to a register 'reg'. Supports 8 and 16 bit registers. e.g. HL, AF, A, B, etc
+wr <reg>:               Watch writes to register 'reg'. Supports 8 and 16 bit registers. e.g. HL, AF, A, B, etc
 rm <addr> [end_addr]:   Read memory address 'addr'. Specifying 'end_addr' will read a range. Hex format
 rr:                     Read registers
 l:                      List watches
@@ -322,7 +322,10 @@ fn print_mem(cpu: &mut Cpu, args: &str) -> () {
         1 => {
             let r = parse_hex(args);
             match r {
-                Ok(addr) => println!("{}: {}", args, cpu.read_mem_debug(addr)),
+                Ok(addr) => {
+                    let val = cpu.read_mem_debug(addr);
+                    println!("{}: {} \t0x{}", args, val, u8_to_hex(val));
+                },
                 Err(_) => println!("invalid memory address: {:?}", args)
             }
         },
@@ -330,9 +333,11 @@ fn print_mem(cpu: &mut Cpu, args: &str) -> () {
             match parse_range(addrs) {
                 Ok((start, end)) => {
                     for i in start..end {
-                        println!("{}: {}", u16_to_hex(i), cpu.read_mem_debug(i))
+                        let val = cpu.read_mem_debug(i);
+                        println!("{}: {} \t0x{}", u16_to_hex(i), val, u8_to_hex(val));
                     }
-                    println!("{}: {}", u16_to_hex(end), cpu.read_mem_debug(end))
+                    let val = cpu.read_mem_debug(end);
+                    println!("{}: {} \t0x{}", u16_to_hex(end), val, u8_to_hex(val));
                 },
                 Err(e) => println!("{}", e),
             }
@@ -476,10 +481,6 @@ fn parse_hex(inp: &str) -> Result<u16, &str> {
     } else {
         Result::Ok(addr_bytes[0] as u16)
     }
-}
-
-fn u16_to_hex(n: u16) -> String {
-    hex::encode_upper(vec![(n >> 8) as u8, n as u8])
 }
 
 fn parse_range(addrs: Vec<&str>) -> Result<(u16, u16), String> {
