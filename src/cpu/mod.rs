@@ -1121,9 +1121,9 @@ impl Cpu {
             self.regs.get_8(Reg8::C),
             self.regs.get_8(Reg8::D),
             self.regs.get_8(Reg8::E),
+            self.regs.f.bits(),
             self.regs.get_8(Reg8::H),
             self.regs.get_8(Reg8::L),
-            self.regs.f.bits(),
             self.regs.get_16(Reg16::SP),
             self.regs.get_16(Reg16::PC)
         );
