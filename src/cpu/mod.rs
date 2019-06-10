@@ -12,7 +12,7 @@ use self::inst::{Cond, Inst, Operand16, Operand8};
 use self::registers::{Flag, Reg16, Reg8, Registers};
 
 mod inst;
-mod registers;
+pub mod registers;
 
 #[cfg(test)]
 mod test;
@@ -20,6 +20,13 @@ mod test;
 // TODO: Refactor later to extract memory-related stuff out of the cpu module.
 const WORK_RAM_SIZE: usize = 8 * 1024; // 8 KB
 const HIGH_RAM_SIZE: usize = 127; // For the address range 0xFF80-0xFFFE (inclusive).
+
+enum Dest {
+    Mem8(u16),
+    Reg8(Reg8),
+    Mem16(u16, u16),
+    Reg16(Reg16),
+}
 
 #[derive(Clone)]
 pub struct Cpu {
@@ -135,7 +142,7 @@ impl Cpu {
 
     /// step n instructions forward.
     pub fn step_n(&mut self, n: usize, watches: &HashSet<Watch>) {
-        let check_watches = watches.len() > 1;
+        let check_watches = n > 1;
         for _ in 0..n {
             let mut interrupts = BitFlags::empty();
             match self.step(true, check_watches, watches) {
@@ -1029,30 +1036,44 @@ impl Cpu {
             Inst::Ld8(n, _) | Inst::Inc8(n) | Inst::Dec8(n) | Inst::Rlc(n) | Inst::Rl(n)
             | Inst::Rrc(n) | Inst::Rr(n) | Inst::Sla(n) | Inst::Sra(n) | Inst::Srl(n)
             | Inst::Swap(n) | Inst::Res(_, n) | Inst::Set(_, n) => {
-                if let Some(addr) = self.get_operand_8_memory_address(n) {
-                    for watch in watches {
-                        match watch {
-                            Watch::Mem(watch_addr) => if addr == *watch_addr { return true; },
-                            Watch::MemRange(start, end) => if addr >= *start && addr <= *end { return true; },
-                        }
+                if let Some(dest) = self.get_operand_8_dest(n) {
+                    match dest {
+                        Dest::Reg8(reg) => return watches.contains(&Watch::Reg8(reg)),
+                        Dest::Mem8(addr) => {
+                            for watch in watches {
+                                match watch {
+                                    Watch::Mem(watch_addr) => if addr == *watch_addr { return true; },
+                                    Watch::MemRange(start, end) => if addr >= *start && addr <= *end { return true; },
+                                    _ => {},
+                                }
+                            }
+                        },
+                        _ => panic!("Invalid operand 8 destination"),
                     }
                 }
             },
             Inst::Ld16(n, _) | Inst::Inc16(n) | Inst::Dec16(n) => {
-                if let Some(addrs) = self.get_operand_16_memory_addresses(n) {
-                    for watch in watches {
-                        match watch {
-                            Watch::Mem(watch_addr) => {
-                                if addrs.0 == *watch_addr || addrs.1 == *watch_addr {
-                                    return true;
+                if let Some(dest) = self.get_operand_16_dest(n) {
+                    match dest {
+                        Dest::Reg16(reg) => return watches.contains(&Watch::Reg16(reg)),
+                        Dest::Mem16(first, second) => {
+                            for watch in watches {
+                                match watch {
+                                    Watch::Mem(watch_addr) => {
+                                        if first == *watch_addr || second == *watch_addr {
+                                            return true;
+                                        }
+                                    },
+                                    Watch::MemRange(start, end) => {
+                                        if (first >= *start && first <= *end) || (second >= *start && second <= *end) {
+                                            return true;
+                                        }
+                                    },
+                                    _ => {},
                                 }
-                            },
-                            Watch::MemRange(start, end) => {
-                                if (addrs.0 >= *start && addrs.0 <= *end) || (addrs.1 >= *start && addrs.1 <= *end) {
-                                    return true;
-                                }
-                            },
+                            }
                         }
+                        _ => panic!("Invalid operand 8 destination"),
                     }
                 }
             },
@@ -1061,21 +1082,23 @@ impl Cpu {
         false
     }
 
-    fn get_operand_8_memory_address(&self, dest: Operand8) -> Option<u16> {
+    fn get_operand_8_dest(&self, dest: Operand8) -> Option<Dest> {
         match dest {
-            Operand8::MemImm(loc) => Some(loc),
-            Operand8::MemReg(reg) => Some(self.regs.get_16(reg)),
-            Operand8::MemHighImm(offset) => Some(0xFF00 | offset as u16),
-            Operand8::MemHighC => Some(0xFF00 | self.regs.bc.low() as u16),
-            Operand8::MemHlPostInc => Some(self.regs.hl.get()),
-            Operand8::MemHlPostDec => Some(self.regs.hl.get()),
+            Operand8::MemImm(loc) => Some(Dest::Mem8(loc)),
+            Operand8::MemReg(reg) => Some(Dest::Mem8(self.regs.get_16(reg))),
+            Operand8::MemHighImm(offset) => Some(Dest::Mem8(0xFF00 | offset as u16)),
+            Operand8::MemHighC => Some(Dest::Mem8(0xFF00 | self.regs.bc.low() as u16)),
+            Operand8::MemHlPostInc => Some(Dest::Mem8(self.regs.hl.get())),
+            Operand8::MemHlPostDec => Some(Dest::Mem8(self.regs.hl.get())),
+            Operand8::Reg8(reg) => Some(Dest::Reg8(reg)),
             _ => None,
         }
     }
 
-    fn get_operand_16_memory_addresses(&self, dest: Operand16) -> Option<(u16, u16)> {
+    fn get_operand_16_dest(&self, dest: Operand16) -> Option<Dest> {
         match dest {
-            Operand16::MemImm16(addr) => Some((addr, addr.wrapping_add(1))),
+            Operand16::MemImm16(addr) => Some(Dest::Mem16(addr, addr.wrapping_add(1))),
+            Operand16::Reg16(reg) => Some(Dest::Reg16(reg)),
             _ => None
         }
     }

@@ -363,6 +363,8 @@ fn print_watches(watches: &HashSet<Watch>) {
         match watch {
             Watch::Mem(addr) => println!("0x{}", u16_to_hex(*addr)),
             Watch::MemRange(start, end) => println!("0x{}:0x{}", u16_to_hex(*start), u16_to_hex(*end)),
+            Watch::Reg8(reg) => println!("{:?}", reg),
+            Watch::Reg16(reg) => println!("{:?}", reg),
         }
     }
 }
