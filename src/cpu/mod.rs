@@ -1,6 +1,6 @@
 use crate::audio::Audio;
 use crate::cart::Cart;
-use crate::debug::{Watch, u16_to_hex, u8_to_hex};
+use crate::debug::Watch;
 use crate::gpu::Gpu;
 use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
@@ -1108,26 +1108,26 @@ impl Cpu {
     /// Print the values of each register
     pub fn print_regs(&self) {
         println!(
-            "A:     {}\t0x{}\n\
-             B:     {}\t0x{}\n\
-             C:     {}\t0x{}\n\
-             D:     {}\t0x{}\n\
-             E:     {}\t0x{}\n\
-             F:     {}\n\
-             H:     {}\t0x{}\n\
-             L:     {}\t0x{}\n\
-             SP:    {}\t0x{}\n\
-             PC:    {}\t0x{}",
-            self.regs.get_8(Reg8::A), u8_to_hex(self.regs.get_8(Reg8::A)),
-            self.regs.get_8(Reg8::B), u8_to_hex(self.regs.get_8(Reg8::B)),
-            self.regs.get_8(Reg8::C), u8_to_hex(self.regs.get_8(Reg8::C)),
-            self.regs.get_8(Reg8::D), u8_to_hex(self.regs.get_8(Reg8::D)),
-            self.regs.get_8(Reg8::E), u8_to_hex(self.regs.get_8(Reg8::E)),
-            format!("{:#06b}", self.regs.f.bits() >> 4),
-            self.regs.get_8(Reg8::H), u8_to_hex(self.regs.get_8(Reg8::H)),
-            self.regs.get_8(Reg8::L), u8_to_hex(self.regs.get_8(Reg8::L)),
-            self.regs.get_16(Reg16::SP), u16_to_hex(self.regs.get_16(Reg16::SP)),
-            self.regs.get_16(Reg16::PC), u16_to_hex(self.regs.get_16(Reg16::PC))
+            "A:     {}\t0x{:02X}\n\
+             B:     {}\t0x{:02X}\n\
+             C:     {}\t0x{:02X}\n\
+             D:     {}\t0x{:02X}\n\
+             E:     {}\t0x{:02X}\n\
+             F:     0b{:04b}\n\
+             H:     {}\t0x{:02X}\n\
+             L:     {}\t0x{:02X}\n\
+             SP:    {}\t0x{:04X}\n\
+             PC:    {}\t0x{:04X}",
+            self.regs.get_8(Reg8::A), self.regs.get_8(Reg8::A),
+            self.regs.get_8(Reg8::B), self.regs.get_8(Reg8::B),
+            self.regs.get_8(Reg8::C), self.regs.get_8(Reg8::C),
+            self.regs.get_8(Reg8::D), self.regs.get_8(Reg8::D),
+            self.regs.get_8(Reg8::E), self.regs.get_8(Reg8::E),
+            self.regs.f.bits() >> 4,
+            self.regs.get_8(Reg8::H), self.regs.get_8(Reg8::H),
+            self.regs.get_8(Reg8::L), self.regs.get_8(Reg8::L),
+            self.regs.get_16(Reg16::SP), self.regs.get_16(Reg16::SP),
+            self.regs.get_16(Reg16::PC), self.regs.get_16(Reg16::PC)
         );
     }
 }

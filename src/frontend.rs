@@ -1,7 +1,7 @@
 use crate::audio::SAMPLE_BUFFER_SIZE;
 use crate::cpu::Cpu;
 use crate::cpu::registers::{Reg8, Reg16};
-use crate::debug::{Watch, u16_to_hex, u8_to_hex};
+use crate::debug::Watch;
 use crate::gpu::{SCREEN_HEIGHT, SCREEN_WIDTH};
 use crate::joypad::{ButtonKey, DirKey};
 use log::info;
@@ -345,7 +345,7 @@ fn print_mem(cpu: &mut Cpu, args: &str) -> () {
             match r {
                 Ok(addr) => {
                     let val = cpu.read_mem_debug(addr);
-                    println!("{}: {} \t0x{}", args, val, u8_to_hex(val));
+                    println!("{:04X}: {} \t0x{:02X}", addr, val, val);
                 },
                 Err(_) => println!("invalid memory address: {:?}", args)
             }
@@ -355,10 +355,10 @@ fn print_mem(cpu: &mut Cpu, args: &str) -> () {
                 Ok((start, end)) => {
                     for i in start..end {
                         let val = cpu.read_mem_debug(i);
-                        println!("{}: {} \t0x{}", u16_to_hex(i), val, u8_to_hex(val));
+                        println!("{:04X}: {} \t0x{:02X}", i, val, val);
                     }
                     let val = cpu.read_mem_debug(end);
-                    println!("{}: {} \t0x{}", u16_to_hex(end), val, u8_to_hex(val));
+                    println!("{:04X}: {} \t0x{:02X}", end, val, val);
                 },
                 Err(e) => println!("{}", e),
             }
@@ -427,8 +427,8 @@ fn add_reg_watch(watches: &mut HashSet<Watch>, args: &str) {
 fn print_watches(watches: &HashSet<Watch>) {
     for watch in watches {
         match watch {
-            Watch::Mem(addr) => println!("0x{}", u16_to_hex(*addr)),
-            Watch::MemRange(start, end) => println!("0x{}:0x{}", u16_to_hex(*start), u16_to_hex(*end)),
+            Watch::Mem(addr) => println!("0x{:04X}", *addr),
+            Watch::MemRange(start, end) => println!("0x{:04X}:0x{:04X}", *start, *end),
             Watch::Reg8(reg) => println!("{:?}", reg),
             Watch::Reg16(reg) => println!("{:?}", reg),
         }

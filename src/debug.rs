@@ -11,11 +11,3 @@ pub enum Watch {
     /// A 16-bit register
     Reg16(Reg16),
 }
-
-pub fn u16_to_hex(n: u16) -> String {
-    hex::encode_upper(vec![(n >> 8) as u8, n as u8])
-}
-
-pub fn u8_to_hex(n: u8) -> String {
-    hex::encode_upper(vec![n])
-}
