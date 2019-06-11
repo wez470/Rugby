@@ -1106,26 +1106,27 @@ impl Cpu {
     /// Print the values of each register
     pub fn print_regs(&self) {
         println!(
-            "A:     {}\t0x{:02X}\n\
-             B:     {}\t0x{:02X}\n\
-             C:     {}\t0x{:02X}\n\
-             D:     {}\t0x{:02X}\n\
-             E:     {}\t0x{:02X}\n\
-             F:     0b{:04b}\n\
-             H:     {}\t0x{:02X}\n\
-             L:     {}\t0x{:02X}\n\
-             SP:    {}\t0x{:04X}\n\
-             PC:    {}\t0x{:04X}",
+            "A:\t{}\t0x{:02X}\n\
+             B:\t{}\t0x{:02X}\n\
+             C:\t{}\t0x{:02X}\n\
+             D:\t{}\t0x{:02X}\n\
+             E:\t{}\t0x{:02X}\n\
+             H:\t{}\t0x{:02X}\n\
+             L:\t{}\t0x{:02X}\n\
+             SP:\t{}\t0x{:04X}\n\
+             PC:\t{}\t0x{:04X}\n\
+             \tZNHC\n\
+             F:\t{:04b}",
             self.regs.get_8(Reg8::A), self.regs.get_8(Reg8::A),
             self.regs.get_8(Reg8::B), self.regs.get_8(Reg8::B),
             self.regs.get_8(Reg8::C), self.regs.get_8(Reg8::C),
             self.regs.get_8(Reg8::D), self.regs.get_8(Reg8::D),
             self.regs.get_8(Reg8::E), self.regs.get_8(Reg8::E),
-            self.regs.f.bits() >> 4,
             self.regs.get_8(Reg8::H), self.regs.get_8(Reg8::H),
             self.regs.get_8(Reg8::L), self.regs.get_8(Reg8::L),
             self.regs.get_16(Reg16::SP), self.regs.get_16(Reg16::SP),
-            self.regs.get_16(Reg16::PC), self.regs.get_16(Reg16::PC)
+            self.regs.get_16(Reg16::PC), self.regs.get_16(Reg16::PC),
+            self.regs.f.bits() >> 4
         );
     }
 }
