@@ -345,7 +345,7 @@ fn print_mem(cpu: &mut Cpu, args: &str) -> () {
             match r {
                 Ok(addr) => {
                     let val = cpu.read_mem_debug(addr);
-                    println!("{:04X}: {} \t0x{:02X}", addr, val, val);
+                    println!("{:04X}:\t{}\t0x{:02X}", addr, val, val);
                 },
                 Err(_) => println!("invalid memory address: {:?}", args)
             }
@@ -355,10 +355,10 @@ fn print_mem(cpu: &mut Cpu, args: &str) -> () {
                 Ok((start, end)) => {
                     for i in start..end {
                         let val = cpu.read_mem_debug(i);
-                        println!("{:04X}: {} \t0x{:02X}", i, val, val);
+                        println!("{:04X}:\t{}\t0x{:02X}", i, val, val);
                     }
                     let val = cpu.read_mem_debug(end);
-                    println!("{:04X}: {} \t0x{:02X}", end, val, val);
+                    println!("{:04X}:\t{}\t0x{:02X}", end, val, val);
                 },
                 Err(e) => println!("{}", e),
             }
