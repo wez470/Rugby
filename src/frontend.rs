@@ -246,7 +246,7 @@ rr:                     Read registers
 l:                      List watches
 dm <addr> [end_addr]:   Delete memory address watch. Hex format
 dr <reg>:               Delete register watch.
-s [n]:                  Step forward 'n' instructions (defaults to 1)
+s [n]:                  Step forward 'n' instructions (defaults to 1). n = 1 will pass over breaks.
 e:                      Exit debugger";
 
 pub fn start_frontend_debug(cpu: &mut Cpu) {
