@@ -27,4 +27,4 @@ pause       = p
 
 <img src="https://i.imgur.com/u30jZ22.png" alt="Rugby Gameplay" width="300"/>
 
-<img src="https://i.imgur.com/iViGdsG.png" alt="Rugby Debugger" width="300">
+<img src="https://i.imgur.com/iViGdsG.png" alt="Rugby Debugger" width="600">
