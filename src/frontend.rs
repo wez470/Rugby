@@ -55,7 +55,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
     let sdl_audio = sdl.audio().expect("Failed to access SDL audio subsystem");
     let desired_spec = AudioSpecDesired {
         freq: Some(44100),
-        channels: Some(1), // mono
+        channels: Some(2), // mono
         samples: Some(SAMPLE_BUFFER_SIZE as u16),
     };
     let mut audio_queue = sdl_audio.open_queue(None, &desired_spec).expect("Failed to open audio queue");

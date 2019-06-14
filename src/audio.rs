@@ -27,11 +27,9 @@ pub struct Audio {
     channel_1_enabled: bool,
     // Audio output fields
     cycles: usize,
+    queue_cycles: usize,
     pub buffer: Box<[u8]>,
     curr_buffer_pos: usize,
-    nibble: usize,
-    repeats: usize,
-    last_played: u8,
 }
 
 impl Audio {
@@ -39,11 +37,9 @@ impl Audio {
         Audio {
             channel3: Channel3::new(),
             cycles: 0,
+            queue_cycles: 0,
             buffer: vec![0; SAMPLE_BUFFER_SIZE * 2].into_boxed_slice(),
             curr_buffer_pos: 0,
-            nibble: 0,
-            repeats: 0,
-            last_played: 0,
             left_enabled: true,
             left_volume: 7,
             right_enabled: true,
@@ -103,23 +99,44 @@ impl Audio {
     }
 
     pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
-        self.cycles += cycles;
-        if self.cycles >= SAMPLE_RATE_CYCLES {
-            self.cycles %= SAMPLE_RATE_CYCLES;
-            self.repeats += 1;
-            if self.repeats > 65536 / (2048 - self.channel3.frequency as usize) {
-                if self.nibble == 0 {
-                    self.last_played = (self.channel3.wave_ram[self.curr_buffer_pos] >> 4) / u8::from(self.channel3.volume);
-                    self.nibble = 1
-                }
-                else {
-                    self.last_played = (self.channel3.wave_ram[self.curr_buffer_pos] & 0b1111) / u8::from(self.channel3.volume);
-                    self.nibble = 0;
-                    self.curr_buffer_pos = (self.curr_buffer_pos + 1) % WAVE_RAM_LENGTH;
-                }
-                self.repeats = 0;
+        if !self.enabled {
+            return;
+        }
+
+        let channel3_val = self.channel3.step(cycles);
+
+        let (mut left, mut right) = self.get_left_and_right_audio(channel3_val);
+        left *= self.left_volume;
+        right *= self.right_volume;
+
+        self.output_to_queue(left, right, audio_queue, cycles);
+    }
+
+    fn get_left_and_right_audio(&self, channel_3_val: u8) -> (u8, u8) {
+        let mut left = 0;
+        let mut right = 0;
+
+        if self.selection & (1 << 6) != 0 {
+            left += channel_3_val;
+        }
+        if self.selection & (1 << 2) != 0 {
+            right += channel_3_val;
+        }
+        (left, right)
+    }
+
+    fn output_to_queue(&mut self, left: u8, right: u8, queue: &mut sdl2::audio::AudioQueue<u8>, cycles: usize) {
+        self.queue_cycles += cycles;
+        if self.queue_cycles >= SAMPLE_RATE_CYCLES {
+            self.queue_cycles %= SAMPLE_RATE_CYCLES;
+            // Need to verify that this is the right way to do left and right audio
+            self.buffer[self.curr_buffer_pos] = left;
+            self.buffer[self.curr_buffer_pos + 1] = right;
+            self.curr_buffer_pos += 2;
+            if self.curr_buffer_pos > SAMPLE_BUFFER_SIZE {
+                queue.queue(&self.buffer[0..self.curr_buffer_pos]);
+                self.curr_buffer_pos = 0;
             }
-            audio_queue.queue(&[((255 * (self.last_played as usize)) / 15) as u8]);
         }
     }
 }
@@ -187,7 +204,16 @@ pub struct Channel3 {
     stop: bool,
 
     /// Wave pattern RAM. Registers FF30-FF3F
-    wave_ram: Box<[u8]>
+    wave_ram: Box<[u8]>,
+
+    /// Track current cycles for audio output
+    cycles: usize,
+
+    /// Track the current nibble index in wave ram
+    curr_index: usize,
+
+    /// Track the current audio output value
+    curr_output: u8,
 }
 
 impl Channel3 {
@@ -200,6 +226,9 @@ impl Channel3 {
             restart: false,
             stop: false,
             wave_ram: vec![0; WAVE_RAM_LENGTH].into_boxed_slice(),
+            cycles: 0,
+            curr_index: 0,
+            curr_output: 0,
         }
     }
 
@@ -239,5 +268,28 @@ impl Channel3 {
             0x30...0x3F => self.wave_ram[(addr - 0x30) as usize] = val,
             _ => panic!("Invalid write address for audio channel 3"),
         }
+    }
+
+    fn step(&mut self, cycles: usize) -> u8 {
+        self.cycles += cycles;
+        let freq = (2048 - self.frequency as usize) * 2;
+        if self.cycles > freq && freq > 0 {
+            self.cycles %= freq;
+            let mut b = self.wave_ram[self.curr_index / 2];
+            if self.curr_index % 2 == 0 {
+                b = (b >> 4) & 0b1111;
+            }
+            else {
+                b &= 0b1111;
+            }
+            self.curr_index = (self.curr_index + 1) % 32;
+            match self.volume {
+                Volume::Zero => self.curr_output = 0,
+                Volume::Full => self.curr_output = b,
+                Volume::Half => self.curr_output = b >> 1,
+                Volume::Quarter => self.curr_output = b >> 2,
+            }
+        }
+        self.curr_output
     }
 }
