@@ -5,6 +5,27 @@ const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 #[derive(Clone)]
 pub struct Audio {
     pub channel3: Channel3,
+    /// Vin to SO2 terminal enabled. Bit 7 at 0xFF24
+    left_enabled: bool,
+    /// S02 volume (0-7). Bits 4-6 at 0xFF24
+    left_volume: u8,
+    /// Vin to S01 terminal enabled. Bit 3 at 0xFF24
+    right_enabled: bool,
+    /// S02 volume (0-7). Bits 0-2 at 0xFF24
+    right_volume: u8,
+    /// Sound channel output selection. register 0xFF25
+    selection: u8,
+    /// Sound enabled. Bit 7 at 0xFF26. Cannot access any sound registers besides 0xFF26 while disabled.
+    enabled: bool,
+    /// Sound 4 enabled. Bit 3 at 0xFF26. Read only
+    channel_4_enabled: bool,
+    /// Sound 3 enabled. Bit 2 at 0xFF26. Read only
+    channel_3_enabled: bool,
+    /// Sound 2 enabled. Bit 1 at 0xFF26. Read only
+    channel_2_enabled: bool,
+    /// Sound 1 enabled. Bit 0 at 0xFF26. Read only
+    channel_1_enabled: bool,
+    // Audio output fields
     cycles: usize,
     pub buffer: Box<[u8]>,
     curr_buffer_pos: usize,
@@ -23,12 +44,38 @@ impl Audio {
             nibble: 0,
             repeats: 0,
             last_played: 0,
+            left_enabled: true,
+            left_volume: 7,
+            right_enabled: true,
+            right_volume: 7,
+            selection: 0xFF,
+            enabled: true,
+            channel_4_enabled: true,
+            channel_3_enabled: true,
+            channel_2_enabled: true,
+            channel_1_enabled: true,
         }
     }
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
             0x1A...0x1E => self.channel3.read_reg(addr),
+            0x24 => {
+                (self.left_enabled as u8) << 7
+                | self.left_volume << 4
+                | (self.right_enabled as u8) << 3
+                | self.right_volume
+            }
+            0x25 => {
+                self.selection
+            }
+            0x26 => {
+                (self.enabled as u8) << 7
+                | (self.channel_4_enabled as u8) << 3
+                | (self.channel_3_enabled as u8) << 2
+                | (self.channel_2_enabled as u8) << 1
+                | (self.channel_1_enabled as u8)
+            }
             0x30...0x3F => self.channel3.read_reg(addr),
             _ => panic!("Unimplemented audio register read"),
         }
@@ -37,6 +84,19 @@ impl Audio {
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
             0x1A...0x1E => self.channel3.write_reg(addr, val),
+            0x24 => {
+                self.left_enabled = addr & (1 << 7) != 0;
+                self.left_volume = (addr >> 4) & 0b111;
+                self.left_enabled = addr & (1 << 3) != 0;
+                self.left_volume = addr & 0b111;
+            }
+            0x25 => {
+                self.selection = val;
+            }
+            0x26 => {
+                // Should destroy all sound register contents upon disabled.
+                self.enabled = val & (1 << 7) != 0;
+            }
             0x30...0x3F => self.channel3.write_reg(addr, val),
             _ => panic!("Unimplemented audio register write"),
         }
