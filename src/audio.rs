@@ -26,20 +26,14 @@ pub struct Audio {
     /// Sound 1 enabled. Bit 0 at 0xFF26. Read only
     channel_1_enabled: bool,
     // Audio output fields
-    cycles: usize,
     queue_cycles: usize,
-    pub buffer: Box<[u8]>,
-    curr_buffer_pos: usize,
 }
 
 impl Audio {
     pub fn new() -> Audio {
         Audio {
             channel3: Channel3::new(),
-            cycles: 0,
             queue_cycles: 0,
-            buffer: vec![0; SAMPLE_BUFFER_SIZE * 2].into_boxed_slice(),
-            curr_buffer_pos: 0,
             left_enabled: true,
             left_volume: 7,
             right_enabled: true,
@@ -130,13 +124,7 @@ impl Audio {
         if self.queue_cycles >= SAMPLE_RATE_CYCLES {
             self.queue_cycles %= SAMPLE_RATE_CYCLES;
             // Need to verify that this is the right way to do left and right audio
-            self.buffer[self.curr_buffer_pos] = left;
-            self.buffer[self.curr_buffer_pos + 1] = right;
-            self.curr_buffer_pos += 2;
-            if self.curr_buffer_pos > SAMPLE_BUFFER_SIZE {
-                queue.queue(&self.buffer[0..self.curr_buffer_pos]);
-                self.curr_buffer_pos = 0;
-            }
+            queue.queue(&[left, right]);
         }
     }
 }
