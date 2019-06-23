@@ -33,6 +33,7 @@ pub struct Audio {
 impl Audio {
     pub fn new() -> Audio {
         Audio {
+            channel2: Channel2::new(),
             channel3: Channel3::new(),
             queue_cycles: 0,
             left_enabled: true,
@@ -292,11 +293,13 @@ impl Channel3 {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum EnvelopeDirection {
     Decrease = 0,
     Increase = 1,
 }
 
+#[derive(Clone)]
 pub struct Channel2 {
     /// Wave pattern. Bits 6-7 of 0xFF16
     wave_pattern: u8,
@@ -322,4 +325,19 @@ pub struct Channel2 {
 
     /// True if we should stop after the current sound length. Bit 6 of 0xFF19
     stop: bool,
+}
+
+impl Channel2 {
+    pub fn new() -> Channel2 {
+        Channel2 {
+            wave_pattern: 0,
+            length: 0,
+            volume: 0,
+            envelope_direction: EnvelopeDirection::Decrease,
+            envelope_sweeps: 0,
+            frequency: 0,
+            restart: false,
+            stop: false,
+        }
+    }
 }
