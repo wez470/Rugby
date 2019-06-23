@@ -4,6 +4,7 @@ const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 
 #[derive(Clone)]
 pub struct Audio {
+    pub channel2: Channel2,
     pub channel3: Channel3,
     /// Vin to SO2 terminal enabled. Bit 7 at 0xFF24
     left_enabled: bool,
@@ -75,10 +76,10 @@ impl Audio {
         match addr {
             0x1A...0x1E => self.channel3.write_reg(addr, val),
             0x24 => {
-                self.left_enabled = addr & (1 << 7) != 0;
-                self.left_volume = (addr >> 4) & 0b111;
-                self.left_enabled = addr & (1 << 3) != 0;
-                self.left_volume = addr & 0b111;
+                self.left_enabled = val & (1 << 7) != 0;
+                self.left_volume = (val >> 4) & 0b111;
+                self.left_enabled = val & (1 << 3) != 0;
+                self.left_volume = val & 0b111;
             }
             0x25 => {
                 self.selection = val;
@@ -93,10 +94,6 @@ impl Audio {
     }
 
     pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
-        if !self.enabled {
-            return;
-        }
-
         let channel3_val = self.channel3.step(cycles);
 
         let (mut left, mut right) = self.get_left_and_right_audio(channel3_val);
@@ -109,13 +106,25 @@ impl Audio {
     fn get_left_and_right_audio(&self, channel_3_val: u8) -> (u8, u8) {
         let mut left = 0;
         let mut right = 0;
+        if !self.enabled {
+            return (left, right);
+        }
 
-        if self.selection & (1 << 6) != 0 {
-            left += channel_3_val;
+        if self.left_enabled {
+            if self.channel_3_enabled {
+                if self.selection & (1 << 6) != 0 {
+                    left += channel_3_val;
+                }
+            }
         }
-        if self.selection & (1 << 2) != 0 {
-            right += channel_3_val;
+        if self.right_enabled {
+            if self.channel_3_enabled {
+                if self.selection & (1 << 2) != 0 {
+                    right += channel_3_val;
+                }
+            }
         }
+
         (left, right)
     }
 
@@ -183,6 +192,7 @@ pub struct Channel3 {
     pub volume: Volume,
 
     /// Frequency. Register FF1D and Bits 0-2 of Register FF1E
+    /// Actual frequency is given by `(2048 - frequency) * 2`. http://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
     pub frequency: u16,
 
     /// True if we are going to restart sound. TODO(wcarlson): What is this?
@@ -192,7 +202,7 @@ pub struct Channel3 {
     stop: bool,
 
     /// Wave pattern RAM. Registers FF30-FF3F
-    wave_ram: Box<[u8]>,
+    pub wave_ram: Box<[u8]>,
 
     /// Track current cycles for audio output
     cycles: usize,
@@ -280,4 +290,36 @@ impl Channel3 {
         }
         self.curr_output
     }
+}
+
+pub enum EnvelopeDirection {
+    Decrease = 0,
+    Increase = 1,
+}
+
+pub struct Channel2 {
+    /// Wave pattern. Bits 6-7 of 0xFF16
+    wave_pattern: u8,
+
+    /// Length of sound data. Bits 0-5 of 0xFF16
+    length: u8,
+
+    /// Volume. Bits 4-7 of 0xFF17
+    volume: u8,
+
+    /// Envelope direction. Bit 3 of 0xFF17.
+    envelope_direction: EnvelopeDirection,
+
+    /// Number of envelope sweeps. Bits 0-2 of 0xFF17
+    envelope_sweeps: u8,
+
+    /// Channel frequency. Lower bits are bits 0-7 of 0xFF18. Higher bits are 0-2 of 0xFF19
+    /// Actual frequency is given by `(2048 - frequency) * 4`. http://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
+    frequency: u16,
+
+    /// True if we are going to restart sound. Bit 7 of 0xFF19
+    restart: bool,
+
+    /// True if we should stop after the current sound length. Bit 6 of 0xFF19
+    stop: bool,
 }
