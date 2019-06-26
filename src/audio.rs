@@ -4,6 +4,7 @@ const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 
 #[derive(Clone)]
 pub struct Audio {
+    pub channel1: Channel1,
     pub channel2: Channel2,
     pub channel3: Channel3,
     pub channel4: Channel4,
@@ -34,6 +35,7 @@ pub struct Audio {
 impl Audio {
     pub fn new() -> Audio {
         Audio {
+            channel1: Channel1::new(),
             channel2: Channel2::new(),
             channel3: Channel3::new(),
             channel4: Channel4::new(),
@@ -53,6 +55,7 @@ impl Audio {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
+            0x11...0x14 => self.channel1.read_reg(addr),
             0x16...0x19 => self.channel2.read_reg(addr),
             0x1A...0x1E => self.channel3.read_reg(addr),
             0x24 => {
@@ -78,6 +81,7 @@ impl Audio {
 
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
+            0x11...0x14 => self.channel1.write_reg(addr, val),
             0x16...0x19 => self.channel2.write_reg(addr, val),
             0x1A...0x1E => self.channel3.write_reg(addr, val),
             0x24 => {
@@ -99,17 +103,18 @@ impl Audio {
     }
 
     pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
-        let channel3_val = self.channel3.step(cycles);
+        let channel1_val = self.channel1.step(cycles);
         let channel2_val = self.channel2.step(cycles);
+        let channel3_val = self.channel3.step(cycles);
 
-        let (mut left, mut right) = self.get_left_and_right_audio(channel2_val, channel3_val);
+        let (mut left, mut right) = self.get_left_and_right_audio(channel1_val, channel2_val, channel3_val);
         left *= self.left_volume;
         right *= self.right_volume;
 
         self.output_to_queue(left, right, audio_queue, cycles);
     }
 
-    fn get_left_and_right_audio(&self, channel2_val: u8, channel3_val: u8) -> (u8, u8) {
+    fn get_left_and_right_audio(&self, channel1_val: u8, channel2_val: u8, channel3_val: u8) -> (u8, u8) {
         let mut left = 0;
         let mut right = 0;
         if !self.enabled {
@@ -127,6 +132,11 @@ impl Audio {
                     left += channel2_val;
                 }
             }
+            if self.channel_1_enabled {
+                if self.selection & (1 << 4) != 0 {
+                    left += channel1_val;
+                }
+            }
         }
         if self.right_enabled {
             if self.channel_3_enabled {
@@ -134,9 +144,14 @@ impl Audio {
                     right += channel3_val;
                 }
             }
-            if self.channel_3_enabled {
+            if self.channel_2_enabled {
                 if self.selection & (1 << 1) != 0 {
                     right += channel2_val;
+                }
+            }
+            if self.channel_1_enabled {
+                if self.selection & 1 != 0 {
+                    right += channel1_val;
                 }
             }
         }
@@ -439,6 +454,128 @@ impl Channel2 {
             2 => 0b1000_0111,
             3 => 0b0111_1110,
             _ => panic!("Invalid channel 2 waveform value")
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct Channel1 {
+    /// TODO(wcarlson): Sweep register
+
+    /// Wave pattern. Bits 6-7 of 0xFF11
+    wave_pattern: u8,
+
+    /// Length of sound data. Bits 0-5 of 0xFF11
+    length: u8,
+
+    /// Volume. Bits 4-7 of 0xFF12
+    volume: u8,
+
+    /// Envelope direction. Bit 3 of 0xFF12.
+    envelope_direction: EnvelopeDirection,
+
+    /// Number of envelope sweeps. Bits 0-2 of 0xFF12
+    envelope_sweeps: u8,
+
+    /// Channel frequency. Lower bits are bits 0-7 of 0xFF13. Higher bits are 0-2 of 0xFF14
+    /// Actual frequency is given by `(2048 - frequency) * 4`. http://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
+    frequency: u16,
+
+    /// True if we are going to restart sound. Bit 7 of 0xFF14
+    restart: bool,
+
+    /// True if we should stop after the current sound length. Bit 6 of 0xFF14
+    stop: bool,
+
+    /// Track current cycles for audio output
+    cycles: usize,
+
+    /// Track the current nibble index in wave ram
+    curr_index: usize,
+
+    /// Track the current audio output value
+    curr_output: u8,
+}
+
+impl Channel1 {
+    pub fn new() -> Channel1 {
+        Channel1 {
+            wave_pattern: 0,
+            length: 0,
+            volume: 0,
+            envelope_direction: EnvelopeDirection::Decrease,
+            envelope_sweeps: 0,
+            frequency: 0,
+            restart: false,
+            stop: false,
+            cycles: 0,
+            curr_index: 0,
+            curr_output: 0,
+        }
+    }
+
+    pub fn read_reg(&self, addr: u8) -> u8 {
+        match addr {
+            0x11 => self.wave_pattern << 6,
+            0x12 => {
+                self.volume << 4
+                    | (self.envelope_direction as u8) << 3
+                    | self.envelope_sweeps
+            },
+            0x13 => self.frequency as u8,
+            0x14 => {
+                0b00111000 // Bits 3-5 unused
+                    | (self.restart as u8) << 7
+                    | (self.stop as u8) << 6
+                    | ((self.frequency >> 8) as u8) & 0b111
+            },
+            _ => panic!("Invalid read address for audio channel 2"),
+        }
+    }
+
+    pub fn write_reg(&mut self, addr: u8, val: u8) {
+        match addr {
+            0x11 => {
+                self.wave_pattern = val >> 6;
+                self.length = val & 0b0011_1111;
+            },
+            0x12 => {
+                self.envelope_sweeps = val & 0b0111;
+                self.envelope_direction = EnvelopeDirection::from((val >> 3) & 1);
+                self.volume = val >> 4;
+            },
+            0x13 => {
+                self.frequency &= !0 << 8;
+                self.frequency |= val as u16
+            },
+            0x14 => {
+                self.restart = (val >> 7) & 1 == 1;
+                self.stop = (val >> 6) & 1 == 1;
+                self.frequency &= 0xFF;
+                self.frequency |= ((val & 0b111) as u16) << 8;
+            },
+            _ => panic!("Invalid write address for audio channel 2"),
+        }
+    }
+
+    pub fn step(&mut self, cycles: usize) -> u8 {
+        self.cycles += cycles;
+        let freq = (2048 - self.frequency as usize) * 4;
+        if self.cycles > freq && freq > 0 {
+            self.cycles %= freq;
+            self.curr_output = (self.get_wave_duty() >> self.curr_index) & 1;
+            self.curr_index = (self.curr_index + 1) % 8;
+        }
+        self.curr_output * self.volume
+    }
+
+    fn get_wave_duty(&self) -> u8 {
+        match self.wave_pattern {
+            0 => 0b0000_0001,
+            1 => 0b1000_0001,
+            2 => 0b1000_0111,
+            3 => 0b0111_1110,
+            _ => panic!("Invalid channel 1 waveform value")
         }
     }
 }
