@@ -51,6 +51,7 @@ impl Audio {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
+            0x16...0x19 => self.channel2.read_reg(addr),
             0x1A...0x1E => self.channel3.read_reg(addr),
             0x24 => {
                 (self.left_enabled as u8) << 7
@@ -75,6 +76,7 @@ impl Audio {
 
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
+            0x16...0x19 => self.channel2.write_reg(addr, val),
             0x1A...0x1E => self.channel3.write_reg(addr, val),
             0x24 => {
                 self.left_enabled = val & (1 << 7) != 0;
@@ -238,11 +240,10 @@ impl Channel3 {
             0x1C => (self.volume as u8) << 5,
             0x1D => self.frequency as u8,
             0x1E => {
-                let mut frequency_higher_data = 0b00111000; // Bits 3-5 unused
-                frequency_higher_data |= (self.restart as u8) << 7;
-                frequency_higher_data |= (self.stop as u8) << 6;
-                frequency_higher_data |= ((self.frequency >> 8) as u8) & 0b111;
-                frequency_higher_data
+                0b00111000 // Bits 3-5 unused
+                | (self.restart as u8) << 7
+                | (self.stop as u8) << 6
+                | ((self.frequency >> 8) as u8) & 0b111
             },
             0x30...0x3F => self.wave_ram[(addr - 0x30) as usize],
             _ => panic!("Invalid read address for audio channel 3"),
@@ -299,6 +300,16 @@ pub enum EnvelopeDirection {
     Increase = 1,
 }
 
+impl std::convert::From<u8> for EnvelopeDirection {
+    fn from(value: u8) -> EnvelopeDirection {
+        match value {
+            0 => EnvelopeDirection::Decrease,
+            1 => EnvelopeDirection::Increase,
+            _ => panic!("Invalid u8 value for envelope direction")
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Channel2 {
     /// Wave pattern. Bits 6-7 of 0xFF16
@@ -338,6 +349,50 @@ impl Channel2 {
             frequency: 0,
             restart: false,
             stop: false,
+        }
+    }
+
+    pub fn read_reg(&self, addr: u8) -> u8 {
+        match addr {
+            0x16 => self.wave_pattern << 6,
+            0x17 => {
+                self.volume << 4
+                | (self.envelope_direction as u8) << 3
+                | self.envelope_sweeps
+            },
+            0x18 => self.frequency as u8,
+            0x19 => {
+                0b00111000 // Bits 3-5 unused
+                | (self.restart as u8) << 7
+                | (self.stop as u8) << 6
+                | ((self.frequency >> 8) as u8) & 0b111
+            },
+            _ => panic!("Invalid read address for audio channel 2"),
+        }
+    }
+
+    pub fn write_reg(&mut self, addr: u8, val: u8) {
+        match addr {
+            0x16 => {
+                self.wave_pattern = val >> 6;
+                self.length = val & 0b0011_1111;
+            },
+            0x17 => {
+                self.envelope_sweeps = val & 0b0111;
+                self.envelope_direction = EnvelopeDirection::from((val >> 3) & 1);
+                self.volume = val >> 4;
+            },
+            0x18 => {
+                self.frequency &= !0 << 8;
+                self.frequency |= val as u16
+            },
+            0x19 => {
+                self.restart = (val >> 7) & 1 == 1;
+                self.stop = (val >> 6) & 1 == 1;
+                self.frequency &= 0xFF;
+                self.frequency |= ((val & 0b111) as u16) << 8;
+            },
+            _ => panic!("Invalid write address for audio channel 2"),
         }
     }
 }
