@@ -6,6 +6,7 @@ const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 pub struct Audio {
     pub channel2: Channel2,
     pub channel3: Channel3,
+    pub channel4: Channel4,
     /// Vin to SO2 terminal enabled. Bit 7 at 0xFF24
     left_enabled: bool,
     /// S02 volume (0-7). Bits 4-6 at 0xFF24
@@ -35,6 +36,7 @@ impl Audio {
         Audio {
             channel2: Channel2::new(),
             channel3: Channel3::new(),
+            channel4: Channel4::new(),
             queue_cycles: 0,
             left_enabled: true,
             left_volume: 7,
@@ -394,5 +396,47 @@ impl Channel2 {
             },
             _ => panic!("Invalid write address for audio channel 2"),
         }
+    }
+}
+
+#[derive(Clone)]
+pub struct Channel4 {
+    /// Sound Length. Bits 0-5 of 0xFF20
+    length: u8,
+
+    /// Initial volume of envelope. Bits 4-7 of 0xFF21
+    envelope_initial_volume: u8,
+
+    /// Envelope direction. Bit 3 of 0xFF21
+    envelope_direction: EnvelopeDirection,
+
+    /// Number of envelope sweeps. Bits 0-2 of 0xFF21
+    envelope_sweeps: u8,
+
+    /// True if we are going to restart sound. TODO(wcarlson): What is this?
+    restart: bool,
+
+    /// True if we should stop after the current sound length
+    stop: bool,
+}
+
+impl Channel4 {
+    pub fn new() -> Self {
+        Self {
+            length: 0,
+            envelope_initial_volume: 0,
+            envelope_direction: EnvelopeDirection::Decrease,
+            envelope_sweeps: 0,
+            restart: false,
+            stop: false,
+        }
+    }
+
+    pub fn read_reg(&self, _addr: u8) -> u8 {
+        unimplemented!();
+    }
+
+    pub fn write_reg(&mut self, _addr: u8, _val: u8) {
+        unimplemented!();
     }
 }
