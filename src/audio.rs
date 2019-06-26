@@ -124,34 +124,34 @@ impl Audio {
         if self.left_enabled {
             if self.channel_3_enabled {
                 if self.selection & (1 << 6) != 0 {
-                    left += channel3_val;
+                    left += channel3_val / 2;
                 }
             }
             if self.channel_2_enabled {
                 if self.selection & (1 << 5) != 0 {
-                    left += channel2_val;
+                    left += channel2_val / 2;
                 }
             }
             if self.channel_1_enabled {
                 if self.selection & (1 << 4) != 0 {
-                    left += channel1_val;
+                    left += channel1_val / 2;
                 }
             }
         }
         if self.right_enabled {
             if self.channel_3_enabled {
                 if self.selection & (1 << 2) != 0 {
-                    right += channel3_val;
+                    right += channel3_val / 2;
                 }
             }
             if self.channel_2_enabled {
                 if self.selection & (1 << 1) != 0 {
-                    right += channel2_val;
+                    right += channel2_val / 2;
                 }
             }
             if self.channel_1_enabled {
                 if self.selection & 1 != 0 {
-                    right += channel1_val;
+                    right += channel1_val / 2;
                 }
             }
         }
