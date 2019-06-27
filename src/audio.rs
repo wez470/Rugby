@@ -115,48 +115,48 @@ impl Audio {
     }
 
     fn get_left_and_right_audio(&self, channel1_val: u8, channel2_val: u8, channel3_val: u8) -> (u8, u8) {
-        let mut left = 0;
-        let mut right = 0;
+        let mut left: u16 = 0;
+        let mut right: u16 = 0;
         if !self.enabled {
-            return (left, right);
+            return (0, 0);
         }
 
         if self.left_enabled {
             if self.channel_3_enabled {
                 if self.selection & (1 << 6) != 0 {
-                    left += channel3_val / 2;
+                    left += channel3_val as u16;
                 }
             }
             if self.channel_2_enabled {
                 if self.selection & (1 << 5) != 0 {
-                    left += channel2_val / 2;
+                    left += channel2_val as u16;
                 }
             }
             if self.channel_1_enabled {
                 if self.selection & (1 << 4) != 0 {
-                    left += channel1_val / 2;
+                    left += channel1_val as u16;
                 }
             }
         }
         if self.right_enabled {
             if self.channel_3_enabled {
                 if self.selection & (1 << 2) != 0 {
-                    right += channel3_val / 2;
+                    right += channel3_val as u16;
                 }
             }
             if self.channel_2_enabled {
                 if self.selection & (1 << 1) != 0 {
-                    right += channel2_val / 2;
+                    right += channel2_val as u16;
                 }
             }
             if self.channel_1_enabled {
                 if self.selection & 1 != 0 {
-                    right += channel1_val / 2;
+                    right += channel1_val as u16;
                 }
             }
         }
 
-        (left, right)
+        ((left / 3) as u8, (right / 3) as u8)
     }
 
     fn output_to_queue(&mut self, left: u8, right: u8, queue: &mut sdl2::audio::AudioQueue<u8>, cycles: usize) {
