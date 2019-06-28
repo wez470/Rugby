@@ -58,6 +58,7 @@ impl Audio {
             0x11...0x14 => self.channel1.read_reg(addr),
             0x16...0x19 => self.channel2.read_reg(addr),
             0x1A...0x1E => self.channel3.read_reg(addr),
+            0x20...0x23 => self.channel4.read_reg(addr),
             0x24 => {
                 (self.left_enabled as u8) << 7
                 | self.left_volume << 4
@@ -84,6 +85,7 @@ impl Audio {
             0x11...0x14 => self.channel1.write_reg(addr, val),
             0x16...0x19 => self.channel2.write_reg(addr, val),
             0x1A...0x1E => self.channel3.write_reg(addr, val),
+            0x20...0x23 => self.channel4.write_reg(addr, val),
             0x24 => {
                 self.left_enabled = val & (1 << 7) != 0;
                 self.left_volume = (val >> 4) & 0b111;
@@ -586,13 +588,22 @@ pub struct Channel4 {
     length: u8,
 
     /// Initial volume of envelope. Bits 4-7 of 0xFF21
-    envelope_initial_volume: u8,
+    volume: u8,
 
     /// Envelope direction. Bit 3 of 0xFF21
     envelope_direction: EnvelopeDirection,
 
     /// Number of envelope sweeps. Bits 0-2 of 0xFF21
     envelope_sweeps: u8,
+
+    /// Shift clock frequency. Bits 4-7 of 0xFF22
+    shift_clock_frequency: u8,
+
+    /// Counter step/width. Bit 3 of 0xFF22. 0=15 bits, 1=7 bits
+    counter_step: u8,
+
+    /// Dividing ratio of frequencies. Bits 0-2 of 0xFF22
+    dividing_ratio: u8,
 
     /// True if we are going to restart sound. TODO(wcarlson): What is this?
     restart: bool,
@@ -605,19 +616,61 @@ impl Channel4 {
     pub fn new() -> Self {
         Self {
             length: 0,
-            envelope_initial_volume: 0,
+            volume: 0,
             envelope_direction: EnvelopeDirection::Decrease,
             envelope_sweeps: 0,
+            shift_clock_frequency: 0,
+            counter_step: 0,
+            dividing_ratio: 0,
             restart: false,
             stop: false,
         }
     }
 
-    pub fn read_reg(&self, _addr: u8) -> u8 {
-        unimplemented!();
+    pub fn read_reg(&self, addr: u8) -> u8 {
+        match addr {
+            0x20 => {
+                self.length
+            },
+            0x21 => {
+                self.volume << 4
+                    | (self.envelope_direction as u8) << 3
+                    | self.envelope_sweeps
+            },
+            0x22 => {
+                self.shift_clock_frequency << 4
+                    | self.counter_step << 3
+                    | self.dividing_ratio
+            },
+            0x23 => {
+                0b00111111 // Bits 0-5 unused
+                    | (self.restart as u8) << 7
+                    | (self.stop as u8) << 6
+            },
+            _ => panic!("Invalid read address for audio channel 4"),
+        }
     }
 
-    pub fn write_reg(&mut self, _addr: u8, _val: u8) {
-        unimplemented!();
+    pub fn write_reg(&mut self, addr: u8, val: u8) {
+        match addr {
+            0x20 => {
+                self.length = val & 0b0011_1111;
+            },
+            0x21 => {
+                self.envelope_sweeps = val & 0b0111;
+                self.envelope_direction = EnvelopeDirection::from((val >> 3) & 1);
+                self.volume = val >> 4;
+            },
+            0x22 => {
+                self.dividing_ratio = val & 0b0111;
+                self.counter_step = (val >> 3) & 1;
+                self.shift_clock_frequency = val >> 4;
+            },
+            0x23 => {
+                self.restart = (val >> 7) & 1 == 1;
+                self.stop = (val >> 6) & 1 == 1;
+            },
+            _ => panic!("Invalid write address for audio channel 4"),
+        }
     }
 }
