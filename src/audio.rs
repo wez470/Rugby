@@ -724,9 +724,11 @@ impl Channel4 {
         let bit_1 = (self.linear_feedback_shift_register >> 1) & 1;
         let new_bit = bit_0 ^ bit_1;
         self.linear_feedback_shift_register = self.linear_feedback_shift_register >> 1;
-        self.linear_feedback_shift_register &= (new_bit << 14) & 0b0011_1111_1111_1111;
+        self.linear_feedback_shift_register &= 0b0011_1111_1111_1111;
+        self.linear_feedback_shift_register &= new_bit << 14;
         if self.counter_step == 1 {
-            self.linear_feedback_shift_register &= (new_bit << 6) & 0b0111_1111_1011_1111;
+            self.linear_feedback_shift_register &= 0b0111_1111_1011_1111;
+            self.linear_feedback_shift_register &= new_bit << 6;
         }
         return (!self.linear_feedback_shift_register & 1) as u8
     }
