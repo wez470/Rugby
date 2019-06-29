@@ -108,15 +108,16 @@ impl Audio {
         let channel1_val = self.channel1.step(cycles);
         let channel2_val = self.channel2.step(cycles);
         let channel3_val = self.channel3.step(cycles);
+        let channel4_val = self.channel4.step();
 
-        let (mut left, mut right) = self.get_left_and_right_audio(channel1_val, channel2_val, channel3_val);
+        let (mut left, mut right) = self.get_left_and_right_audio(channel1_val, channel2_val, channel3_val, channel4_val);
         left *= self.left_volume;
         right *= self.right_volume;
 
         self.output_to_queue(left, right, audio_queue, cycles);
     }
 
-    fn get_left_and_right_audio(&self, channel1_val: u8, channel2_val: u8, channel3_val: u8) -> (u8, u8) {
+    fn get_left_and_right_audio(&self, channel1_val: u8, channel2_val: u8, channel3_val: u8, channel4_val: u8) -> (u8, u8) {
         let mut left: u16 = 0;
         let mut right: u16 = 0;
         if !self.enabled {
@@ -124,6 +125,11 @@ impl Audio {
         }
 
         if self.left_enabled {
+            if self.channel_4_enabled {
+                if self.selection & (1 << 7) != 0 {
+                    left += channel4_val as u16;
+                }
+            }
             if self.channel_3_enabled {
                 if self.selection & (1 << 6) != 0 {
                     left += channel3_val as u16;
@@ -141,6 +147,11 @@ impl Audio {
             }
         }
         if self.right_enabled {
+            if self.channel_4_enabled {
+                if self.selection & (1 << 3) != 0 {
+                    right += channel4_val as u16;
+                }
+            }
             if self.channel_3_enabled {
                 if self.selection & (1 << 2) != 0 {
                     right += channel3_val as u16;
@@ -158,7 +169,7 @@ impl Audio {
             }
         }
 
-        ((left / 3) as u8, (right / 3) as u8)
+        ((left / 4) as u8, (right / 4) as u8)
     }
 
     fn output_to_queue(&mut self, left: u8, right: u8, queue: &mut sdl2::audio::AudioQueue<u8>, cycles: usize) {
@@ -605,11 +616,18 @@ pub struct Channel4 {
     /// Dividing ratio of frequencies. Bits 0-2 of 0xFF22
     dividing_ratio: u8,
 
+    /// 15 bit linear feedback shift register
+    linear_feedback_shift_register: u16,
+
     /// True if we are going to restart sound. TODO(wcarlson): What is this?
     restart: bool,
 
     /// True if we should stop after the current sound length
     stop: bool,
+
+    curr_index: usize,
+
+    curr_output: u8,
 }
 
 impl Channel4 {
@@ -621,9 +639,12 @@ impl Channel4 {
             envelope_sweeps: 0,
             shift_clock_frequency: 0,
             counter_step: 0,
+            linear_feedback_shift_register: 0,
             dividing_ratio: 0,
             restart: false,
             stop: false,
+            curr_index: 0,
+            curr_output: 0,
         }
     }
 
@@ -672,5 +693,41 @@ impl Channel4 {
             },
             _ => panic!("Invalid write address for audio channel 4"),
         }
+    }
+
+    pub fn step(&mut self) -> u8 {
+        self.curr_index += 1;
+        let out_freq = self.get_divisor(self.dividing_ratio) << self.shift_clock_frequency as usize;
+        if self.curr_index >= out_freq {
+            self.curr_index %= out_freq;
+            self.curr_output = self.get_next_output();
+        }
+        self.curr_output * self.volume
+    }
+
+    fn get_divisor(&self, dividing_ratio: u8) -> usize {
+        match dividing_ratio {
+            0 => 8,
+            1 => 16,
+            2 => 32,
+            3 => 48,
+            4 => 64,
+            5 => 80,
+            6 => 96,
+            7 => 112,
+            _ => panic!("Invalid dividing ratio"),
+        }
+    }
+
+    fn get_next_output(&mut self) -> u8 {
+        let bit_0 = self.linear_feedback_shift_register & 1;
+        let bit_1 = (self.linear_feedback_shift_register >> 1) & 1;
+        let new_bit = bit_0 ^ bit_1;
+        self.linear_feedback_shift_register = self.linear_feedback_shift_register >> 1;
+        self.linear_feedback_shift_register &= (new_bit << 14) & 0b0011_1111_1111_1111;
+        if self.counter_step == 1 {
+            self.linear_feedback_shift_register &= ((new_bit << 6) & 0b0111_1111_1011_1111);
+        }
+        return (!self.linear_feedback_shift_register & 1) as u8
     }
 }
