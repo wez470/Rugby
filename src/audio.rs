@@ -639,7 +639,7 @@ impl Channel4 {
             envelope_sweeps: 0,
             shift_clock_frequency: 0,
             counter_step: 0,
-            linear_feedback_shift_register: 0,
+            linear_feedback_shift_register: 0x7FFF,
             dividing_ratio: 0,
             restart: false,
             stop: false,
