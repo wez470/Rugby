@@ -6,6 +6,7 @@ use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
 use crate::timer::Timer;
 use std::collections::HashSet;
+use sdl2::audio::AudioQueue;
 use enumflags2::BitFlags;
 use log::{debug, info, log_enabled, trace, warn};
 use self::inst::{Cond, Inst, Operand16, Operand8};
@@ -121,13 +122,14 @@ impl Cpu {
 
     /// Keep executing instructions until more than the given number of cycles have passed.
     /// Returns true if we have hit a watch.
-    pub fn step_cycles(&mut self, cycles: usize, watches: &HashSet<Watch>) -> bool {
+    pub fn step_cycles(&mut self, cycles: usize, audio_queue: &mut AudioQueue<u8>, watches: &HashSet<Watch>) -> bool {
         let mut curr_cycles: usize = 0;
         let check_watches = watches.len() > 0;
         while curr_cycles < cycles {
             let mut interrupts = BitFlags::empty();
             match self.step(false, check_watches, watches) {
                 Some(step_cycles) => {
+                    self.audio.step(step_cycles, audio_queue);
                     interrupts |= self.gpu.step(step_cycles);
                     interrupts |= self.timer.step(step_cycles);
                     interrupts |= self.joypad.step();
@@ -978,8 +980,11 @@ impl Cpu {
             0x04...0x07 => self.timer.read_reg(port),
             // The top 3 bits are unused and always 1.
             0x0F => 0b1110_0000 | self.interrupt_flags_register.bits(),
-            0x10...0x14 | 0x16...0x19 | 0x20...0x26 => warn_unimplemented("sound"),
+            0x10 => warn_unimplemented("sound"),
+            0x11...0x14 => self.audio.read_reg(port),
+            0x16...0x19 => self.audio.read_reg(port),
             0x1A...0x1E => self.audio.read_reg(port),
+            0x20...0x26 => self.audio.read_reg(port),
             0x30...0x3F => self.audio.read_reg(port),
             0x40...0x45 | 0x47...0x4B => self.gpu.read_reg(port),
 
@@ -1007,8 +1012,11 @@ impl Cpu {
             0x01...0x02 => warn_unimplemented("serial"),
             0x04...0x07 => self.timer.write_reg(port, val),
             0x0F => self.interrupt_flags_register = BitFlags::from_bits_truncate(val),
-            0x10...0x14 | 0x16...0x19 | 0x20...0x26 => warn_unimplemented("sound"),
+            0x10 => warn_unimplemented("sound"),
+            0x11...0x14 => self.audio.write_reg(port, val),
+            0x16...0x19 => self.audio.write_reg(port, val),
             0x1A...0x1E => self.audio.write_reg(port, val),
+            0x20...0x26 => self.audio.write_reg(port, val),
             0x30...0x3F => self.audio.write_reg(port, val),
             0x40...0x45 | 0x47...0x4B => self.gpu.write_reg(port, val),
 
