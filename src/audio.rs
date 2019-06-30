@@ -699,7 +699,7 @@ impl Channel4 {
                         self.length_counter = 64
                     }
                 }
-                self.length_counter_enabled = self.restart || self.stop_after_sound_length;
+                self.length_counter_enabled = self.restart;
             },
             _ => panic!("Invalid write address for audio channel 4"),
         }
