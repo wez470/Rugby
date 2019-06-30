@@ -1,5 +1,6 @@
 pub const SAMPLE_BUFFER_SIZE: usize = 1024; // Number of samples in our audio buffer
 const SAMPLE_RATE_CYCLES: usize = 95; // Number of cycles between samples to achieve at rate of 44100Hz
+const LENGTH_COUNTER_RATE_CYCLES: usize = 16383; // Number of cycles between length counter updates to achieve 256Hz.
 const WAVE_RAM_LENGTH: usize = 16; // Wave RAM can fit 32 4-bit samples
 
 #[derive(Clone)]
@@ -108,7 +109,7 @@ impl Audio {
         let channel1_val = self.channel1.step(cycles);
         let channel2_val = self.channel2.step(cycles);
         let channel3_val = self.channel3.step(cycles);
-        let channel4_val = self.channel4.step();
+        let channel4_val = self.channel4.step(cycles);
 
         let (mut left, mut right) = self.get_left_and_right_audio(channel1_val, channel2_val, channel3_val, channel4_val);
         left *= self.left_volume;
@@ -124,48 +125,45 @@ impl Audio {
             return (0, 0);
         }
 
-        if self.left_enabled {
-            if self.channel_4_enabled {
-                if self.selection & (1 << 7) != 0 {
-                    left += channel4_val as u16;
-                }
-            }
-            if self.channel_3_enabled {
-                if self.selection & (1 << 6) != 0 {
-                    left += channel3_val as u16;
-                }
-            }
-            if self.channel_2_enabled {
-                if self.selection & (1 << 5) != 0 {
-                    left += channel2_val as u16;
-                }
-            }
-            if self.channel_1_enabled {
-                if self.selection & (1 << 4) != 0 {
-                    left += channel1_val as u16;
-                }
+        if self.channel_4_enabled {
+            if self.selection & (1 << 7) != 0 {
+                left += channel4_val as u16;
             }
         }
-        if self.right_enabled {
-            if self.channel_4_enabled {
-                if self.selection & (1 << 3) != 0 {
-                    right += channel4_val as u16;
-                }
+        if self.channel_3_enabled {
+            if self.selection & (1 << 6) != 0 {
+                left += channel3_val as u16;
             }
-            if self.channel_3_enabled {
-                if self.selection & (1 << 2) != 0 {
-                    right += channel3_val as u16;
-                }
+        }
+        if self.channel_2_enabled {
+            if self.selection & (1 << 5) != 0 {
+                left += channel2_val as u16;
             }
-            if self.channel_2_enabled {
-                if self.selection & (1 << 1) != 0 {
-                    right += channel2_val as u16;
-                }
+        }
+        if self.channel_1_enabled {
+            if self.selection & (1 << 4) != 0 {
+                left += channel1_val as u16;
             }
-            if self.channel_1_enabled {
-                if self.selection & 1 != 0 {
-                    right += channel1_val as u16;
-                }
+        }
+
+        if self.channel_4_enabled {
+            if self.selection & (1 << 3) != 0 {
+                right += channel4_val as u16;
+            }
+        }
+        if self.channel_3_enabled {
+            if self.selection & (1 << 2) != 0 {
+                right += channel3_val as u16;
+            }
+        }
+        if self.channel_2_enabled {
+            if self.selection & (1 << 1) != 0 {
+                right += channel2_val as u16;
+            }
+        }
+        if self.channel_1_enabled {
+            if self.selection & 1 != 0 {
+                right += channel1_val as u16;
             }
         }
 
@@ -239,7 +237,7 @@ pub struct Channel3 {
     /// Actual frequency is given by `(2048 - frequency) * 2`. http://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
     pub frequency: u16,
 
-    /// True if we are going to restart sound. TODO(wcarlson): What is this?
+    /// True if we are going to restart sound.
     restart: bool,
 
     /// True if we should stop after the current sound length
@@ -598,6 +596,12 @@ pub struct Channel4 {
     /// Sound Length. Bits 0-5 of 0xFF20
     length: u8,
 
+    /// Length counter. Used to tell when to stop playing audio. Sound length is given by 64 - length.
+    length_counter: u8,
+
+    /// True if the length counter is enabled
+    length_counter_enabled: bool,
+
     /// Initial volume of envelope. Bits 4-7 of 0xFF21
     volume: u8,
 
@@ -619,32 +623,44 @@ pub struct Channel4 {
     /// 15 bit linear feedback shift register
     linear_feedback_shift_register: u16,
 
-    /// True if we are going to restart sound. TODO(wcarlson): What is this?
+    /// True if we are going to restart sound.
     restart: bool,
 
     /// True if we should stop after the current sound length
-    stop: bool,
+    stop_after_sound_length: bool,
 
+    /// Track the current step updating audio output
     curr_index: usize,
 
+    /// Track current cycles for audio output
+    curr_cycles: usize,
+
+    /// Track the current audio output value
     curr_output: u8,
+
+    /// True if the channel is enabled
+    enabled: bool,
 }
 
 impl Channel4 {
     pub fn new() -> Self {
         Self {
             length: 0,
+            length_counter: 64,
+            length_counter_enabled: true,
             volume: 0,
             envelope_direction: EnvelopeDirection::Decrease,
             envelope_sweeps: 0,
             shift_clock_frequency: 0,
             counter_step: 0,
-            linear_feedback_shift_register: 0x7FFF,
+            linear_feedback_shift_register: 0b0111_1111_1111_1111,
             dividing_ratio: 0,
             restart: false,
-            stop: false,
+            stop_after_sound_length: false,
             curr_index: 0,
+            curr_cycles: 0,
             curr_output: 0,
+            enabled: true,
         }
     }
 
@@ -666,7 +682,7 @@ impl Channel4 {
             0x23 => {
                 0b00111111 // Bits 0-5 unused
                     | (self.restart as u8) << 7
-                    | (self.stop as u8) << 6
+                    | (self.stop_after_sound_length as u8) << 6
             },
             _ => panic!("Invalid read address for audio channel 4"),
         }
@@ -676,6 +692,7 @@ impl Channel4 {
         match addr {
             0x20 => {
                 self.length = val & 0b0011_1111;
+                self.length_counter = 64 - self.length;
             },
             0x21 => {
                 self.envelope_sweeps = val & 0b0111;
@@ -689,19 +706,50 @@ impl Channel4 {
             },
             0x23 => {
                 self.restart = (val >> 7) & 1 == 1;
-                self.stop = (val >> 6) & 1 == 1;
+                self.stop_after_sound_length = (val >> 6) & 1 == 1;
+
+                if self.length_counter == 0 && self.restart {
+                    self.length_counter = 64;
+                }
+                if self.length_counter_enabled {
+                    self.length_counter = 64
+                }
+                if self.restart {
+                    self.linear_feedback_shift_register = 0b0111_1111_1111_1111;
+                    self.enabled = true;
+                    if self.stop_after_sound_length {
+                        self.length_counter = 64
+                    }
+                }
+                self.length_counter_enabled = self.restart || self.stop_after_sound_length;
             },
             _ => panic!("Invalid write address for audio channel 4"),
         }
     }
 
-    pub fn step(&mut self) -> u8 {
+    pub fn step(&mut self, cycles: usize) -> u8 {
+        if !self.enabled {
+            return 0;
+        }
+
         self.curr_index += 1;
         let out_freq = self.get_divisor(self.dividing_ratio) << self.shift_clock_frequency as usize;
         if self.curr_index >= out_freq {
             self.curr_index %= out_freq;
             self.curr_output = self.get_next_output();
         }
+
+        self.curr_cycles += cycles;
+        if self.curr_cycles >= LENGTH_COUNTER_RATE_CYCLES {
+            self.curr_cycles %= LENGTH_COUNTER_RATE_CYCLES;
+            if self.length_counter > 0 && self.length_counter_enabled {
+                self.length_counter -= 1;
+                if self.length_counter == 0 {
+                    self.enabled = false;
+                }
+            }
+        }
+
         self.curr_output * self.volume
     }
 
