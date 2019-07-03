@@ -1,3 +1,5 @@
+use super::LENGTH_COUNTER_RATE_CYCLES;
+
 /// Wave RAM can fit 32 4-bit samples
 const WAVE_RAM_LENGTH: usize = 16;
 
@@ -26,13 +28,16 @@ pub struct Channel3 {
     restart: bool,
 
     /// True if we should stop after the current sound length
-    stop: bool,
+    stop_after_sound_length: bool,
 
     /// Wave pattern RAM. Registers FF30-FF3F
     pub wave_ram: Box<[u8]>,
 
     /// Track current cycles for audio output
-    cycles: usize,
+    curr_cycles: usize,
+
+    /// Track current cycles for length counter
+    curr_length_counter_cycles: usize,
 
     /// Track the current nibble index in wave ram
     curr_index: usize,
@@ -53,9 +58,10 @@ impl Channel3 {
             volume: Volume::Zero,
             frequency: 0,
             restart: false,
-            stop: false,
+            stop_after_sound_length: false,
             wave_ram: vec![0; WAVE_RAM_LENGTH].into_boxed_slice(),
-            cycles: 0,
+            curr_cycles: 0,
+            curr_length_counter_cycles: 0,
             curr_index: 0,
             curr_output: 0,
             enabled: true,
@@ -71,7 +77,7 @@ impl Channel3 {
             0x1E => {
                 0b00111000 // Bits 3-5 unused
                 | (self.restart as u8) << 7
-                | (self.stop as u8) << 6
+                | (self.stop_after_sound_length as u8) << 6
                 | ((self.frequency >> 8) as u8) & 0b111
             },
             0x30...0x3F => self.wave_ram[(addr - 0x30) as usize],
@@ -93,9 +99,23 @@ impl Channel3 {
             },
             0x1E => {
                 self.restart = (val >> 7) & 1 == 1;
-                self.stop = (val >> 6) & 1 == 1;
+                self.stop_after_sound_length = (val >> 6) & 1 == 1;
                 self.frequency &= 0xFF;
                 self.frequency |= ((val & 0b111) as u16) << 8;
+
+                if self.length_counter == 0 && self.restart {
+                    self.length_counter = MAX_SOUND_LENGTH;
+                }
+                if self.length_counter_enabled {
+                    self.length_counter = MAX_SOUND_LENGTH
+                }
+                if self.restart {
+                    self.enabled = true;
+                    if self.stop_after_sound_length {
+                        self.length_counter = MAX_SOUND_LENGTH
+                    }
+                }
+                self.length_counter_enabled = self.restart;
             },
             0x30...0x3F => self.wave_ram[(addr - 0x30) as usize] = val,
             _ => panic!("Invalid write address for audio channel 3"),
@@ -107,10 +127,10 @@ impl Channel3 {
             return 0;
         }
 
-        self.cycles += cycles;
+        self.curr_cycles += cycles;
         let freq = (2048 - self.frequency as usize) * 2;
-        if self.cycles > freq && freq > 0 {
-            self.cycles %= freq;
+        if self.curr_cycles > freq && freq > 0 {
+            self.curr_cycles %= freq;
             let mut b = self.wave_ram[self.curr_index / 2];
             if self.curr_index % 2 == 0 {
                 b = (b >> 4) & 0b1111;
@@ -126,7 +146,23 @@ impl Channel3 {
                 Volume::Quarter => self.curr_output = b >> 2,
             }
         }
+
+        self.update_length_counter(cycles);
+
         self.curr_output
+    }
+
+    fn update_length_counter(&mut self, cycles: usize) {
+        self.curr_length_counter_cycles += cycles;
+        if self.curr_length_counter_cycles >= LENGTH_COUNTER_RATE_CYCLES {
+            self.curr_length_counter_cycles %= LENGTH_COUNTER_RATE_CYCLES;
+            if self.length_counter > 0 && self.length_counter_enabled {
+                self.length_counter -= 1;
+                if self.length_counter == 0 {
+                    self.enabled = false;
+                }
+            }
+        }
     }
 }
 

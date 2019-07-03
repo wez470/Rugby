@@ -151,16 +151,7 @@ impl Channel4 {
             self.curr_output = self.get_next_output();
         }
 
-        self.curr_cycles += cycles;
-        if self.curr_cycles >= LENGTH_COUNTER_RATE_CYCLES {
-            self.curr_cycles %= LENGTH_COUNTER_RATE_CYCLES;
-            if self.length_counter > 0 && self.length_counter_enabled {
-                self.length_counter -= 1;
-                if self.length_counter == 0 {
-                    self.enabled = false;
-                }
-            }
-        }
+        self.update_length_counter(cycles);
 
         self.curr_output * self.volume
     }
@@ -191,5 +182,18 @@ impl Channel4 {
             self.linear_feedback_shift_register |= new_bit << 6;
         }
         return (!self.linear_feedback_shift_register & 1) as u8
+    }
+
+    fn update_length_counter(&mut self, cycles: usize) {
+        self.curr_cycles += cycles;
+        if self.curr_cycles >= LENGTH_COUNTER_RATE_CYCLES {
+            self.curr_cycles %= LENGTH_COUNTER_RATE_CYCLES;
+            if self.length_counter > 0 && self.length_counter_enabled {
+                self.length_counter -= 1;
+                if self.length_counter == 0 {
+                    self.enabled = false;
+                }
+            }
+        }
     }
 }
