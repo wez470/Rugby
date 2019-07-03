@@ -8,6 +8,12 @@ pub struct Channel2 {
     /// Length of sound data. Bits 0-5 of 0xFF16
     length: u8,
 
+    /// Length counter. Used to tell when to stop playing audio. Sound length is given by 64 - length.
+    length_counter: u8,
+
+    /// True if the length counter is enabled
+    length_counter_enabled: bool,
+
     /// Volume. Bits 4-7 of 0xFF17
     volume: u8,
 
@@ -30,11 +36,14 @@ pub struct Channel2 {
     /// Track current cycles for audio output
     cycles: usize,
 
-    /// Track the current nibble index in wave ram
-    curr_index: usize,
+    /// Track the wave pattern position
+    curr_index: u8,
 
     /// Track the current audio output value
     curr_output: u8,
+
+    /// True if the channel is enabled
+    enabled: bool,
 }
 
 impl Channel2 {
@@ -42,6 +51,8 @@ impl Channel2 {
         Channel2 {
             wave_pattern: 0,
             length: 0,
+            length_counter: 64,
+            length_counter_enabled: true,
             volume: 0,
             envelope_direction: EnvelopeDirection::Decrease,
             envelope_sweeps: 0,
@@ -51,6 +62,7 @@ impl Channel2 {
             cycles: 0,
             curr_index: 0,
             curr_output: 0,
+            enabled: true,
         }
     }
 

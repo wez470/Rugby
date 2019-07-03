@@ -9,6 +9,12 @@ pub struct Channel3 {
     /// Sound Length. Register FF1B
     length: u8,
 
+    /// Length counter. Used to tell when to stop playing audio. Sound length is given by 256 - length.
+    length_counter: u16,
+
+    /// True if the length counter is enabled
+    length_counter_enabled: bool,
+
     /// Volume. Register FF1C
     pub volume: Volume,
 
@@ -33,6 +39,9 @@ pub struct Channel3 {
 
     /// Track the current audio output value
     curr_output: u8,
+
+    /// True if the channel is enabled
+    enabled: bool,
 }
 
 impl Channel3 {
@@ -40,6 +49,8 @@ impl Channel3 {
         Channel3 {
             on: false,
             length: 0,
+            length_counter: 256,
+            length_counter_enabled: true,
             volume: Volume::Zero,
             frequency: 0,
             restart: false,
@@ -48,6 +59,7 @@ impl Channel3 {
             cycles: 0,
             curr_index: 0,
             curr_output: 0,
+            enabled: true,
         }
     }
 
