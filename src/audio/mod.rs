@@ -7,6 +7,7 @@ use channel1::Channel1;
 use channel2::Channel2;
 use channel3::Channel3;
 use channel4::Channel4;
+use log::warn;
 
 /// Number of samples in our audio buffer
 pub const SAMPLE_BUFFER_SIZE: usize = 1024;
@@ -24,11 +25,11 @@ pub struct Audio {
     pub channel3: Channel3,
     pub channel4: Channel4,
     /// Vin to SO2 terminal enabled. Bit 7 at 0xFF24
-    left_enabled: bool,
+    output_vin_left: bool,
     /// S02 volume (0-7). Bits 4-6 at 0xFF24
     left_volume: u8,
     /// Vin to S01 terminal enabled. Bit 3 at 0xFF24
-    right_enabled: bool,
+    output_vin_right: bool,
     /// S02 volume (0-7). Bits 0-2 at 0xFF24
     right_volume: u8,
     /// Sound channel output selection. register 0xFF25
@@ -55,9 +56,9 @@ impl Audio {
             channel3: Channel3::new(),
             channel4: Channel4::new(),
             queue_cycles: 0,
-            left_enabled: true,
+            output_vin_left: true,
             left_volume: 7,
-            right_enabled: true,
+            output_vin_right: true,
             right_volume: 7,
             selection: 0xFF,
             enabled: true,
@@ -75,9 +76,9 @@ impl Audio {
             0x1A...0x1E => self.channel3.read_reg(addr),
             0x20...0x23 => self.channel4.read_reg(addr),
             0x24 => {
-                (self.left_enabled as u8) << 7
+                (self.output_vin_left as u8) << 7
                 | self.left_volume << 4
-                | (self.right_enabled as u8) << 3
+                | (self.output_vin_right as u8) << 3
                 | self.right_volume
             }
             0x25 => {
@@ -102,10 +103,14 @@ impl Audio {
             0x1A...0x1E => self.channel3.write_reg(addr, val),
             0x20...0x23 => self.channel4.write_reg(addr, val),
             0x24 => {
-                self.left_enabled = val & (1 << 7) != 0;
+                self.output_vin_left = val & (1 << 7) != 0;
                 self.left_volume = (val >> 4) & 0b111;
-                self.left_enabled = val & (1 << 3) != 0;
-                self.left_volume = val & 0b111;
+                self.output_vin_right = val & (1 << 3) != 0;
+                self.right_volume = val & 0b111;
+                if self.output_vin_left || self.output_vin_right {
+                    warn!("Game wants us to output the Vin audio signal from \
+                        the cartridge, which is completely unimplemented");
+                }
             }
             0x25 => {
                 self.selection = val;
