@@ -43,7 +43,7 @@ pub struct Audio {
     channel_2_enabled: bool,
     /// Sound 1 enabled. Bit 0 at 0xFF26. Read only
     channel_1_enabled: bool,
-    // Audio output fields
+    /// Cycle counter for outputting sound data to the audio queue at the proper rate.
     queue_cycles: usize,
 }
 

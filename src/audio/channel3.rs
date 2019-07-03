@@ -1,11 +1,11 @@
 /// Wave RAM can fit 32 4-bit samples
 const WAVE_RAM_LENGTH: usize = 16;
 
+/// Max length for sound data
+const MAX_SOUND_LENGTH: u16 = 256;
+
 #[derive(Clone)]
 pub struct Channel3 {
-    /// True if sound is on. Register FF1A
-    pub on: bool,
-
     /// Sound Length. Register FF1B
     length: u8,
 
@@ -47,9 +47,8 @@ pub struct Channel3 {
 impl Channel3 {
     pub fn new() -> Channel3 {
         Channel3 {
-            on: false,
             length: 0,
-            length_counter: 256,
+            length_counter: MAX_SOUND_LENGTH,
             length_counter_enabled: true,
             volume: Volume::Zero,
             frequency: 0,
@@ -65,7 +64,7 @@ impl Channel3 {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x1A => (self.on as u8) << 7,
+            0x1A => (self.enabled as u8) << 7,
             0x1B => self.length,
             0x1C => (self.volume as u8) << 5,
             0x1D => self.frequency as u8,
@@ -82,8 +81,11 @@ impl Channel3 {
 
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
-            0x1A => self.on = (val >> 7) == 1,
-            0x1B => self.length = val,
+            0x1A => self.enabled = (val >> 7) == 1,
+            0x1B => {
+                self.length = val;
+                self.length_counter = MAX_SOUND_LENGTH - self.length as u16;
+            },
             0x1C => self.volume = Volume::from((val >> 5) & 0b11),
             0x1D => {
                 self.frequency &= !0 << 8;
@@ -101,6 +103,10 @@ impl Channel3 {
     }
 
     pub fn step(&mut self, cycles: usize) -> u8 {
+        if !self.enabled {
+            return 0;
+        }
+
         self.cycles += cycles;
         let freq = (2048 - self.frequency as usize) * 2;
         if self.cycles > freq && freq > 0 {

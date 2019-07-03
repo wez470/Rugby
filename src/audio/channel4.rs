@@ -1,5 +1,8 @@
 use super::{EnvelopeDirection, LENGTH_COUNTER_RATE_CYCLES};
 
+/// Max length for sound data
+const MAX_SOUND_LENGTH: u8 = 64;
+
 #[derive(Clone)]
 pub struct Channel4 {
     /// Sound Length. Bits 0-5 of 0xFF20
@@ -55,7 +58,7 @@ impl Channel4 {
     pub fn new() -> Self {
         Self {
             length: 0,
-            length_counter: 64,
+            length_counter: MAX_SOUND_LENGTH,
             length_counter_enabled: true,
             volume: 0,
             envelope_direction: EnvelopeDirection::Decrease,
@@ -101,7 +104,7 @@ impl Channel4 {
         match addr {
             0x20 => {
                 self.length = val & 0b0011_1111;
-                self.length_counter = 64 - self.length;
+                self.length_counter = MAX_SOUND_LENGTH - self.length;
             },
             0x21 => {
                 self.envelope_sweeps = val & 0b0111;

@@ -1,5 +1,8 @@
 use super::EnvelopeDirection;
 
+/// Max length for sound data
+const MAX_SOUND_LENGTH: u8 = 64;
+
 #[derive(Clone)]
 pub struct Channel2 {
     /// Wave pattern. Bits 6-7 of 0xFF16
@@ -51,7 +54,7 @@ impl Channel2 {
         Channel2 {
             wave_pattern: 0,
             length: 0,
-            length_counter: 64,
+            length_counter: MAX_SOUND_LENGTH,
             length_counter_enabled: true,
             volume: 0,
             envelope_direction: EnvelopeDirection::Decrease,
@@ -68,7 +71,7 @@ impl Channel2 {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x16 => self.wave_pattern << 6,
+            0x16 => (self.wave_pattern << 6) & self.length,
             0x17 => {
                 self.volume << 4
                     | (self.envelope_direction as u8) << 3
@@ -90,6 +93,7 @@ impl Channel2 {
             0x16 => {
                 self.wave_pattern = val >> 6;
                 self.length = val & 0b0011_1111;
+                self.length_counter = MAX_SOUND_LENGTH - self.length;
             },
             0x17 => {
                 self.envelope_sweeps = val & 0b0111;
@@ -111,6 +115,10 @@ impl Channel2 {
     }
 
     pub fn step(&mut self, cycles: usize) -> u8 {
+        if !self.enabled {
+            return 0;
+        }
+
         self.cycles += cycles;
         let freq = (2048 - self.frequency as usize) * 4;
         if self.cycles > freq && freq > 0 {
