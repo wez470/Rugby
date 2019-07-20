@@ -187,7 +187,7 @@ fn high(x: u16) -> u8 {
     ((x >> 8) & 0xFF) as u8
 }
 
-/// The actual tests.
+// The actual tests.
 cpu_tests! {
     test_nop() {
         rom = [0x00], // nop
