@@ -111,24 +111,32 @@ impl Channel1 {
                 self.frequency |= val as u16
             },
             0x14 => {
-                self.restart = (val >> 7) & 1 == 1;
-                self.stop_after_sound_length = (val >> 6) & 1 == 1;
+                let next_restart_val = (val >> 7) & 1 == 1;
+                let next_stop_after_sound_length_val = (val >> 6) & 1 == 1;
                 self.frequency &= 0xFF;
                 self.frequency |= ((val & 0b111) as u16) << 8;
+                self.enabled = next_restart_val;
+                // TODO: Possibly disable sound here based on envelope
 
-                if self.length_counter == 0 && self.restart {
-                    self.length_counter = MAX_SOUND_LENGTH;
-                }
-                if self.length_counter_enabled {
-                    self.length_counter = MAX_SOUND_LENGTH
-                }
-                if self.restart {
-                    self.enabled = true;
-                    if self.stop_after_sound_length {
-                        self.length_counter = MAX_SOUND_LENGTH
+                if !self.stop_after_sound_length && next_stop_after_sound_length_val && self.length_counter % 2 == 0 && self.enabled {
+                    // Extra length clock
+                    self.update_length_counter(4);
+                    // Sound disabled ony if trigger is clear
+                    if next_restart_val {
+                        self.enabled = true;
                     }
                 }
-                self.length_counter_enabled = self.restart;
+
+                if next_restart_val && !self.enabled {
+                    self.length_counter = MAX_SOUND_LENGTH;
+                    if next_stop_after_sound_length_val && self.length_counter % 2 == 0 {
+                        // Extra length clock
+                        self.update_length_counter(4);
+                    }
+                }
+
+                self.restart = next_restart_val;
+                self.stop_after_sound_length = next_stop_after_sound_length_val;
             },
             _ => panic!("Invalid write address for audio channel 2"),
         }
