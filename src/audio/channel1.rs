@@ -1,3 +1,4 @@
+use log::warn;
 use super::{LENGTH_COUNTER_RATE_CYCLES, EnvelopeDirection};
 
 /// Max length for sound data
@@ -77,6 +78,10 @@ impl Channel1 {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
+            0x10 => {
+                warn!("unimplemented read from channel 1 audio sweep register");
+                0xFF
+            }
             0x11 => (self.wave_pattern << 6) & self.length,
             0x12 => {
                 self.volume << 4
@@ -96,6 +101,7 @@ impl Channel1 {
 
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
+            0x10 => warn!("unimplemented write to channel 1 audio sweep register"),
             0x11 => {
                 self.wave_pattern = val >> 6;
                 self.length = val & 0b0011_1111;

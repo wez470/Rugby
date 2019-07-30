@@ -71,7 +71,7 @@ impl Audio {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x11...0x14 => self.channel1.read_reg(addr),
+            0x10...0x14 => self.channel1.read_reg(addr),
             0x16...0x19 => self.channel2.read_reg(addr),
             0x1A...0x1E => self.channel3.read_reg(addr),
             0x20...0x23 => self.channel4.read_reg(addr),
@@ -99,7 +99,7 @@ impl Audio {
 
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
-            0x11...0x14 => self.channel1.write_reg(addr, val),
+            0x10...0x14 => self.channel1.write_reg(addr, val),
             0x16...0x19 => self.channel2.write_reg(addr, val),
             0x1A...0x1E => self.channel3.write_reg(addr, val),
             0x20...0x23 => self.channel4.write_reg(addr, val),
