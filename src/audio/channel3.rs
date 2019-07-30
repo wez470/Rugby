@@ -70,12 +70,12 @@ impl Channel3 {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x1A => (self.enabled as u8) << 7,
+            0x1A => ((self.enabled as u8) << 7) | 0b0111_1111, // Lower 7 bits unused
             0x1B => self.length,
-            0x1C => (self.volume as u8) << 5,
+            0x1C => ((self.volume as u8) << 5) | 0b1001_1111, // All other bits unused
             0x1D => self.frequency as u8,
             0x1E => {
-                0b00111000 // Bits 3-5 unused
+                0b0011_1000 // Bits 3-5 unused
                 | (self.restart as u8) << 7
                 | (self.stop_after_sound_length as u8) << 6
                 | ((self.frequency >> 8) as u8) & 0b111

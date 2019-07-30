@@ -981,11 +981,8 @@ impl Cpu {
             // The top 3 bits are unused and always 1.
             0x0F => 0b1110_0000 | self.interrupt_flags_register.bits(),
             0x10 => warn_unimplemented("sound"),
-            0x11...0x14 => self.audio.read_reg(port),
-            0x16...0x19 => self.audio.read_reg(port),
-            0x1A...0x1E => self.audio.read_reg(port),
-            0x20...0x26 => self.audio.read_reg(port),
-            0x30...0x3F => self.audio.read_reg(port),
+            0x11...0x14 | 0x16...0x19 | 0x1A...0x1E | 0x20...0x26 | 0x30...0x3F =>
+                self.audio.read_reg(port),
             0x40...0x45 | 0x47...0x4B => self.gpu.read_reg(port),
 
             // Cannot read from DMA transfer register.
@@ -1013,11 +1010,8 @@ impl Cpu {
             0x04...0x07 => self.timer.write_reg(port, val),
             0x0F => self.interrupt_flags_register = BitFlags::from_bits_truncate(val),
             0x10 => warn_unimplemented("sound"),
-            0x11...0x14 => self.audio.write_reg(port, val),
-            0x16...0x19 => self.audio.write_reg(port, val),
-            0x1A...0x1E => self.audio.write_reg(port, val),
-            0x20...0x26 => self.audio.write_reg(port, val),
-            0x30...0x3F => self.audio.write_reg(port, val),
+            0x11...0x14 | 0x16...0x19 | 0x1A...0x1E | 0x20...0x26 | 0x30...0x3F =>
+                self.audio.write_reg(port, val),
             0x40...0x45 | 0x47...0x4B => self.gpu.write_reg(port, val),
 
             // DMA Transfer - Takes 160 microseconds to complete. During this time, only HRAM can

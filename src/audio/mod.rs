@@ -86,6 +86,7 @@ impl Audio {
             }
             0x26 => {
                 (self.enabled as u8) << 7
+                | 0b0111_0000 // Unused bits
                 | (self.channel_4_enabled as u8) << 3
                 | (self.channel_3_enabled as u8) << 2
                 | (self.channel_2_enabled as u8) << 1

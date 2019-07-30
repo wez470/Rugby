@@ -79,7 +79,7 @@ impl Channel4 {
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
             0x20 => {
-                self.length
+                self.length | 0b1100_0000 // Upper 2 bits unused
             },
             0x21 => {
                 self.volume << 4
