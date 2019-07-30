@@ -120,20 +120,8 @@ impl Channel4 {
                 self.restart = (val >> 7) & 1 == 1;
                 self.stop_after_sound_length = (val >> 6) & 1 == 1;
 
-                if self.length_counter == 0 && self.restart {
-                    self.length_counter = 64;
-                }
-                if self.length_counter_enabled {
-                    self.length_counter = 64
-                }
-                if self.restart {
-                    self.linear_feedback_shift_register = 0b0111_1111_1111_1111;
-                    self.enabled = true;
-                    if self.stop_after_sound_length {
-                        self.length_counter = 64
-                    }
-                }
-                self.length_counter_enabled = self.restart;
+                self.length_counter_enabled = self.stop_after_sound_length;
+                self.enabled = self.restart;
             },
             _ => panic!("Invalid write address for audio channel 4"),
         }

@@ -103,19 +103,8 @@ impl Channel3 {
                 self.frequency &= 0xFF;
                 self.frequency |= ((val & 0b111) as u16) << 8;
 
-                if self.length_counter == 0 && self.restart {
-                    self.length_counter = MAX_SOUND_LENGTH;
-                }
-                if self.length_counter_enabled {
-                    self.length_counter = MAX_SOUND_LENGTH
-                }
-                if self.restart {
-                    self.enabled = true;
-                    if self.stop_after_sound_length {
-                        self.length_counter = MAX_SOUND_LENGTH
-                    }
-                }
-                self.length_counter_enabled = self.restart;
+                self.length_counter_enabled = self.stop_after_sound_length;
+                self.enabled = self.restart;
             },
             0x30...0x3F => self.wave_ram[(addr - 0x30) as usize] = val,
             _ => panic!("Invalid write address for audio channel 3"),
