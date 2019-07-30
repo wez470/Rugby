@@ -72,15 +72,13 @@ impl Channel4 {
             curr_index: 0,
             curr_cycles: 0,
             curr_output: 0,
-            enabled: true,
+            enabled: false,
         }
     }
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x20 => {
-                self.length | 0b1100_0000 // Upper 2 bits unused
-            },
+            0x20 => 0xFF, // This entire register is write-only
             0x21 => {
                 self.volume << 4
                     | (self.envelope_direction as u8) << 3
@@ -92,7 +90,7 @@ impl Channel4 {
                     | self.dividing_ratio
             },
             0x23 => {
-                0b00111111 // Bits 0-5 unused
+                0b10111111 // These bits are unused or write-only
                     | (self.restart as u8) << 7
                     | (self.stop_after_sound_length as u8) << 6
             },

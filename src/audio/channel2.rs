@@ -69,24 +69,22 @@ impl Channel2 {
             curr_length_counter_cycles: 0,
             curr_index: 0,
             curr_output: 0,
-            enabled: true,
+            enabled: false,
         }
     }
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x16 => (self.wave_pattern << 6) & self.length,
+            0x16 => (self.wave_pattern << 6) | 0b0011_1111, // Low bits are write-only
             0x17 => {
                 self.volume << 4
                     | (self.envelope_direction as u8) << 3
                     | self.envelope_sweeps
             },
-            0x18 => self.frequency as u8,
+            0x18 => 0xFF, // This register is entirely write-only
             0x19 => {
-                0b00111000 // Bits 3-5 unused
-                    | (self.restart as u8) << 7
+                0b10111111 // These bits are unused or write-only
                     | (self.stop_after_sound_length as u8) << 6
-                    | ((self.frequency >> 8) as u8) & 0b111
             },
             _ => panic!("Invalid read address for audio channel 2"),
         }
