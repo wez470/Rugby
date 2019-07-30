@@ -969,14 +969,12 @@ impl Cpu {
     }
 
     fn read_io_port(&self, port: u8) -> u8 {
-        let warn_unimplemented = |desc| {
-            warn!("unimplemented: read from {} I/O port FF{:02X}; returning 0xFF", desc, port);
-            0xFF
-        };
-
         match port {
             0x00 => self.joypad.read_reg(),
-            0x01...0x02 => warn_unimplemented("serial"),
+            0x01...0x02 => {
+                warn!("unimplemented read from serial I/O FF{:02X}", port);
+                0xFF
+            }
             0x04...0x07 => self.timer.read_reg(port),
             // The top 3 bits are unused and always 1.
             0x0F => 0b1110_0000 | self.interrupt_flags_register.bits(),
@@ -996,16 +994,9 @@ impl Cpu {
     }
 
     fn write_io_port(&mut self, port: u8, val: u8) {
-        let warn_unimplemented = |desc| {
-            warn!(
-                "unimplemented: write to {} I/O port FF{:02X}: 0x{2:02X} / 0b{2:08b} / {2}",
-                desc, port, val
-            );
-        };
-
         match port {
             0x00 => self.joypad.write_reg(val),
-            0x01...0x02 => warn_unimplemented("serial"),
+            0x01...0x02 => warn!("unimplemented write to serial I/O port FF{:02X}", port),
             0x04...0x07 => self.timer.write_reg(port, val),
             0x0F => self.interrupt_flags_register = BitFlags::from_bits_truncate(val),
             0x10...0x14 | 0x16...0x19 | 0x1A...0x1E | 0x20...0x26 | 0x30...0x3F =>
