@@ -6,9 +6,9 @@ const MAX_SOUND_LENGTH: u8 = 64;
 
 #[derive(Clone)]
 pub struct Channel1 {
-    /// TODO(wcarlson): Sweep register
+    // TODO(wcarlson): Sweep register
 
-    /// Wave pattern. Bits 6-7 of 0xFF11
+    /// Wave pattern duty. Bits 6-7 of 0xFF11
     wave_pattern: u8,
 
     /// Length of sound data. Bits 0-5 of 0xFF11
@@ -58,13 +58,13 @@ pub struct Channel1 {
 impl Channel1 {
     pub fn new() -> Channel1 {
         Channel1 {
-            wave_pattern: 0,
+            wave_pattern: 0b10,
             length: 0,
             length_counter: MAX_SOUND_LENGTH,
             length_counter_enabled: true,
-            volume: 0,
+            volume: 0b11111,
             envelope_direction: EnvelopeDirection::Decrease,
-            envelope_sweeps: 0,
+            envelope_sweeps: 0b11,
             frequency: 0,
             restart: false,
             stop_after_sound_length: false,
@@ -72,7 +72,7 @@ impl Channel1 {
             curr_length_counter_cycles: 0,
             curr_index: 0,
             curr_output: 0,
-            enabled: true,
+            enabled: false,
         }
     }
 
@@ -80,22 +80,20 @@ impl Channel1 {
         match addr {
             0x10 => {
                 warn!("unimplemented read from channel 1 audio sweep register");
-                0xFF
+                0x80
             }
-            0x11 => (self.wave_pattern << 6) & self.length,
+            0x11 => (self.wave_pattern << 6) | 0b0011_1111, // Low bits are write-only
             0x12 => {
                 self.volume << 4
                     | (self.envelope_direction as u8) << 3
                     | self.envelope_sweeps
             },
-            0x13 => self.frequency as u8,
+            0x13 => 0xFF, // This register is entirely write-only
             0x14 => {
-                0b00111000 // Bits 3-5 unused
-                    | (self.restart as u8) << 7
+                0b10111111 // These bits are unused or write-only
                     | (self.stop_after_sound_length as u8) << 6
-                    | ((self.frequency >> 8) as u8) & 0b111
-            },
-            _ => panic!("Invalid read address for audio channel 2"),
+            }
+            _ => panic!("Invalid read address for audio channel 1"),
         }
     }
 
@@ -136,7 +134,7 @@ impl Channel1 {
                 }
                 self.length_counter_enabled = self.restart;
             },
-            _ => panic!("Invalid write address for audio channel 2"),
+            _ => panic!("Invalid write address for audio channel 1"),
         }
     }
 
