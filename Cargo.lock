@@ -138,7 +138,7 @@ dependencies = [
 
 [[package]]
 name = "enumflags2"
-version = "0.5.0"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -545,7 +545,7 @@ name = "rugby"
 version = "0.1.0"
 dependencies = [
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "enumflags2 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "enumflags2 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "enumflags2_derive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -834,7 +834,7 @@ dependencies = [
 "checksum cloudabi 0.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 "checksum constant_time_eq 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8ff012e225ce166d4422e0e78419d901719760f62ae2b7969ca6b564d1b54a9e"
 "checksum dirs 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "3fd78930633bd1c6e35c4b42b1df7b0cbc6bc191146e512bb3bedf243fcc3901"
-"checksum enumflags2 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "801303a673e02d2110a196d70e4a807f0ff0a68ce1060eebc1e6a0d598db65e8"
+"checksum enumflags2 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "8c30a444d141611c4826a1a2e7eba9a494458edf14754945fa37c9c20f6f7563"
 "checksum enumflags2_derive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9e015b3dfedc096cb55cdc5d022d6b4e6b94547212fb94ad2d9ece20bcd88fe3"
 "checksum env_logger 0.5.13 (registry+https://github.com/rust-lang/crates.io-index)" = "15b0a4d2e39f8420210be8b27eeda28029729e2fd4291019455016c348240c38"
 "checksum env_logger 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "afb070faf94c85d17d50ca44f6ad076bce18ae92f0037d350947240a36e9d42e"
