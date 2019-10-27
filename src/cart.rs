@@ -7,6 +7,7 @@ const RAM_BANK_SIZE: usize = 0x2000;
 
 #[derive(Clone, Debug)]
 pub struct CartConfig {
+    pub title: Vec<u8>,
     pub cart_type: CartType,
     pub rom_size: usize,
     pub ram_size: usize,
@@ -15,6 +16,7 @@ pub struct CartConfig {
 impl CartConfig {
     pub fn from_cart_header(cart_header: &CartHeader) -> Result<Self, CartError> {
         Ok(CartConfig {
+            title: cart_header.title.clone(),
             cart_type: cart_header.cart_type,
             rom_size: match cart_header.rom_size {
                 MemSize::Bytes(b) => b,
@@ -29,7 +31,13 @@ impl CartConfig {
 }
 
 #[derive(Clone, Debug)]
-pub enum Cart {
+pub struct Cart {
+    pub title: Vec<u8>,
+    pub cart_data: CartTypeData,
+}
+
+#[derive(Clone, Debug)]
+pub enum CartTypeData {
     NoMbc(NoMbc),
     Mbc1(Mbc1),
     Mbc3(Mbc3),
@@ -70,49 +78,59 @@ impl Cart {
             None => vec![0; config.ram_size].into_boxed_slice(),
         };
 
-        Ok(match config.cart_type {
-            CartType::NoMbc => Cart::NoMbc(NoMbc::new(rom, ram)),
-            CartType::Mbc1 => Cart::Mbc1(Mbc1::new(rom, ram)),
-            CartType::Mbc3 => Cart::Mbc3(Mbc3::new(rom, ram)),
-            CartType::Mbc5 => Cart::Mbc5(Mbc5::new(rom, ram)),
+        let cart_data = match config.cart_type {
+            CartType::NoMbc => CartTypeData::NoMbc(NoMbc::new(rom, ram)),
+            CartType::Mbc1 => CartTypeData::Mbc1(Mbc1::new(rom, ram)),
+            CartType::Mbc3 => CartTypeData::Mbc3(Mbc3::new(rom, ram)),
+            CartType::Mbc5 => CartTypeData::Mbc5(Mbc5::new(rom, ram)),
             _ => panic!("Unimplemented Mbc Type!"),
-        })
+        };
+        Ok(Cart{title: config.title.clone(), cart_data})
     }
 
     pub fn read(&self, addr: u16) -> u8 {
-        match self {
-            Cart::NoMbc(nombc) => nombc.read(addr),
-            Cart::Mbc1(mbc1) => mbc1.read(addr),
-            Cart::Mbc3(mbc3) => mbc3.read(addr),
-            Cart::Mbc5(mbc5) => mbc5.read(addr),
+        match &self.cart_data {
+            CartTypeData::NoMbc(nombc) => nombc.read(addr),
+            CartTypeData::Mbc1(mbc1) => mbc1.read(addr),
+            CartTypeData::Mbc3(mbc3) => mbc3.read(addr),
+            CartTypeData::Mbc5(mbc5) => mbc5.read(addr),
         }
     }
 
     pub fn write(&mut self, addr: u16, val: u8) {
-        match self {
-            Cart::NoMbc(nombc) => nombc.write(addr, val),
-            Cart::Mbc1(mbc1) => mbc1.write(addr, val),
-            Cart::Mbc3(mbc3) => mbc3.write(addr, val),
-            Cart::Mbc5(mbc5) => mbc5.write(addr, val),
+        match &mut self.cart_data {
+            CartTypeData::NoMbc(nombc) => nombc.write(addr, val),
+            CartTypeData::Mbc1(mbc1) => mbc1.write(addr, val),
+            CartTypeData::Mbc3(mbc3) => mbc3.write(addr, val),
+            CartTypeData::Mbc5(mbc5) => mbc5.write(addr, val),
         }
     }
 
     #[cfg(test)] // Silence "never used" warning.
     pub fn rom(&self) -> &[u8] {
-        match self {
-            Cart::NoMbc(nombc) => &nombc.rom,
-            Cart::Mbc1(mbc1) => &mbc1.rom,
-            Cart::Mbc3(mbc3) => &mbc3.rom,
-            Cart::Mbc5(mbc5) => &mbc5.rom,
+        match &self.cart_data {
+            CartTypeData::NoMbc(nombc) => &nombc.rom,
+            CartTypeData::Mbc1(mbc1) => &mbc1.rom,
+            CartTypeData::Mbc3(mbc3) => &mbc3.rom,
+            CartTypeData::Mbc5(mbc5) => &mbc5.rom,
         }
     }
 
     pub fn ram(&self) -> &[u8] {
-        match self {
-            Cart::NoMbc(nombc) => &nombc.ram,
-            Cart::Mbc1(mbc1) => &mbc1.ram,
-            Cart::Mbc3(mbc3) => &mbc3.ram,
-            Cart::Mbc5(mbc5) => &mbc5.ram,
+        match &self.cart_data {
+            CartTypeData::NoMbc(nombc) => &nombc.ram,
+            CartTypeData::Mbc1(mbc1) => &mbc1.ram,
+            CartTypeData::Mbc3(mbc3) => &mbc3.ram,
+            CartTypeData::Mbc5(mbc5) => &mbc5.ram,
+        }
+    }
+
+    pub fn set_ram(&mut self, ram: Box<[u8]>) {
+        match &mut self.cart_data {
+            CartTypeData::NoMbc(nombc) => nombc.ram = ram,
+            CartTypeData::Mbc1(mbc1) => mbc1.ram = ram,
+            CartTypeData::Mbc3(mbc3) => mbc3.ram = ram,
+            CartTypeData::Mbc5(mbc5) => mbc5.ram = ram,
         }
     }
 }

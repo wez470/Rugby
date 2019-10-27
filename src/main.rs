@@ -95,17 +95,7 @@ fn run(opts: &RunOpts) -> Result<(), failure::Error> {
     let cart_header = CartHeader::from_rom(&rom).context("Failed to parse cartridge header")?;
     let cart_config = CartConfig::from_cart_header(&cart_header)?;
 
-    // TODO(solson): Include some kind of game-identifying information in the save file to
-    // prevent loading a save file with the wrong game.
-    let ram = opts.save_path
-        .as_ref()
-        .and_then(|path| std::fs::read(path).ok())
-        .map(|r| r.into_boxed_slice());
-    if ram.is_some() {
-        info!("Initialized cartridge RAM from file");
-    }
-
-    let cart = Cart::new(rom, ram, &cart_config).context("Failed to initialize cartridge")?;
+    let cart = Cart::new(rom, None, &cart_config).context("Failed to initialize cartridge")?;
     let mut cpu = Cpu::new(cart);
 
     if let Some(path) = &opts.symbols_path {
