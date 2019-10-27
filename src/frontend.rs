@@ -161,14 +161,13 @@ fn run_emulator(
                                     Keycode::Num0 => "3",
                                     _ => "1"
                                 };
-                                println!("load {}", save_num_str);
+                                info!("load {}", save_num_str);
                                 let mut cart_title = String::from_utf8(cpu.cart.title.clone()).unwrap();
                                 cart_title.make_ascii_lowercase();
                                 let file_name = format!("{}-{}.sav", cart_title, save_num_str);
                                 let ram = std::fs::read(file_name)
                                     .map(|r| r.into_boxed_slice());
                                 if ram.is_ok() {
-                                    info!("loading save file slot: {}", save_num_str);
                                     cpu.cart.set_ram(ram.unwrap());
                                 }
                             },
