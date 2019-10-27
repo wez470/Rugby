@@ -19,6 +19,8 @@ use linefeed::{Interface, ReadResult};
 use hex;
 use hex::FromHex;
 use std::collections::HashSet;
+use std::fs::File;
+use std::io::Write;
 
 const CYCLES_PER_FRAME: usize = 69905;
 const WINDOW_SCALE: usize = 5;
@@ -134,7 +136,42 @@ fn run_emulator(
                             Keycode::Space => {
                                 paused = false;
                                 pause_next_frame = true;
-                            }
+                            },
+                            num @ Keycode::Num1 | num @ Keycode::Num2 | num @ Keycode::Num3 => {
+                                let save_num_str = match num {
+                                    Keycode::Num1 => "1",
+                                    Keycode::Num2 => "2",
+                                    Keycode::Num3 => "3",
+                                    _ => "1"
+                                };
+                                let ram = cpu.cart.ram();
+                                let mut cart_title = String::from_utf8(cpu.cart.title.clone()).unwrap();
+                                cart_title.make_ascii_lowercase();
+                                let file_name = format!("{}-{}.sav", cart_title, save_num_str);
+                                info!("save slot {}", save_num_str);
+                                let mut f = File::create(file_name).expect("Failed to create file for saving");
+                                f.set_len(0);
+                                f.write_all(ram);
+
+                            },
+                            num @ Keycode::Num8 | num @ Keycode::Num9 | num @ Keycode::Num0 => {
+                                let save_num_str = match num {
+                                    Keycode::Num8 => "1",
+                                    Keycode::Num9 => "2",
+                                    Keycode::Num0 => "3",
+                                    _ => "1"
+                                };
+                                println!("load {}", save_num_str);
+                                let mut cart_title = String::from_utf8(cpu.cart.title.clone()).unwrap();
+                                cart_title.make_ascii_lowercase();
+                                let file_name = format!("{}-{}.sav", cart_title, save_num_str);
+                                let ram = std::fs::read(file_name)
+                                    .map(|r| r.into_boxed_slice());
+                                if ram.is_ok() {
+                                    info!("loading save file slot: {}", save_num_str);
+                                    cpu.cart.set_ram(ram.unwrap());
+                                }
+                            },
                             _ => {}
                         }
                     }
