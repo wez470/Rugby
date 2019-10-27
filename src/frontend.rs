@@ -147,6 +147,7 @@ fn run_emulator(
                                 let ram = cpu.cart.ram();
                                 let mut cart_title = String::from_utf8(cpu.cart.title.clone()).unwrap();
                                 cart_title.make_ascii_lowercase();
+                                cart_title = cart_title.replace(" ", "_");
                                 let file_name = format!("{}-{}.sav", cart_title, save_num_str);
                                 info!("save slot {}", save_num_str);
                                 let mut f = File::create(file_name).expect("Failed to create file for saving");
@@ -164,6 +165,7 @@ fn run_emulator(
                                 info!("load {}", save_num_str);
                                 let mut cart_title = String::from_utf8(cpu.cart.title.clone()).unwrap();
                                 cart_title.make_ascii_lowercase();
+                                cart_title = cart_title.replace(" ", "_");
                                 let file_name = format!("{}-{}.sav", cart_title, save_num_str);
                                 let ram = std::fs::read(file_name)
                                     .map(|r| r.into_boxed_slice());
