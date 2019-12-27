@@ -840,32 +840,32 @@ impl Cpu {
         let val = match addr {
             // First 16KB is ROM Bank 00 (in cartridge, fixed at bank 00)
             // Second 16KB are ROM Banks 01..NN (in cartridge, switchable bank number)
-            0x0000...0x7FFF => self.cart.read(addr),
+            0x0000..=0x7FFF => self.cart.read(addr),
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
-            0x8000...0x9FFF => {
+            0x8000..=0x9FFF => {
                 let i = (addr - 0x8000) as usize;
                 self.gpu.read_vram(i)
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
-            0xA000...0xBFFF => self.cart.read(addr),
+            0xA000..=0xBFFF => self.cart.read(addr),
 
             // C000-CFFF: 4KB Work RAM Bank 0 (WRAM)
             // D000-DFFF: 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
             //
             // NOTE: Since we don't support CGB mode yet, there is no switching and we handle this
             // like a contiguous 8KB block.
-            0xC000...0xDFFF => {
+            0xC000..=0xDFFF => {
                 let i = (addr - 0xC000) as usize;
                 self.work_ram[i]
             }
 
             // Same as C000-DDFF (ECHO) (typically not used)
-            0xE000...0xFDFF => self.read_mem(addr - 0xE000 + 0xC000),
+            0xE000..=0xFDFF => self.read_mem(addr - 0xE000 + 0xC000),
 
             // Sprite Attribute Table (OAM)
-            0xFE00...0xFE9F => {
+            0xFE00..=0xFE9F => {
                 let i = (addr - 0xFE00) as usize;
                 self.gpu.read_sprite_ram(i)
             }
@@ -874,13 +874,13 @@ impl Cpu {
             //
             // This part of the address space is not connected to any hardware, but some games do
             // reads here. The result is 0xFF, the default value for the Game Boy data bus.
-            0xFEA0...0xFEFF => 0xFF,
+            0xFEA0..=0xFEFF => 0xFF,
 
             // I/O Ports
-            0xFF00...0xFF7F => self.read_io_port(addr as u8),
+            0xFF00..=0xFF7F => self.read_io_port(addr as u8),
 
             // High RAM (HRAM)
-            0xFF80...0xFFFE => {
+            0xFF80..=0xFFFE => {
                 let i = (addr - 0xFF80) as usize;
                 self.high_ram[i]
             }
@@ -903,32 +903,32 @@ impl Cpu {
 
         match addr {
             // 32KB cartridge write
-            0x0000...0x7FFF => self.cart.write(addr, val),
+            0x0000..=0x7FFF => self.cart.write(addr, val),
 
             // 8KB Video RAM (VRAM) (switchable bank 0-1 in CGB Mode)
-            0x8000...0x9FFF => {
+            0x8000..=0x9FFF => {
                 let i = (addr - 0x8000) as usize;
                 self.gpu.write_vram(i, val);
             }
 
             // 8KB External RAM (in cartridge, switchable bank, if any)
-            0xA000...0xBFFF => self.cart.write(addr, val),
+            0xA000..=0xBFFF => self.cart.write(addr, val),
 
             // C000-CFFF: 4KB Work RAM Bank 0 (WRAM)
             // D000-DFFF: 4KB Work RAM Bank 1 (WRAM) (switchable bank 1-7 in CGB Mode)
             //
             // NOTE: Since we don't support CGB mode yet, there is no switching and we handle this
             // like a contiguous 8KB block.
-            0xC000...0xDFFF => {
+            0xC000..=0xDFFF => {
                 let i = (addr - 0xC000) as usize;
                 self.work_ram[i] = val;
             }
 
             // Same as C000-DDFF (ECHO) (typically not used)
-            0xE000...0xFDFF => self.write_mem(addr - 0xE000 + 0xC000, val),
+            0xE000..=0xFDFF => self.write_mem(addr - 0xE000 + 0xC000, val),
 
             // Sprite Attribute Table (OAM). TODO: Can only write during H-Blank or V-Blank phase
-            0xFE00...0xFE9F => {
+            0xFE00..=0xFE9F => {
                 let i = (addr - 0xFE00) as usize;
                 self.gpu.write_sprite_ram(i, val);
             }
@@ -937,13 +937,13 @@ impl Cpu {
             //
             // This part of the address space is not connected to any hardware, but some games do
             // writes here (I'm looking at you, Tetris). They are to be silently ignored.
-            0xFEA0...0xFEFF => {}
+            0xFEA0..=0xFEFF => {}
 
             // I/O Ports
-            0xFF00...0xFF7F => self.write_io_port(addr as u8, val),
+            0xFF00..=0xFF7F => self.write_io_port(addr as u8, val),
 
             // High RAM (HRAM)
-            0xFF80...0xFFFE => {
+            0xFF80..=0xFFFE => {
                 let i = (addr - 0xFF80) as usize;
                 self.high_ram[i] = val;
             }
@@ -971,23 +971,23 @@ impl Cpu {
     fn read_io_port(&self, port: u8) -> u8 {
         match port {
             0x00 => self.joypad.read_reg(),
-            0x01...0x02 => {
+            0x01..=0x02 => {
                 warn!("unimplemented read from serial I/O FF{:02X}", port);
                 0xFF
             }
-            0x04...0x07 => self.timer.read_reg(port),
+            0x04..=0x07 => self.timer.read_reg(port),
             // The top 3 bits are unused and always 1.
             0x0F => 0b1110_0000 | self.interrupt_flags_register.bits(),
-            0x10...0x14 | 0x16...0x19 | 0x1A...0x1E | 0x20...0x26 | 0x30...0x3F =>
+            0x10..=0x14 | 0x16..=0x19 | 0x1A..=0x1E | 0x20..=0x26 | 0x30..=0x3F =>
                 self.audio.read_reg(port),
-            0x40...0x45 | 0x47...0x4B => self.gpu.read_reg(port),
+            0x40..=0x45 | 0x47..=0x4B => self.gpu.read_reg(port),
 
             // Cannot read from DMA transfer register.
             // TODO(solson): Should it return 0xFF like most other inaccessible registers?
             0x46 => 0,
 
             // Unmapped I/O ports always return all bits high.
-            0x03 | 0x08...0x0E | 0x15 | 0x1F | 0x27...0x2F | 0x4C...0x7F => 0xFF,
+            0x03 | 0x08..=0x0E | 0x15 | 0x1F | 0x27..=0x2F | 0x4C..=0x7F => 0xFF,
 
             _ => panic!("unimplemented: read from I/O port FF{:02X}", port),
         }
@@ -996,12 +996,12 @@ impl Cpu {
     fn write_io_port(&mut self, port: u8, val: u8) {
         match port {
             0x00 => self.joypad.write_reg(val),
-            0x01...0x02 => warn!("unimplemented write to serial I/O port FF{:02X}", port),
-            0x04...0x07 => self.timer.write_reg(port, val),
+            0x01..=0x02 => warn!("unimplemented write to serial I/O port FF{:02X}", port),
+            0x04..=0x07 => self.timer.write_reg(port, val),
             0x0F => self.interrupt_flags_register = BitFlags::from_bits_truncate(val),
-            0x10...0x14 | 0x16...0x19 | 0x1A...0x1E | 0x20...0x26 | 0x30...0x3F =>
+            0x10..=0x14 | 0x16..=0x19 | 0x1A..=0x1E | 0x20..=0x26 | 0x30..=0x3F =>
                 self.audio.write_reg(port, val),
-            0x40...0x45 | 0x47...0x4B => self.gpu.write_reg(port, val),
+            0x40..=0x45 | 0x47..=0x4B => self.gpu.write_reg(port, val),
 
             // DMA Transfer - Takes 160 microseconds to complete. During this time, only HRAM can
             // be accessed.
@@ -1016,7 +1016,7 @@ impl Cpu {
             }
 
             // Unmapped I/O ports always ignore writes.
-            0x03 | 0x08...0x0E | 0x15 | 0x1F | 0x27...0x2F | 0x4C...0x7F => {}
+            0x03 | 0x08..=0x0E | 0x15 | 0x1F | 0x27..=0x2F | 0x4C..=0x7F => {}
 
             _ => panic!("unimplemented: write to I/O port FF{:02X}", port),
         }

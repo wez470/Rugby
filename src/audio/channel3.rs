@@ -80,7 +80,7 @@ impl Channel3 {
                 | (self.stop_after_sound_length as u8) << 6
                 | ((self.frequency >> 8) as u8) & 0b111
             },
-            0x30...0x3F => self.wave_ram[(addr - 0x30) as usize],
+            0x30..=0x3F => self.wave_ram[(addr - 0x30) as usize],
             _ => panic!("Invalid read address for audio channel 3"),
         }
     }
@@ -117,7 +117,7 @@ impl Channel3 {
                 }
                 self.length_counter_enabled = self.restart;
             },
-            0x30...0x3F => self.wave_ram[(addr - 0x30) as usize] = val,
+            0x30..=0x3F => self.wave_ram[(addr - 0x30) as usize] = val,
             _ => panic!("Invalid write address for audio channel 3"),
         }
     }

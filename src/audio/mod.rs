@@ -71,10 +71,10 @@ impl Audio {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x10...0x14 => self.channel1.read_reg(addr),
-            0x16...0x19 => self.channel2.read_reg(addr),
-            0x1A...0x1E => self.channel3.read_reg(addr),
-            0x20...0x23 => self.channel4.read_reg(addr),
+            0x10..=0x14 => self.channel1.read_reg(addr),
+            0x16..=0x19 => self.channel2.read_reg(addr),
+            0x1A..=0x1E => self.channel3.read_reg(addr),
+            0x20..=0x23 => self.channel4.read_reg(addr),
             0x24 => {
                 (self.output_vin_left as u8) << 7
                 | self.left_volume << 4
@@ -92,17 +92,17 @@ impl Audio {
                 | (self.channel_2_enabled as u8) << 1
                 | (self.channel_1_enabled as u8)
             }
-            0x30...0x3F => self.channel3.read_reg(addr),
+            0x30..=0x3F => self.channel3.read_reg(addr),
             _ => panic!("Unimplemented audio register read"),
         }
     }
 
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
-            0x10...0x14 => self.channel1.write_reg(addr, val),
-            0x16...0x19 => self.channel2.write_reg(addr, val),
-            0x1A...0x1E => self.channel3.write_reg(addr, val),
-            0x20...0x23 => self.channel4.write_reg(addr, val),
+            0x10..=0x14 => self.channel1.write_reg(addr, val),
+            0x16..=0x19 => self.channel2.write_reg(addr, val),
+            0x1A..=0x1E => self.channel3.write_reg(addr, val),
+            0x20..=0x23 => self.channel4.write_reg(addr, val),
             0x24 => {
                 self.output_vin_left = val & (1 << 7) != 0;
                 self.left_volume = (val >> 4) & 0b111;
@@ -120,7 +120,7 @@ impl Audio {
                 // Should destroy all sound register contents upon disabled.
                 self.enabled = val & (1 << 7) != 0;
             }
-            0x30...0x3F => self.channel3.write_reg(addr, val),
+            0x30..=0x3F => self.channel3.write_reg(addr, val),
             _ => panic!("Unimplemented audio register write"),
         }
     }

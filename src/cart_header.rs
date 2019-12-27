@@ -212,12 +212,12 @@ impl CartHeader {
         };
 
         let cart_type = match bytes[0x47] {
-            0x00 | 0x08...0x09 => CartType::NoMbc,
-            0x01...0x03 => CartType::Mbc1,
-            0x05...0x06 => CartType::Mbc2,
-            0x0B...0x0D => CartType::Mmm01,
-            0x0F...0x13 => CartType::Mbc3,
-            0x19...0x1E => CartType::Mbc5,
+            0x00 | 0x08..=0x09 => CartType::NoMbc,
+            0x01..=0x03 => CartType::Mbc1,
+            0x05..=0x06 => CartType::Mbc2,
+            0x0B..=0x0D => CartType::Mmm01,
+            0x0F..=0x13 => CartType::Mbc3,
+            0x19..=0x1E => CartType::Mbc5,
             0x20 => CartType::Mbc6,
             0x22 => CartType::Mbc7,
             0xFC => CartType::PocketCamera,
@@ -242,7 +242,7 @@ impl CartHeader {
         };
 
         let rom_size = match bytes[0x48] {
-            n @ 0x00...0x08 => MemSize::Bytes((32 * 1024) << n),
+            n @ 0x00..=0x08 => MemSize::Bytes((32 * 1024) << n),
             n => MemSize::Unknown(n),
         };
 

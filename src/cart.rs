@@ -131,10 +131,10 @@ impl NoMbc {
     fn read(&self, addr: u16) -> u8 {
         match addr {
             // ROM
-            0x0000...0x7FFF => self.rom[addr as usize],
+            0x0000..=0x7FFF => self.rom[addr as usize],
 
             // RAM
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 let ram_index = (addr - 0xA000) as usize;
                 // If the RAM is not present, the hardware returns all bits set.
                 *self.ram.get(ram_index).unwrap_or(&0xFF)
@@ -147,10 +147,10 @@ impl NoMbc {
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
             // ROM: Writes are ignored.
-            0x0000...0x7FFF => {}
+            0x0000..=0x7FFF => {}
 
             // RAM
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 let ram_index = (addr - 0xA000) as usize;
                 // If the RAM is not present, the hardware ignores writes.
                 if let Some(p) = self.ram.get_mut(ram_index) {
@@ -186,7 +186,7 @@ impl Mbc1 {
 
     fn read(&self, addr: u16) -> u8 {
         match addr {
-            0x0000...0x3FFF => {
+            0x0000..=0x3FFF => {
                 let bank = match self.mode {
                     MbcMode::Rom => 0,
                     MbcMode::Ram => self.bank_reg2 << 5,
@@ -194,12 +194,12 @@ impl Mbc1 {
                 get_rom(&self.rom, bank as u16, addr)
             }
 
-            0x4000...0x7FFF => {
+            0x4000..=0x7FFF => {
                 let bank = self.bank_reg2 << 5 | self.bank_reg1;
                 get_rom(&self.rom, bank as u16, addr)
             }
 
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 // When RAM is disabled, the hardware returns all bits set.
                 if !self.ram_enabled || self.ram.len() == 0 { return 0xFF; }
                 let bank = match self.mode {
@@ -216,12 +216,12 @@ impl Mbc1 {
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
             // RAM Enable
-            0x0000...0x1FFF => {
+            0x0000..=0x1FFF => {
                 self.ram_enabled = (val & 0b1111) == 0b1010;
             }
 
             // ROM bank lower bits write
-            0x2000...0x3FFF => {
+            0x2000..=0x3FFF => {
                 self.bank_reg1 = val & 0b0001_1111;
                 if self.bank_reg1 == 0 {
                     self.bank_reg1 = 1;
@@ -229,17 +229,17 @@ impl Mbc1 {
             }
 
             // RAM Bank / Upper ROM bank bits write
-            0x4000...0x5FFF => {
+            0x4000..=0x5FFF => {
                 self.bank_reg2 = val & 0b0011;
             }
 
             // ROM / RAM Mode
-            0x6000...0x7FFF => {
+            0x6000..=0x7FFF => {
                 self.mode = if val & 1 == 0 { MbcMode::Rom } else { MbcMode::Ram };
             }
 
             // Switchable RAM bank
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 // When RAM is disabled, the hardware ignores writes.
                 if !self.ram_enabled || self.ram.len() == 0 { return; }
                 let bank = match self.mode {
@@ -272,20 +272,20 @@ impl Mbc3 {
     fn read(&self, addr: u16) -> u8 {
         match addr {
             // ROM Bank 0
-            0x0000...0x3FFF => get_rom(&self.rom, 0, addr),
+            0x0000..=0x3FFF => get_rom(&self.rom, 0, addr),
 
             // Switchable ROM bank
-            0x4000...0x7FFF => get_rom(&self.rom, self.rom_bank as u16, addr),
+            0x4000..=0x7FFF => get_rom(&self.rom, self.rom_bank as u16, addr),
 
             // Switchable RAM bank
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 // When RAM is disabled, the hardware returns all bits set.
                 if !self.ram_rtc_enabled { return 0xFF; }
 
                 let bank = self.ram_rtc_bank as u16;
                 match bank {
                     // Read from RTC values
-                    0x8...0xC => {
+                    0x8..=0xC => {
                         //TODO(wcarlson): Read from RTC values
                         unimplemented!()
                     }
@@ -302,12 +302,12 @@ impl Mbc3 {
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
             // RAM Enable
-            0x0000...0x1FFF => {
+            0x0000..=0x1FFF => {
                 self.ram_rtc_enabled = (val & 0b1111) == 0b1010;
             }
 
             // ROM bank
-            0x2000...0x3FFF => {
+            0x2000..=0x3FFF => {
                 self.rom_bank = val & 0b0111_1111;
                 if self.rom_bank == 0 {
                     self.rom_bank = 1;
@@ -315,24 +315,24 @@ impl Mbc3 {
             }
 
             // RAM Bank / RTC register
-            0x4000...0x5FFF => {
+            0x4000..=0x5FFF => {
                 self.ram_rtc_bank = val;
             }
 
             // Latch clock data
-            0x6000...0x7FFF => {
+            0x6000..=0x7FFF => {
                 warn!("unimplemented: write to MBC3 RTC latch register");
             }
 
             // Switchable RAM bank
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 // When RAM is disabled, the hardware ignores writes.
                 if !self.ram_rtc_enabled { return; }
 
                 let bank = self.ram_rtc_bank as u16;
                 match bank {
                     // Write to RTC values
-                    0x8...0xC => {
+                    0x8..=0xC => {
                         warn!("unimplemented: write to MBC3 RTC data");
                     }
 
@@ -374,16 +374,16 @@ impl Mbc5 {
 
     fn read(&self, addr: u16) -> u8 {
         match addr {
-            0x0000...0x3FFF => {
+            0x0000..=0x3FFF => {
                 get_rom(&self.rom, 0, addr)
             }
 
-            0x4000...0x7FFF => {
+            0x4000..=0x7FFF => {
                 let bank = u16::from_le_bytes([self.rom_bank_reg1, self.rom_bank_reg2]);
                 get_rom(&self.rom, bank, addr)
             }
 
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 // When RAM is disabled, the hardware returns all bits set.
                 if !self.ram_enabled || self.ram.len() == 0 { return 0xFF; }
                 get_ram(&self.ram, self.ram_bank_reg as u16, addr)
@@ -396,27 +396,27 @@ impl Mbc5 {
     fn write(&mut self, addr: u16, val: u8) {
         match addr {
             // RAM Enable
-            0x0000...0x1FFF => {
+            0x0000..=0x1FFF => {
                 self.ram_enabled = (val & 0b1111) == 0b1010;
             }
 
             // ROM bank lower bits write
-            0x2000...0x2FFF => {
+            0x2000..=0x2FFF => {
                 self.rom_bank_reg1 = val;
             }
 
             // ROM bank higher bit write
-            0x3000...0x3FFF => {
+            0x3000..=0x3FFF => {
                 self.rom_bank_reg2 = val & 0b0001;
             }
 
             // RAM bank write
-            0x4000...0x5FFF => {
+            0x4000..=0x5FFF => {
                 self.ram_bank_reg = val & 0b1111;
             }
 
             // Switchable RAM bank
-            0xA000...0xBFFF => {
+            0xA000..=0xBFFF => {
                 // When RAM is disabled, the hardware ignores writes.
                 if !self.ram_enabled || self.ram.len() == 0 { return; }
                 set_ram(&mut self.ram, self.ram_bank_reg as u16, addr, val);
