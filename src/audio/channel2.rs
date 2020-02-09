@@ -73,6 +73,8 @@ impl Channel2 {
         }
     }
 
+    pub fn enabled(&self) -> bool { self.enabled }
+
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
             0x16 => (self.wave_pattern << 6) | 0b0011_1111, // Low bits are write-only
@@ -130,10 +132,8 @@ impl Channel2 {
         }
     }
 
-    pub fn step(&mut self, cycles: usize) -> u8 {
-        if !self.enabled {
-            return 0;
-        }
+    pub fn step(&mut self, cycles: usize) -> f32 {
+        if !self.enabled { return 0.0/0.0; }
 
         self.curr_cycles += cycles;
         let freq = (2048 - self.frequency as usize) * 4;
@@ -145,7 +145,11 @@ impl Channel2 {
 
         self.update_length_counter(cycles);
 
-        self.curr_output * self.volume
+        if self.curr_output == 1 {
+            (self.volume as f32) * (1.0/15.0)
+        } else {
+            -(self.volume as f32) * (1.0/15.0)
+        }
     }
 
     fn get_wave_duty(&self) -> u8 {

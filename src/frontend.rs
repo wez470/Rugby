@@ -60,6 +60,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
         samples: Some(SAMPLE_BUFFER_SIZE as u16),
     };
     let mut audio_queue = sdl_audio.open_queue(None, &desired_spec).expect("Failed to open audio queue");
+    println!("{:?}", audio_queue.spec());
     audio_queue.resume();
 
     run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, false, None, &HashSet::new())
@@ -67,7 +68,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
 
 fn run_emulator(
     cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut EventPump, sdl_fps: &mut FPSManager,
-    sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, audio_queue: &mut AudioQueue<u8>,
+    sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, audio_queue: &mut AudioQueue<f32>,
     debug: bool, num_instrs: Option<usize>, watches: &HashSet<Watch>
 ) {
     let mut paused = false;

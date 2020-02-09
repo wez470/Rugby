@@ -1,5 +1,5 @@
 use log::warn;
-use super::{LENGTH_COUNTER_RATE_CYCLES, EnvelopeDirection};
+use super::{LENGTH_COUNTER_RATE_CYCLES, EnvelopeDirection, gb_sample_to_float};
 
 /// Max length for sound data
 const MAX_SOUND_LENGTH: u8 = 64;
@@ -62,7 +62,7 @@ impl Channel1 {
             length: 0,
             length_counter: MAX_SOUND_LENGTH,
             length_counter_enabled: true,
-            volume: 0b11111,
+            volume: 0xF,
             envelope_direction: EnvelopeDirection::Decrease,
             envelope_sweeps: 0b11,
             frequency: 0,
@@ -72,9 +72,11 @@ impl Channel1 {
             curr_length_counter_cycles: 0,
             curr_index: 0,
             curr_output: 0,
-            enabled: false,
+            enabled: true,
         }
     }
+
+    pub fn enabled(&self) -> bool { self.enabled }
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
@@ -138,10 +140,8 @@ impl Channel1 {
         }
     }
 
-    pub fn step(&mut self, cycles: usize) -> u8 {
-        if !self.enabled {
-            return 0;
-        }
+    pub fn step(&mut self, cycles: usize) -> f32 {
+        if !self.enabled { return 0.0/0.0; }
 
         self.curr_cycles += cycles;
         let freq = (2048 - self.frequency as usize) * 4;
@@ -153,7 +153,11 @@ impl Channel1 {
 
         self.update_length_counter(cycles);
 
-        self.curr_output * self.volume
+        if self.curr_output == 1 {
+            (self.volume as f32) * (1.0/15.0)
+        } else {
+            -(self.volume as f32) * (1.0/15.0)
+        }
     }
 
     fn get_wave_duty(&self) -> u8 {

@@ -122,7 +122,7 @@ impl Cpu {
 
     /// Keep executing instructions until more than the given number of cycles have passed.
     /// Returns true if we have hit a watch.
-    pub fn step_cycles(&mut self, cycles: usize, audio_queue: &mut AudioQueue<u8>, watches: &HashSet<Watch>) -> bool {
+    pub fn step_cycles(&mut self, cycles: usize, audio_queue: &mut AudioQueue<f32>, watches: &HashSet<Watch>) -> bool {
         let mut curr_cycles: usize = 0;
         let check_watches = watches.len() > 0;
         while curr_cycles < cycles {

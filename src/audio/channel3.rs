@@ -68,6 +68,8 @@ impl Channel3 {
         }
     }
 
+    pub fn enabled(&self) -> bool { self.enabled }
+
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
             0x1A => ((self.enabled as u8) << 7) | 0b0111_1111, // Lower 7 bits unused

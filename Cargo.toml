@@ -25,6 +25,7 @@ version = "0.32.1"
 features = ["gfx"]
 
 [dev-dependencies]
+approx = "0.3.2"
 quickcheck = "0.8.0"
 
 [profile.dev]

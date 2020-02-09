@@ -36,14 +36,6 @@ pub struct Audio {
     selection: u8,
     /// Sound enabled. Bit 7 at 0xFF26. Cannot access any sound registers besides 0xFF26 while disabled.
     enabled: bool,
-    /// Sound 4 enabled. Bit 3 at 0xFF26. Read only
-    channel_4_enabled: bool,
-    /// Sound 3 enabled. Bit 2 at 0xFF26. Read only
-    channel_3_enabled: bool,
-    /// Sound 2 enabled. Bit 1 at 0xFF26. Read only
-    channel_2_enabled: bool,
-    /// Sound 1 enabled. Bit 0 at 0xFF26. Read only
-    channel_1_enabled: bool,
     /// Cycle counter for outputting sound data to the audio queue at the proper rate.
     queue_cycles: usize,
 
@@ -68,11 +60,7 @@ impl Audio {
             output_vin_right: false,
             right_volume: 7,
             selection: 0xF3,
-            enabled: true,
-            channel_4_enabled: true,
-            channel_3_enabled: true,
-            channel_2_enabled: true,
-            channel_1_enabled: true,
+            enabled: false,
             channel_4_muted: false,
             channel_3_muted: false,
             channel_2_muted: false,
@@ -98,10 +86,10 @@ impl Audio {
             0x26 => {
                 (self.enabled as u8) << 7
                 | 0b0111_0000 // Unused bits
-                | (self.channel_4_enabled as u8) << 3
-                | (self.channel_3_enabled as u8) << 2
-                | (self.channel_2_enabled as u8) << 1
-                | (self.channel_1_enabled as u8)
+                | (self.channel4.enabled() as u8) << 3
+                | (self.channel3.enabled() as u8) << 2
+                | (self.channel2.enabled() as u8) << 1
+                | (self.channel1.enabled() as u8)
             }
             0x30..=0x3F => self.channel3.read_reg(addr),
             _ => panic!("Unimplemented audio register read"),
@@ -136,72 +124,86 @@ impl Audio {
         }
     }
 
-    pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
+    pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<f32>) {
+        fn convert(sample: u8) -> f32 {
+            assert!(sample <= 15);
+            (sample as f32) * (2.0 / 15.0) - 1.0
+        }
+
+        assert!(convert(0) == -1.0);
+        assert!(convert(15) == 1.0);
+
         let channel1_val = self.channel1.step(cycles);
         let channel2_val = self.channel2.step(cycles);
-        let channel3_val = self.channel3.step(cycles);
+        // let channel3_val = convert(self.channel3.step(cycles));
+        let channel3_val = 0.0;
         let channel4_val = self.channel4.step(cycles);
 
         let (mut left, mut right) = self.get_left_and_right_audio(channel1_val, channel2_val, channel3_val, channel4_val);
-        left *= self.left_volume;
-        right *= self.right_volume;
+
+        // TODO(solson): Re-investigate how master volume is supposed to work.
+        left *= (self.left_volume as f32 + 1.0) / 8.0;
+        right *= (self.right_volume as f32 + 1.0) / 8.0;
+
 
         self.output_to_queue(left, right, audio_queue, cycles);
     }
 
-    fn get_left_and_right_audio(&self, channel1_val: u8, channel2_val: u8, channel3_val: u8, channel4_val: u8) -> (u8, u8) {
-        let mut left: u16 = 0;
-        let mut right: u16 = 0;
-        if !self.enabled {
-            return (0, 0);
-        }
+    fn get_left_and_right_audio(
+        &self,
+        channel1_val: f32,
+        channel2_val: f32,
+        channel3_val: f32,
+        channel4_val: f32,
+    ) -> (f32, f32) {
+        if !self.enabled { return (0.0, 0.0); }
 
-        if self.channel_4_enabled && !self.channel_4_muted {
-            if self.selection & (1 << 7) != 0 {
-                left += channel4_val as u16;
-            }
-        }
-        if self.channel_3_enabled && !self.channel_3_muted {
-            if self.selection & (1 << 6) != 0 {
-                left += channel3_val as u16;
-            }
-        }
-        if self.channel_2_enabled && !self.channel_2_muted {
-            if self.selection & (1 << 5) != 0 {
-                left += channel2_val as u16;
-            }
-        }
-        if self.channel_1_enabled && !self.channel_1_muted {
+        let mut left: f32 = 0.0;
+        let mut right: f32 = 0.0;
+
+        if self.channel1.enabled() && !self.channel_1_muted {
             if self.selection & (1 << 4) != 0 {
-                left += channel1_val as u16;
+                left += channel1_val;
+                log::trace!("channel 1: {}", channel1_val);
             }
-        }
-
-        if self.channel_4_enabled && !self.channel_4_muted {
-            if self.selection & (1 << 3) != 0 {
-                right += channel4_val as u16;
-            }
-        }
-        if self.channel_3_enabled && !self.channel_3_muted {
-            if self.selection & (1 << 2) != 0 {
-                right += channel3_val as u16;
-            }
-        }
-        if self.channel_2_enabled && !self.channel_2_muted {
-            if self.selection & (1 << 1) != 0 {
-                right += channel2_val as u16;
-            }
-        }
-        if self.channel_1_enabled && !self.channel_1_muted {
             if self.selection & 1 != 0 {
-                right += channel1_val as u16;
+                right += channel1_val;
+            }
+        }
+        if self.channel2.enabled() && !self.channel_2_muted {
+            if self.selection & (1 << 5) != 0 {
+                left += channel2_val;
+                log::trace!("channel 2: {}", channel2_val);
+            }
+            if self.selection & (1 << 1) != 0 {
+                right += channel2_val;
+            }
+        }
+        if self.channel3.enabled() && !self.channel_3_muted {
+            if self.selection & (1 << 6) != 0 {
+                left += channel3_val;
+                log::trace!("channel 3: {}", channel3_val);
+            }
+            if self.selection & (1 << 2) != 0 {
+                right += channel3_val;
+            }
+        }
+        if self.channel4.enabled() && !self.channel_4_muted {
+            if self.selection & (1 << 7) != 0 {
+                left += channel4_val;
+                log::trace!("channel 4: {}", channel4_val);
+            }
+            if self.selection & (1 << 3) != 0 {
+                right += channel4_val;
             }
         }
 
-        ((left / 4) as u8, (right / 4) as u8)
+        log::trace!("overall:   {}", left / 4.0);
+
+        (left / 4.0, right / 4.0)
     }
 
-    fn output_to_queue(&mut self, left: u8, right: u8, queue: &mut sdl2::audio::AudioQueue<u8>, cycles: usize) {
+    fn output_to_queue(&mut self, left: f32, right: f32, queue: &mut sdl2::audio::AudioQueue<f32>, cycles: usize) {
         self.queue_cycles += cycles;
         if self.queue_cycles >= SAMPLE_RATE_CYCLES {
             self.queue_cycles %= SAMPLE_RATE_CYCLES;
@@ -226,3 +228,57 @@ impl std::convert::From<u8> for EnvelopeDirection {
         }
     }
 }
+
+fn gb_sample_to_float(s: u8) -> f32 {
+    -1.0 + (s as f32) * (2.0/15.0)
+}
+
+// /// A 4-bit integer Game Boy audio sample, ranging from 0 to 15.
+// ///
+// /// Our current assumption about how the values map to standard floating-point
+// /// samples is as follows:
+// ///   * 0 maps to -1.0
+// ///   * 15 maps to 1.0
+// ///   * The other values are perfectly linearly spaced
+// ///
+// /// In particular, this means that the step size between adjacent samples is
+// /// `2/15` or `0.1(3)`. In general, sample `n` maps to `-1.0 + n*(2/15)`. For
+// /// example, sample 1 is `-1.0 + 0.1(3) == -0.8(6)`.
+// ///
+// /// Note that this interpretation means there is no neutral sample mapping to
+// /// 0.0, since sample 7 is `-0.0(6)` and sample 8 is `+0.0(6)`. This shouldn't be
+// /// a huge problem, since when channels aren't playing, they are turned off
+// /// completely, and we can treat that state as a true 0.0 level.
+// ///
+// /// This assumption is based on blargg's sound documentation at
+// /// https://gist.github.com/drhelius/3652407 or
+// /// http://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware#Channel_DAC.
+// #[derive(Clone, Copy, Debug)]
+// pub struct Sample(u8);
+
+// impl Sample {
+//     /// Create a new sample from the given byte, which *must* be between 0 and 15
+//     /// inclusive, or else we panic.
+//     fn new(s: u8) -> Sample {
+//         assert!(s <= 15);
+//         Sample(s)
+//     }
+// }
+
+// impl std::convert::From<Sample> for f32 {
+//     fn from(s: Sample) -> f32 {
+//         debug_assert!(s.0 <= 15);
+//         -1.0 + (s.0 as f32) * (2.0/15.0)
+//     }
+// }
+
+// #[test]
+// fn sample_test() {
+//     // Test all the values mentioned in the `Sample` doc comment.
+//     use approx::assert_relative_eq;
+//     assert_relative_eq!(f32::from(Sample::new(0)), -1.0);
+//     assert_relative_eq!(f32::from(Sample::new(1)), -0.86666666666666666666);
+//     assert_relative_eq!(f32::from(Sample::new(7)), -0.06666666666666666666);
+//     assert_relative_eq!(f32::from(Sample::new(8)), 0.06666666666666666666);
+//     assert_relative_eq!(f32::from(Sample::new(15)), 1.0);
+// }
