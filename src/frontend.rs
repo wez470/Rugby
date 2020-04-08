@@ -22,6 +22,7 @@ use std::collections::HashSet;
 
 const CYCLES_PER_FRAME: usize = 69905;
 const WINDOW_SCALE: usize = 5;
+const BASE_FPS: u32 = 60;
 
 /// The four colors of the original Game Boy screen, from lightest to darkest, in RGB.
 const GAME_BOY_COLORS: [sdl2::pixels::Color; 4] = [
@@ -47,7 +48,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
     let mut sdl_events = sdl.event_pump().expect("Failed to get SDL event pump");
 
     let mut sdl_fps = sdl2::gfx::framerate::FPSManager::new();
-    sdl_fps.set_framerate(60).expect("Failed to set SDL framerate");
+    sdl_fps.set_framerate(BASE_FPS).expect("Failed to set SDL framerate");
 
     let sdl_controllers = sdl.game_controller().expect("Failed to get SDL game controllers");
     let mut controllers = vec![];
@@ -69,7 +70,6 @@ fn run_emulator(
     sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, audio_queue: &mut AudioQueue<u8>,
     debug: bool, num_instrs: Option<usize>, watches: &HashSet<Watch>
 ) {
-    let mut speed_multiplier: f32 = 1.0;
     let mut paused = false;
     let mut pause_next_frame = false;
     'main: loop {
@@ -158,10 +158,6 @@ fn run_emulator(
                             Keycode::Tab => cpu.joypad.button_key_up(ButtonKey::Select),
                             Keycode::K => cpu.joypad.button_key_up(ButtonKey::A),
                             Keycode::J => cpu.joypad.button_key_up(ButtonKey::B),
-                            Keycode::RightBracket =>
-                                speed_multiplier = (speed_multiplier * 2.0).min(4.0),
-                            Keycode::LeftBracket =>
-                                speed_multiplier = (speed_multiplier / 2.0).max(0.25),
                             _ => {}
                         }
                     }
@@ -205,10 +201,6 @@ fn run_emulator(
                         Button::DPadRight => cpu.joypad.dir_key_up(DirKey::Right),
                         Button::DPadUp => cpu.joypad.dir_key_up(DirKey::Up),
                         Button::DPadDown => cpu.joypad.dir_key_up(DirKey::Down),
-                        Button::RightShoulder =>
-                            speed_multiplier = (speed_multiplier * 2.0).min(4.0),
-                        Button::LeftShoulder =>
-                            speed_multiplier = (speed_multiplier / 2.0).max(0.25),
                         _ => {}
                     }
                 }
@@ -225,7 +217,7 @@ fn run_emulator(
             None => {
                 if !paused {
                     let should_break = cpu.step_cycles(
-                        (CYCLES_PER_FRAME as f32 * speed_multiplier) as usize,
+                        CYCLES_PER_FRAME,
                         audio_queue,
                         watches,
                     );
@@ -269,7 +261,7 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
     let mut sdl_events = sdl.event_pump().expect("Failed to get SDL event pump");
 
     let mut sdl_fps = FPSManager::new();
-    sdl_fps.set_framerate(60).expect("Failed to set SDL framerate");
+    sdl_fps.set_framerate(BASE_FPS).expect("Failed to set SDL framerate");
 
     let sdl_controllers = sdl.game_controller().expect("Failed to get SDL game controllers");
     let mut controllers = vec![];

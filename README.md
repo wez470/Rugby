@@ -20,8 +20,6 @@ up          = w
 left        = a
 down        = s
 right       = d
-speed x2    = right bracket (max x4)
-speed x0.5  = left bracket  (min x0.25)
 pause       = p
 ```
 
