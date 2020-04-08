@@ -46,6 +46,13 @@ pub struct Audio {
     channel_1_enabled: bool,
     /// Cycle counter for outputting sound data to the audio queue at the proper rate.
     queue_cycles: usize,
+
+    /// Debug features
+    /// Whether or not to mute in a specified channel
+    pub channel_1_muted: bool,
+    pub channel_2_muted: bool,
+    pub channel_3_muted: bool,
+    pub channel_4_muted: bool,
 }
 
 impl Audio {
@@ -66,6 +73,10 @@ impl Audio {
             channel_3_enabled: true,
             channel_2_enabled: true,
             channel_1_enabled: true,
+            channel_4_muted: false,
+            channel_3_muted: false,
+            channel_2_muted: false,
+            channel_1_muted: false,
         }
     }
 
@@ -145,43 +156,43 @@ impl Audio {
             return (0, 0);
         }
 
-        if self.channel_4_enabled {
+        if self.channel_4_enabled && !self.channel_4_muted {
             if self.selection & (1 << 7) != 0 {
                 left += channel4_val as u16;
             }
         }
-        if self.channel_3_enabled {
+        if self.channel_3_enabled && !self.channel_3_muted {
             if self.selection & (1 << 6) != 0 {
                 left += channel3_val as u16;
             }
         }
-        if self.channel_2_enabled {
+        if self.channel_2_enabled && !self.channel_2_muted {
             if self.selection & (1 << 5) != 0 {
                 left += channel2_val as u16;
             }
         }
-        if self.channel_1_enabled {
+        if self.channel_1_enabled && !self.channel_1_muted {
             if self.selection & (1 << 4) != 0 {
                 left += channel1_val as u16;
             }
         }
 
-        if self.channel_4_enabled {
+        if self.channel_4_enabled && !self.channel_4_muted {
             if self.selection & (1 << 3) != 0 {
                 right += channel4_val as u16;
             }
         }
-        if self.channel_3_enabled {
+        if self.channel_3_enabled && !self.channel_3_muted {
             if self.selection & (1 << 2) != 0 {
                 right += channel3_val as u16;
             }
         }
-        if self.channel_2_enabled {
+        if self.channel_2_enabled && !self.channel_2_muted {
             if self.selection & (1 << 1) != 0 {
                 right += channel2_val as u16;
             }
         }
-        if self.channel_1_enabled {
+        if self.channel_1_enabled && !self.channel_1_muted {
             if self.selection & 1 != 0 {
                 right += channel1_val as u16;
             }

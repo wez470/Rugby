@@ -134,7 +134,11 @@ fn run_emulator(
                             Keycode::Space => {
                                 paused = false;
                                 pause_next_frame = true;
-                            }
+                            },
+                            Keycode::F1 if !repeat => cpu.audio.channel_1_muted = !cpu.audio.channel_1_muted,
+                            Keycode::F2 if !repeat => cpu.audio.channel_2_muted = !cpu.audio.channel_2_muted,
+                            Keycode::F3 if !repeat => cpu.audio.channel_3_muted = !cpu.audio.channel_3_muted,
+                            Keycode::F4 if !repeat => cpu.audio.channel_4_muted = !cpu.audio.channel_4_muted,
                             _ => {}
                         }
                     }
