@@ -2,6 +2,8 @@ use super::{EnvelopeDirection, LENGTH_COUNTER_RATE_CYCLES};
 
 /// Max length for sound data
 const MAX_SOUND_LENGTH: u8 = 64;
+const CPU_CLOCK_RATE: usize = 4194304;
+const MAX_VOLUME: u8 = 15;
 
 #[derive(Clone)]
 pub struct Channel4 {
@@ -42,16 +44,19 @@ pub struct Channel4 {
     stop_after_sound_length: bool,
 
     /// Track the current step updating audio output
-    curr_index: usize,
+    curr_cycles: usize,
 
     /// Track current cycles for audio output
-    curr_cycles: usize,
+    curr_length_counter_cycles: usize,
 
     /// Track the current audio output value
     curr_output: u8,
 
     /// True if the channel is enabled
     enabled: bool,
+
+    /// Volume countdown. WIP copied from Sameboy
+    volume_countdown: u8,
 }
 
 impl Channel4 {
@@ -69,10 +74,11 @@ impl Channel4 {
             dividing_ratio: 0,
             restart: false,
             stop_after_sound_length: false,
-            curr_index: 0,
             curr_cycles: 0,
+            curr_length_counter_cycles: 0,
             curr_output: 0,
             enabled: false,
+            volume_countdown: 0,
         }
     }
 
@@ -80,21 +86,30 @@ impl Channel4 {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x20 => 0xFF, // This entire register is write-only
+            0x20 => {
+                println!("Read {:X}. val: {}", addr, 0xFF);
+                0xFF
+            }, // This entire register is write-only
             0x21 => {
-                self.volume << 4
+                let val = self.volume << 4
                     | (self.envelope_direction as u8) << 3
-                    | self.envelope_sweeps
+                    | self.envelope_sweeps;
+                println!("Read {:X}. val: {}", addr, val);
+                val
             },
             0x22 => {
-                self.shift_clock_frequency << 4
+                let val = self.shift_clock_frequency << 4
                     | self.counter_step << 3
-                    | self.dividing_ratio
+                    | self.dividing_ratio;
+                println!("Read {:X}. val: {}", addr, val);
+                val
             },
             0x23 => {
-                0b10111111 // These bits are unused or write-only
+                let val = 0b10111111 // These bits are unused or write-only
                     | (self.restart as u8) << 7
-                    | (self.stop_after_sound_length as u8) << 6
+                    | (self.stop_after_sound_length as u8) << 6;
+                println!("Read {:X}. val: {}", addr, val);
+                val
             },
             _ => panic!("Invalid read address for audio channel 4"),
         }
@@ -103,18 +118,31 @@ impl Channel4 {
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
             0x20 => {
-                self.length = val & 0b0011_1111;
+                // self.length = val & 0b0011_1111;
+                self.length = 63 & 0b0011_1111;
                 self.length_counter = MAX_SOUND_LENGTH - self.length;
+                // println!("Write NR41. Value: {}", val);
             },
             0x21 => {
-                self.envelope_sweeps = val & 0b0111;
-                self.envelope_direction = EnvelopeDirection::from((val >> 3) & 1);
-                self.volume = val >> 4;
+                if self.envelope_sweeps != 0 && (val & 0b0111) == 0 {
+                    // envelope disabled
+                    self.volume_countdown = 0;
+                }
+                if (val & 0b1111_1000) == 0 {
+                    // disables DAC
+                    self.enabled = false;
+                } else if self.enabled {
+                    self.envelope_sweeps = val & 0b0111;
+                    self.envelope_direction = EnvelopeDirection::from((val >> 3) & 1);
+                    self.volume = val >> 4;
+                }
+                // println!("Write NR42. Value: {}", val);
             },
             0x22 => {
                 self.dividing_ratio = val & 0b0111;
                 self.counter_step = (val >> 3) & 1;
                 self.shift_clock_frequency = val >> 4;
+                // println!("Write NR43. Value: {}", val);
             },
             0x23 => {
                 self.restart = (val >> 7) & 1 == 1;
@@ -134,6 +162,70 @@ impl Channel4 {
                     }
                 }
                 self.length_counter_enabled = self.restart;
+                // println!("Write NR44. Value: {}", val);
+
+                // SAMEBOY NR44 WRITE CODE
+                //
+                // if (value & 0x80) {
+                //     gb->apu.noise_channel.sample_countdown = (gb->apu.noise_channel.sample_length) * 2 + 6 - gb->apu.lf_div;
+                //
+                //     /* I'm COMPLETELY unsure about this logic, but it passes all relevant tests.
+                //        See comment in NR43. */
+                //     if ((gb->io_registers[GB_IO_NR43] & 7) && (gb->apu.noise_channel.alignment & 2) == 0) {
+                //         if ((gb->io_registers[GB_IO_NR43] & 7) == 1) {
+                //             gb->apu.noise_channel.sample_countdown += 2;
+                //         }
+                //         else {
+                //             gb->apu.noise_channel.sample_countdown -= 2;
+                //         }
+                //     }
+                //     if (gb->apu.is_active[GB_NOISE]) {
+                //         gb->apu.noise_channel.sample_countdown += 2;
+                //     }
+                //
+                //     gb->apu.noise_channel.current_volume = gb->io_registers[GB_IO_NR42] >> 4;
+                //
+                //     /* The volume changes caused by NRX4 sound start take effect instantly (i.e. the effect the previously
+                //      started sound). The playback itself is not instant which is why we don't update the sample for other
+                //      cases. */
+                //     if (gb->apu.is_active[GB_NOISE]) {
+                //         update_sample(gb, GB_NOISE,
+                //                       gb->apu.current_lfsr_sample ?
+                //         gb->apu.noise_channel.current_volume : 0,
+                //         0);
+                //     }
+                //     gb->apu.noise_channel.lfsr = 0;
+                //     gb->apu.current_lfsr_sample = false;
+                //     gb->apu.noise_channel.volume_countdown = gb->io_registers[GB_IO_NR42] & 7;
+                //
+                //     if (!gb->apu.is_active[GB_NOISE] && (gb->io_registers[GB_IO_NR42] & 0xF8) != 0) {
+                //         gb->apu.is_active[GB_NOISE] = true;
+                //         update_sample(gb, GB_NOISE, 0, 0);
+                //     }
+                //
+                //     if (gb->apu.noise_channel.pulse_length == 0) {
+                //         gb->apu.noise_channel.pulse_length = 0x40;
+                //         gb->apu.noise_channel.length_enabled = false;
+                //     }
+                // }
+                //
+                // /* APU glitch - if length is enabled while the DIV-divider's LSB is 1, tick the length once. */
+                // if ((value & 0x40) &&
+                //     !gb->apu.noise_channel.length_enabled &&
+                //     (gb->apu.div_divider & 1) &&
+                //     gb->apu.noise_channel.pulse_length) {
+                //     gb->apu.noise_channel.pulse_length--;
+                //     if (gb->apu.noise_channel.pulse_length == 0) {
+                //         if (value & 0x80) {
+                //             gb->apu.noise_channel.pulse_length = 0x3F;
+                //         }
+                //         else {
+                //             gb->apu.is_active[GB_NOISE] = false;
+                //             update_sample(gb, GB_NOISE, 0, 0);
+                //         }
+                //     }
+                // }
+                // gb->apu.noise_channel.length_enabled = value & 0x40;
             },
             _ => panic!("Invalid write address for audio channel 4"),
         }
@@ -142,33 +234,24 @@ impl Channel4 {
     pub fn step(&mut self, cycles: usize) -> f32 {
         if !self.enabled { return 0.0/0.0; }
 
-        self.curr_index += 1;
-        let out_freq = self.get_divisor(self.dividing_ratio) << self.shift_clock_frequency as usize;
-        if self.curr_index >= out_freq {
-            self.curr_index %= out_freq;
+        self.curr_cycles += cycles;
+        // Frequency formula describe here: http://bgb.bircd.org/pandocs.htm#soundcontroller
+        let out_freq = if self.dividing_ratio > 0 {
+            524288 / (self.dividing_ratio as usize * (1 << (1 + self.shift_clock_frequency) as usize))
+        } else {
+            524288 / (0.5 * (1 << (1 + self.shift_clock_frequency) as usize) as f64) as usize
+        };
+        if self.curr_cycles >= (CPU_CLOCK_RATE / out_freq)  {
+            self.curr_cycles %= CPU_CLOCK_RATE / out_freq;
             self.curr_output = self.get_next_output();
         }
 
         self.update_length_counter(cycles);
 
         if self.curr_output == 1 {
-            (self.volume as f32) * (1.0/15.0)
+            (self.volume as f32) / MAX_VOLUME as f32
         } else {
-            -(self.volume as f32) * (1.0/15.0)
-        }
-    }
-
-    fn get_divisor(&self, dividing_ratio: u8) -> usize {
-        match dividing_ratio {
-            0 => 8,
-            1 => 16,
-            2 => 32,
-            3 => 48,
-            4 => 64,
-            5 => 80,
-            6 => 96,
-            7 => 112,
-            _ => panic!("Invalid dividing ratio"),
+            -(self.volume as f32) / MAX_VOLUME as f32
         }
     }
 
@@ -187,9 +270,9 @@ impl Channel4 {
     }
 
     fn update_length_counter(&mut self, cycles: usize) {
-        self.curr_cycles += cycles;
-        if self.curr_cycles >= LENGTH_COUNTER_RATE_CYCLES {
-            self.curr_cycles %= LENGTH_COUNTER_RATE_CYCLES;
+        self.curr_length_counter_cycles += cycles;
+        if self.curr_length_counter_cycles >= LENGTH_COUNTER_RATE_CYCLES {
+            self.curr_length_counter_cycles %= LENGTH_COUNTER_RATE_CYCLES;
             if self.length_counter > 0 && self.length_counter_enabled {
                 self.length_counter -= 1;
                 if self.length_counter == 0 {

@@ -135,8 +135,7 @@ impl Audio {
 
         let channel1_val = self.channel1.step(cycles);
         let channel2_val = self.channel2.step(cycles);
-        // let channel3_val = convert(self.channel3.step(cycles));
-        let channel3_val = 0.0;
+        let channel3_val = convert(self.channel3.step(cycles));
         let channel4_val = self.channel4.step(cycles);
 
         let (mut left, mut right) = self.get_left_and_right_audio(channel1_val, channel2_val, channel3_val, channel4_val);
