@@ -1,8 +1,7 @@
 use enumflags2::BitFlags;
-use enumflags2_derive::EnumFlags;
 use crate::interrupts::Interrupt;
 
-#[derive(Copy, Clone, Debug, EnumFlags)]
+#[derive(BitFlags, Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum ButtonKey {
     A      = 1 << 0,
@@ -11,7 +10,7 @@ pub enum ButtonKey {
     Start  = 1 << 3,
 }
 
-#[derive(Copy, Clone, Debug, EnumFlags)]
+#[derive(BitFlags, Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum DirKey {
     Right = 1 << 0,

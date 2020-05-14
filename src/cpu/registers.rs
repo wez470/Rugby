@@ -1,5 +1,4 @@
 use enumflags2::BitFlags;
-use enumflags2_derive::EnumFlags;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub enum Reg8 { A, B, C, D, E, H, L }
@@ -9,7 +8,7 @@ pub enum Reg8 { A, B, C, D, E, H, L }
 pub enum Reg16 { AF, BC, DE, HL, SP, PC }
 
 /// Game Boy CPU flags, as stored in `F`, the flags register.
-#[derive(Clone, Copy, Debug, EnumFlags)]
+#[derive(BitFlags, Clone, Copy, Debug)]
 #[repr(u8)]
 pub enum Flag {
     Carry     = 1 << 4,

@@ -1,5 +1,4 @@
 use enumflags2::BitFlags;
-use enumflags2_derive::EnumFlags;
 use failure_derive::Fail;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -56,7 +55,7 @@ pub enum CartType {
     Unknown(u8),
 }
 
-#[derive(Copy, Clone, Debug, EnumFlags)]
+#[derive(BitFlags, Copy, Clone, Debug)]
 #[repr(u8)]
 pub enum CartHardware {
     Ram           = 1 << 0,

@@ -1,6 +1,6 @@
-use enumflags2_derive::EnumFlags;
+use enumflags2::BitFlags;
 
-#[derive(Copy, Clone, Debug, EnumFlags, Eq, PartialEq)]
+#[derive(BitFlags, Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
 pub enum Interrupt {
     VBlank = 1 << 0,

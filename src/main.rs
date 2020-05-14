@@ -78,7 +78,7 @@ struct InfoOpts {
 fn main() -> Result<(), failure::Error> {
     let env = env_logger::Env::new().filter("RUGBY_LOG").write_style("RUGBY_LOG_STYLE");
     env_logger::Builder::from_env(env)
-        .default_format_timestamp(false)
+        .format_timestamp(None)
         .init();
 
     match &Opts::from_args() {
