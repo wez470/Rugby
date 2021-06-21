@@ -9,6 +9,10 @@ use channel3::Channel3;
 use channel4::Channel4;
 use log::warn;
 
+/// CPU cycles per second for the Gamboy
+/// TODO(wcarlson): move this somewhere else?
+const CYCLES_PER_SECOND: usize = 4194304;
+
 /// Number of samples in our audio buffer
 pub const SAMPLE_BUFFER_SIZE: usize = 1024;
 
@@ -211,7 +215,7 @@ impl Audio {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum EnvelopeDirection {
     Decrease = 0,
     Increase = 1,
