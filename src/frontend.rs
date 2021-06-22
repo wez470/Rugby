@@ -67,7 +67,7 @@ pub fn start_frontend(cpu: &mut Cpu) {
 
 fn run_emulator(
     cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut EventPump, sdl_fps: &mut FPSManager,
-    sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, audio_queue: &mut AudioQueue<u8>,
+    sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, audio_queue: &mut AudioQueue<f32>,
     debug: bool, num_instrs: Option<usize>, watches: &HashSet<Watch>
 ) {
     let mut paused = false;

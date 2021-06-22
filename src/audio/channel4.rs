@@ -22,7 +22,7 @@ pub struct Channel4 {
     envelope_direction: EnvelopeDirection,
 
     /// Number of envelope sweeps. Bits 0-2 of 0xFF21
-    envelope_sweeps: u8,
+    envelope_sweep: u8,
 
     /// Shift clock frequency. Bits 4-7 of 0xFF22
     shift_clock_frequency: u8,
@@ -66,7 +66,7 @@ impl Channel4 {
             initial_volume: 0,
             curr_volume: 0,
             envelope_direction: EnvelopeDirection::Decrease,
-            envelope_sweeps: 0,
+            envelope_sweep: 0,
             shift_clock_frequency: 0,
             counter_step: 0,
             linear_feedback_shift_register: 0b0111_1111_1111_1111,
@@ -87,7 +87,7 @@ impl Channel4 {
             0x21 => {
                 self.initial_volume << 4
                     | (self.envelope_direction as u8) << 3
-                    | self.envelope_sweeps
+                    | self.envelope_sweep
             },
             0x22 => {
                 self.shift_clock_frequency << 4
@@ -109,7 +109,7 @@ impl Channel4 {
                 self.length_counter = MAX_SOUND_LENGTH - (val & 0b0011_1111);
             },
             0x21 => {
-                self.envelope_sweeps = val & 0b0111;
+                self.envelope_sweep = val & 0b0111;
                 self.envelope_direction = EnvelopeDirection::from((val >> 3) & 1);
                 self.initial_volume = val >> 4;
             },
@@ -124,9 +124,6 @@ impl Channel4 {
 
                 if self.length_counter == 0 && self.restart {
                     self.length_counter = 64;
-                }
-                if self.length_counter_enabled {
-                    self.length_counter = 64
                 }
                 if self.restart {
                     self.linear_feedback_shift_register = 0b0111_1111_1111_1111;
@@ -204,12 +201,12 @@ impl Channel4 {
     fn update_volume(&mut self, cycles: usize) {
         if self.curr_volume == 0 && self.envelope_direction == EnvelopeDirection::Decrease ||
             self.curr_volume == 15 && self.envelope_direction == EnvelopeDirection::Increase ||
-            self.envelope_sweeps == 0 {
+            self.envelope_sweep == 0 {
             return
         }
         self.curr_volume_cycles += cycles;
-        if self.curr_volume_cycles >= self.envelope_sweeps as usize * CYCLES_PER_SECOND / 64 {
-            self.curr_volume_cycles %= self.envelope_sweeps as usize * CYCLES_PER_SECOND / 64;
+        if self.curr_volume_cycles >= self.envelope_sweep as usize * CYCLES_PER_SECOND / 64 {
+            self.curr_volume_cycles %= self.envelope_sweep as usize * CYCLES_PER_SECOND / 64;
             let vol_adjustment = if self.envelope_direction == EnvelopeDirection::Increase { 1 } else { -1 };
             self.curr_volume = (self.curr_volume as i32 + vol_adjustment) as u8;
         }

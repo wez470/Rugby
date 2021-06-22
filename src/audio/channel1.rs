@@ -6,7 +6,14 @@ const MAX_SOUND_LENGTH: u8 = 64;
 
 #[derive(Clone)]
 pub struct Channel1 {
-    // TODO(wcarlson): Sweep register
+    /// Sweep time
+    freq_sweep_time: u8,
+
+    /// Direction of frequency shift. bit 3 of 0xFF10. 0 is increase, 1 is decrease
+    freq_direction: u8,
+
+    /// The number of sweep shift. bits 2-0 of 0xFF10
+    freq_sweep: u8,
 
     /// Wave pattern duty. Bits 6-7 of 0xFF11
     wave_pattern: u8,
@@ -28,7 +35,7 @@ pub struct Channel1 {
     envelope_direction: EnvelopeDirection,
 
     /// Number of envelope sweeps. Bits 0-2 of 0xFF12
-    envelope_sweeps: u8,
+    envelope_sweep: u8,
 
     /// Channel frequency. Lower bits are bits 0-7 of 0xFF13. Higher bits are 0-2 of 0xFF14
     /// Actual frequency is given by `(2048 - frequency) * 4`. http://gbdev.gg8.se/wiki/articles/Gameboy_sound_hardware
@@ -63,12 +70,15 @@ impl Channel1 {
     pub fn new() -> Channel1 {
         Channel1 {
             wave_pattern: 0b10,
+            freq_sweep: 0,
+            freq_direction: 0,
+            freq_sweep_time: 0,
             length_counter: MAX_SOUND_LENGTH,
             length_counter_enabled: true,
             initial_volume: 0b11111,
             curr_volume: 0, // TODO: check what this should be for channels 1,2,4
             envelope_direction: EnvelopeDirection::Decrease,
-            envelope_sweeps: 0b11,
+            envelope_sweep: 0b11,
             frequency: 0,
             restart: false,
             stop_after_sound_length: false,
@@ -83,15 +93,16 @@ impl Channel1 {
 
     pub fn read_reg(&self, addr: u8) -> u8 {
         match addr {
-            0x10 => {
-                warn!("unimplemented read from channel 1 audio sweep register");
-                0x80
+            0x10 => { // TODO: what should bit 7 be on read?
+                self.freq_sweep_time << 4
+                    | self.freq_direction << 3
+                    | self.freq_sweep
             }
             0x11 => (self.wave_pattern << 6) | 0b0011_1111, // Low bits are write-only
             0x12 => {
                 self.initial_volume << 4
                     | (self.envelope_direction as u8) << 3
-                    | self.envelope_sweeps
+                    | self.envelope_sweep
             },
             0x13 => 0xFF, // This register is entirely write-only
             0x14 => {
@@ -104,13 +115,17 @@ impl Channel1 {
 
     pub fn write_reg(&mut self, addr: u8, val: u8) {
         match addr {
-            0x10 => warn!("unimplemented write to channel 1 audio sweep register"),
+            0x10 => {
+                self.freq_sweep_time = val >> 4 & 0b0111;
+                self.freq_direction = (val >> 3) & 1;
+                self.freq_sweep = val & 0b0111;
+            },
             0x11 => {
                 self.wave_pattern = val >> 6;
                 self.length_counter = MAX_SOUND_LENGTH - (val & 0b0011_1111);
             },
             0x12 => {
-                self.envelope_sweeps = val & 0b0111;
+                self.envelope_sweep = val & 0b0111;
                 self.envelope_direction = EnvelopeDirection::from((val >> 3) & 1);
                 self.initial_volume = val >> 4;
             },
@@ -127,9 +142,6 @@ impl Channel1 {
                 if self.length_counter == 0 && self.restart {
                     self.length_counter = MAX_SOUND_LENGTH;
                 }
-                // if self.length_counter_enabled {
-                //     self.length_counter = MAX_SOUND_LENGTH
-                // }
                 if self.restart {
                     self.enabled = true;
                     self.curr_volume = self.initial_volume;
@@ -188,12 +200,12 @@ impl Channel1 {
     fn update_volume(&mut self, cycles: usize) {
         if self.curr_volume == 0 && self.envelope_direction == EnvelopeDirection::Decrease ||
             self.curr_volume == 15 && self.envelope_direction == EnvelopeDirection::Increase ||
-            self.envelope_sweeps == 0 {
+            self.envelope_sweep == 0 {
             return
         }
         self.curr_volume_cycles += cycles;
-        if self.curr_volume_cycles >= self.envelope_sweeps as usize * CYCLES_PER_SECOND / 64 {
-            self.curr_volume_cycles %= self.envelope_sweeps as usize * CYCLES_PER_SECOND / 64;
+        if self.curr_volume_cycles >= self.envelope_sweep as usize * CYCLES_PER_SECOND / 64 {
+            self.curr_volume_cycles %= self.envelope_sweep as usize * CYCLES_PER_SECOND / 64;
             let vol_adjustment = if self.envelope_direction == EnvelopeDirection::Increase { 1 } else { -1 };
             self.curr_volume = (self.curr_volume as i32 + vol_adjustment) as u8;
         }
