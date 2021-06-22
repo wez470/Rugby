@@ -9,6 +9,10 @@ use channel3::Channel3;
 use channel4::Channel4;
 use log::warn;
 
+/// CPU cycles per second for the Gamboy
+/// TODO(wcarlson): move this somewhere else?
+const CYCLES_PER_SECOND: usize = 4194304;
+
 /// Number of samples in our audio buffer
 pub const SAMPLE_BUFFER_SIZE: usize = 1024;
 
@@ -136,17 +140,18 @@ impl Audio {
         }
     }
 
-    pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<u8>) {
+    pub fn step(&mut self, cycles: usize, audio_queue: &mut sdl2::audio::AudioQueue<f32>) {
         let channel1_val = self.channel1.step(cycles);
         let channel2_val = self.channel2.step(cycles);
         let channel3_val = self.channel3.step(cycles);
         let channel4_val = self.channel4.step(cycles);
 
-        let (mut left, mut right) = self.get_left_and_right_audio(channel1_val, channel2_val, channel3_val, channel4_val);
-        left *= self.left_volume;
-        right *= self.right_volume;
+        let (left, right) = self.get_left_and_right_audio(channel1_val, channel2_val, channel3_val, channel4_val);
+        // TODO: revisit master volume
+        let left_float = gb_sample_to_float(left) * (self.left_volume as f32 + 1.0) / 8.0;
+        let right_float = gb_sample_to_float(right) * (self.right_volume as f32 + 1.0) / 8.0;
 
-        self.output_to_queue(left, right, audio_queue, cycles);
+        self.output_to_queue(left_float, right_float, audio_queue, cycles);
     }
 
     fn get_left_and_right_audio(&self, channel1_val: u8, channel2_val: u8, channel3_val: u8, channel4_val: u8) -> (u8, u8) {
@@ -201,7 +206,7 @@ impl Audio {
         ((left / 4) as u8, (right / 4) as u8)
     }
 
-    fn output_to_queue(&mut self, left: u8, right: u8, queue: &mut sdl2::audio::AudioQueue<u8>, cycles: usize) {
+    fn output_to_queue(&mut self, left: f32, right: f32, queue: &mut sdl2::audio::AudioQueue<f32>, cycles: usize) {
         self.queue_cycles += cycles;
         if self.queue_cycles >= SAMPLE_RATE_CYCLES {
             self.queue_cycles %= SAMPLE_RATE_CYCLES;
@@ -211,7 +216,7 @@ impl Audio {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum EnvelopeDirection {
     Decrease = 0,
     Increase = 1,
@@ -225,4 +230,9 @@ impl std::convert::From<u8> for EnvelopeDirection {
             _ => panic!("Invalid u8 value for envelope direction")
         }
     }
+}
+
+// Converts the standard 0 to 15 (4-bit) GB sample to a range of -1.0 to 1.0
+fn gb_sample_to_float(s: u8) -> f32 {
+    -1.0 + (s as f32) * (2.0/15.0)
 }

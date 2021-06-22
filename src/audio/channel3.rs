@@ -156,7 +156,7 @@ impl Channel3 {
         self.curr_length_counter_cycles += cycles;
         if self.curr_length_counter_cycles >= LENGTH_COUNTER_RATE_CYCLES {
             self.curr_length_counter_cycles %= LENGTH_COUNTER_RATE_CYCLES;
-            if self.length_counter > 0 && self.length_counter_enabled {
+            if self.length_counter > 0 && self.stop_after_sound_length {
                 self.length_counter -= 1;
                 if self.length_counter == 0 {
                     self.enabled = false;
