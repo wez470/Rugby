@@ -129,6 +129,7 @@ impl Channel4 {
                     self.linear_feedback_shift_register = 0b0111_1111_1111_1111;
                     self.enabled = true;
                     self.curr_volume = self.initial_volume;
+                    self.curr_volume_cycles = 0;
                     if self.stop_after_sound_length {
                         self.length_counter = 64
                     }

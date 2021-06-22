@@ -122,6 +122,7 @@ impl Channel2 {
                 if self.restart {
                     self.enabled = true;
                     self.curr_volume = self.initial_volume;
+                    self.curr_volume_cycles = 0;
                     if self.stop_after_sound_length {
                         self.length_counter = MAX_SOUND_LENGTH
                     }

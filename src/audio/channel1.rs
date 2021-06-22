@@ -1,4 +1,5 @@
 use log::warn;
+use std::cmp;
 use super::{CYCLES_PER_SECOND, LENGTH_COUNTER_RATE_CYCLES, EnvelopeDirection};
 
 /// Max length for sound data
@@ -53,6 +54,9 @@ pub struct Channel1 {
     /// Track current cycles for volume envelope sweep
     curr_volume_cycles: usize,
 
+    /// Track current cycles for frequency sweep
+    curr_freq_cycles: usize,
+
     /// Track current cycles for length counter
     curr_length_counter_cycles: usize,
 
@@ -84,6 +88,7 @@ impl Channel1 {
             stop_after_sound_length: false,
             curr_cycles: 0,
             curr_volume_cycles: 0,
+            curr_freq_cycles: 0,
             curr_length_counter_cycles: 0,
             curr_index: 0,
             curr_output: 0,
@@ -145,6 +150,8 @@ impl Channel1 {
                 if self.restart {
                     self.enabled = true;
                     self.curr_volume = self.initial_volume;
+                    self.curr_volume_cycles = 0;
+                    self.curr_freq_cycles = 0;
                     if self.stop_after_sound_length {
                         self.length_counter = MAX_SOUND_LENGTH
                     }
@@ -170,6 +177,7 @@ impl Channel1 {
 
         self.update_length_counter(cycles);
         self.update_volume(cycles);
+        self.update_frequency(cycles);
 
         self.curr_output * self.curr_volume
     }
@@ -208,6 +216,21 @@ impl Channel1 {
             self.curr_volume_cycles %= self.envelope_sweep as usize * CYCLES_PER_SECOND / 64;
             let vol_adjustment = if self.envelope_direction == EnvelopeDirection::Increase { 1 } else { -1 };
             self.curr_volume = (self.curr_volume as i32 + vol_adjustment) as u8;
+        }
+    }
+
+    fn update_frequency(&mut self, cycles: usize) {
+        if self.freq_sweep_time == 0 {
+            return
+        }
+        self.curr_freq_cycles += cycles;
+        if self.curr_freq_cycles >= self.freq_sweep_time as usize * CYCLES_PER_SECOND / 128 {
+            self.curr_freq_cycles %= self.freq_sweep_time as usize * CYCLES_PER_SECOND / 128;
+            // new freq given by X(t) = X(t-1) +/- X(t-1)/2^n. https://gbdev.io/pandocs/Sound_Controller.html#sound-channel-1---tone--sweep
+            // X(t) is the new freq and X(t-1) is the current freq. n is the freq_sweep. Direction decides whether it's plus or minus
+            let direction: i32 = if self.freq_direction == 0 { 1 } else { -1 };
+            let freq_i32: i32 = self.frequency as i32;
+            self.frequency = cmp::max(0, cmp::min(2047, freq_i32 + direction * (freq_i32 >> self.freq_sweep as i32))) as u16;
         }
     }
 }
