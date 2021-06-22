@@ -23,6 +23,6 @@ right       = d
 pause       = p
 ```
 
-<img src="https://i.imgur.com/u30jZ22.png" alt="Rugby Gameplay" width="300"/>
+<img src="https://media3.giphy.com/media/zsPv55feI0PdeIEDvs/giphy.gif?cid=790b76116f660dc27e73302163eb5d954264f4c3b07d9aaf&rid=giphy.gif&ct=g" alt="Rugby Gameplay" width="300"/>
 
 <img src="https://i.imgur.com/iViGdsG.png" alt="Rugby Debugger" width="600">
