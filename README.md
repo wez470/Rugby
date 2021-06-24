@@ -21,7 +21,7 @@ left        = a
 down        = s
 right       = d
 pause       = p
-1           = save (This is a battery save, not a snapshot. save-file needs to be provided to use.)
+1           = save (this is a battery save, not a snapshot. save-file needs to be provided to use.)
 ```
 
 <img src="https://media3.giphy.com/media/zsPv55feI0PdeIEDvs/giphy.gif?cid=790b76116f660dc27e73302163eb5d954264f4c3b07d9aaf&rid=giphy.gif&ct=g" alt="Rugby Gameplay" width="300"/>
