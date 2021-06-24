@@ -6,6 +6,7 @@ use crate::interrupts::Interrupt;
 use crate::joypad::Joypad;
 use crate::timer::Timer;
 use std::collections::HashSet;
+use std::path::PathBuf;
 use sdl2::audio::AudioQueue;
 use enumflags2::BitFlags;
 use log::{debug, info, log_enabled, trace, warn};
@@ -834,6 +835,12 @@ impl Cpu {
 
     pub fn read_mem_debug(&self, addr: u16) -> u8 {
         self.read_mem(addr)
+    }
+
+    pub fn save_cart_ram(&self, save_file: Option<PathBuf>) {
+        if let Some(file) = save_file {
+            std::fs::write(file, self.cart.ram());
+        }
     }
 
     fn read_mem(&self, addr: u16) -> u8 {

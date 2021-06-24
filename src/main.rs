@@ -114,7 +114,7 @@ fn run(opts: &RunOpts) -> Result<(), failure::Error> {
             .context("Failed to parse WLA DX symbol file")?);
     }
 
-    start_frontend(&mut cpu);
+    start_frontend(&mut cpu, opts.save_path.clone());
 
     Ok(())
 }

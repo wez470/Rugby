@@ -19,6 +19,7 @@ use linefeed::{Interface, ReadResult};
 use hex;
 use hex::FromHex;
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 const CYCLES_PER_FRAME: usize = 69905;
 const WINDOW_SCALE: usize = 5;
@@ -32,7 +33,7 @@ const GAME_BOY_COLORS: [sdl2::pixels::Color; 4] = [
     sdl2::pixels::Color { r: 15,  g: 56,  b: 15, a: 0xFF },
 ];
 
-pub fn start_frontend(cpu: &mut Cpu) {
+pub fn start_frontend(cpu: &mut Cpu, save_file: Option<PathBuf>) {
     let sdl = sdl2::init().expect("Failed to initialize SDL");
 
     let sdl_video = sdl.video().expect("Failed to access SDL video subsystem");
@@ -62,13 +63,25 @@ pub fn start_frontend(cpu: &mut Cpu) {
     let mut audio_queue = sdl_audio.open_queue(None, &desired_spec).expect("Failed to open audio queue");
     audio_queue.resume();
 
-    run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, false, None, &HashSet::new())
+    run_emulator(
+        cpu,
+        &mut canvas,
+		&mut sdl_events,
+		&mut sdl_fps,
+		&sdl_controllers,
+		&mut controllers,
+		&mut audio_queue,
+		false,
+		None,
+		&HashSet::new(),
+        save_file.clone(),
+    )
 }
 
 fn run_emulator(
     cpu: &mut Cpu, canvas: &mut Canvas<Window>, sdl_events: &mut EventPump, sdl_fps: &mut FPSManager,
     sdl_controllers: &GameControllerSubsystem, controllers: &mut Vec<GameController>, audio_queue: &mut AudioQueue<f32>,
-    debug: bool, num_instrs: Option<usize>, watches: &HashSet<Watch>
+    debug: bool, num_instrs: Option<usize>, watches: &HashSet<Watch>, save_file: Option<PathBuf>,
 ) {
     let mut paused = false;
     let mut pause_next_frame = false;
@@ -139,6 +152,7 @@ fn run_emulator(
                             Keycode::F2 if !repeat => cpu.audio.channel_2_muted = !cpu.audio.channel_2_muted,
                             Keycode::F3 if !repeat => cpu.audio.channel_3_muted = !cpu.audio.channel_3_muted,
                             Keycode::F4 if !repeat => cpu.audio.channel_4_muted = !cpu.audio.channel_4_muted,
+                            Keycode::Num1 if !repeat => cpu.save_cart_ram(save_file.clone()),
                             _ => {}
                         }
                     }
@@ -288,11 +302,11 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
                 println!("{}", COMMANDS);
             }
             "p" => {
-                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, true, None, &watches)
+                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, true, None, &watches, None)
             }
             "s" => {
                 let n= if let Some(x) = args.parse::<usize>().ok() { x } else { 1 };
-                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, true, Some(n), &watches)
+                run_emulator(cpu, &mut canvas, &mut sdl_events, &mut sdl_fps, &sdl_controllers, &mut controllers, &mut audio_queue, true, Some(n), &watches, None)
             }
             "rr" => {
                 cpu.print_regs();
