@@ -55,8 +55,12 @@ pub fn start_frontend(cpu: &mut Cpu, save_file: Option<PathBuf>) {
     let mut controllers = vec![];
 
     let sdl_audio = sdl.audio().expect("Failed to access SDL audio subsystem");
+    // We would use 44100Hz, but the closest to that frequency we can output is every 95 clock cycles, which is a little to fast
+    // (4194304 / 44100 ~= 95.1). This causes us to output audio to the queue to fast for the speed at which it's being played and
+    // drifts the audio out of sync over time. 44150Hz is much closer to 95 clock cycles and makes the out of sync issue happen
+    // much slower
     let desired_spec = AudioSpecDesired {
-        freq: Some(44100),
+        freq: Some(44150),
         channels: Some(2), // Stereo
         samples: Some(SAMPLE_BUFFER_SIZE as u16),
     };
