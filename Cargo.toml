@@ -16,12 +16,11 @@ failure_derive = "0.1.8"
 tabwriter = "1.2.1"
 structopt = "0.3.14"
 enumflags2 = "0.6.4"
-linefeed = "0.6.0"
 hex = "0.4.2"
 
 [dependencies.sdl2]
 version = "0.34.0"
-features = ["gfx"]
+features = ["gfx", "use-pkgconfig"]
 
 [dev-dependencies]
 quickcheck = "0.9.2"

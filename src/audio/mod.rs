@@ -16,8 +16,8 @@ const CYCLES_PER_SECOND: usize = 4194304;
 /// Number of samples in our audio buffer
 pub const SAMPLE_BUFFER_SIZE: usize = 1024;
 
-/// Number of cycles between samples to achieve at rate of 44100Hz
-const SAMPLE_RATE_CYCLES: usize = 95;
+/// Output sample rate (Hz), matched to the SDL audio device
+const SAMPLE_FREQ: usize = 44100;
 
 /// Number of cycles between length counter updates to achieve 256Hz
 const LENGTH_COUNTER_RATE_CYCLES: usize = 16383;
@@ -48,8 +48,8 @@ pub struct Audio {
     channel_2_enabled: bool,
     /// Sound 1 enabled. Bit 0 at 0xFF26. Read only
     channel_1_enabled: bool,
-    /// Cycle counter for outputting sound data to the audio queue at the proper rate.
-    queue_cycles: usize,
+    /// Fractional accumulator for emitting samples at SAMPLE_FREQ Hz.
+    sample_accum: usize,
 
     /// Debug features
     /// Whether or not to mute in a specified channel
@@ -66,7 +66,7 @@ impl Audio {
             channel2: Channel2::new(),
             channel3: Channel3::new(),
             channel4: Channel4::new(),
-            queue_cycles: 0,
+            sample_accum: 0,
             output_vin_left: false,
             left_volume: 7,
             output_vin_right: false,
@@ -207,10 +207,9 @@ impl Audio {
     }
 
     fn output_to_queue(&mut self, left: f32, right: f32, queue: &mut sdl2::audio::AudioQueue<f32>, cycles: usize) {
-        self.queue_cycles += cycles;
-        if self.queue_cycles >= SAMPLE_RATE_CYCLES {
-            self.queue_cycles %= SAMPLE_RATE_CYCLES;
-            // Need to verify that this is the right way to do left and right audio
+        self.sample_accum += cycles * SAMPLE_FREQ;
+        while self.sample_accum >= CYCLES_PER_SECOND {
+            self.sample_accum -= CYCLES_PER_SECOND;
             queue.queue(&[left, right]);
         }
     }
