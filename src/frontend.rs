@@ -15,15 +15,19 @@ use sdl2::video::Window;
 use sdl2::gfx::framerate::FPSManager;
 use sdl2::GameControllerSubsystem;
 use sdl2::controller::GameController;
-use linefeed::{Interface, ReadResult};
 use hex;
+use std::io::{self, Write};
 use hex::FromHex;
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::time::Duration;
 
 const CYCLES_PER_FRAME: usize = 69905;
 const WINDOW_SCALE: usize = 5;
 const BASE_FPS: u32 = 60;
+const SAMPLE_FREQ: u32 = 44100;
+/// f32 stereo => 8 bytes per sample-pair; keep ~3 frames buffered
+const AUDIO_QUEUE_TARGET_BYTES: u32 = (SAMPLE_FREQ * 8 / BASE_FPS) * 3;
 
 /// The four colors of the original Game Boy screen, from lightest to darkest, in RGB.
 const GAME_BOY_COLORS: [sdl2::pixels::Color; 4] = [
@@ -55,12 +59,8 @@ pub fn start_frontend(cpu: &mut Cpu, save_file: Option<PathBuf>) {
     let mut controllers = vec![];
 
     let sdl_audio = sdl.audio().expect("Failed to access SDL audio subsystem");
-    // We would use 44100Hz, but the closest to that frequency we can output is every 95 clock cycles, which is a little too fast
-    // (4194304 / 44100 ~= 95.1). This causes Rugby to output audio to the queue too fast for the speed at which it's being played and
-    // drifts the audio out of sync over time. 44150Hz is closer to 95 clock cycles and makes the out of sync issue happen
-    // much slower
     let desired_spec = AudioSpecDesired {
-        freq: Some(44150),
+        freq: Some(SAMPLE_FREQ as i32),
         channels: Some(2), // Stereo
         samples: Some(SAMPLE_BUFFER_SIZE as u16),
     };
@@ -246,7 +246,13 @@ fn run_emulator(
             },
         }
 
-        sdl_fps.delay();
+        if paused {
+            sdl_fps.delay();
+        } else if num_instrs.is_none() {
+            while audio_queue.size() > AUDIO_QUEUE_TARGET_BYTES {
+                std::thread::sleep(Duration::from_millis(1));
+            }
+        }
     }
 }
 
@@ -286,19 +292,25 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
 
     let sdl_audio = sdl.audio().expect("Failed to access SDL audio subsystem");
     let desired_spec = AudioSpecDesired {
-        freq: Some(44100),
-        channels: Some(1), // mono
+        freq: Some(SAMPLE_FREQ as i32),
+        channels: Some(2),
         samples: Some(SAMPLE_BUFFER_SIZE as u16),
     };
     let mut audio_queue = sdl_audio.open_queue(None, &desired_spec).expect("Failed to open audio queue");
     audio_queue.resume();
 
-    let reader = Interface::new("rugby-interactive-debugger").expect("Failed to create interactive terminal");
     println!("\nWelcome to the rugby debugger! Press h for help");
-    reader.set_prompt("rugby> ").expect("Failed to set terminal prompt");
     let mut watches = HashSet::new();
+    let stdin = io::stdin();
+    let mut input = String::new();
 
-    while let Some(ReadResult::Input(input)) = reader.read_line().ok() {
+    loop {
+        print!("rugby> ");
+        io::stdout().flush().expect("Failed to flush stdout");
+        input.clear();
+        if stdin.read_line(&mut input).expect("Failed to read stdin") == 0 {
+            break;
+        }
         let (cmd, args) = split_first_word(&input);
 
         match cmd {
@@ -337,7 +349,7 @@ pub fn start_frontend_debug(cpu: &mut Cpu) {
                 println!("Happy debugging :)");
                 break
             }
-            _ => println!("unknown command: {:?}", input)
+            _ => println!("unknown command: {:?}", input.trim())
         }
     }
 }
