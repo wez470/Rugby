@@ -406,10 +406,19 @@ impl Gpu {
             }
         }
 
-        for screen_x in (self.window_x as usize)..SCREEN_WIDTH {
-            let (y, overflow) = self.scan_line.overflowing_sub(self.window_y);
-            if !overflow && (y as usize) < SCREEN_HEIGHT {
-                let color = get_palette_color(self.window[y as usize][screen_x - (self.window_x as usize)], self.background_palette);
+        // Fix: Render window with signed offset calculation
+        let start = self.window_x as i16 - 7;
+        let y = self.scan_line.wrapping_sub(self.window_y);
+
+        if self.scan_line < self.window_y || y as usize >= SCREEN_HEIGHT {
+            return;
+        }
+
+        for screen_x in (start.max(0) as usize)..SCREEN_WIDTH {
+            let window_col = (screen_x as i16 - start) as usize;
+            // Only render if we're not outside of valid window area horizontally
+            if window_col < 256 {
+                let color = get_palette_color(self.window[y as usize][window_col], self.background_palette);
                 self.screen_buffer[self.scan_line as usize][screen_x] = color;
             }
         }
@@ -482,7 +491,7 @@ impl Gpu {
             0x48 => self.obj_palette_0,
             0x49 => self.obj_palette_1,
             0x4A => self.window_y,
-            0x4B => self.window_x.wrapping_add(7),
+            0x4B => self.window_x,
             _ => panic!("Invalid read address for GPU"),
         }
     }
@@ -500,7 +509,7 @@ impl Gpu {
             0x48 => self.obj_palette_0 = val,
             0x49 => self.obj_palette_1 = val,
             0x4A => self.window_y = val,
-            0x4B => self.window_x = val.wrapping_sub(7),
+            0x4B => self.window_x = val,
             _ => panic!("Invalid write address for GPU"),
         }
     }
